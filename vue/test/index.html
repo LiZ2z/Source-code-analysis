@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>test</title>
+
+</head>
+<body>
+
+    <div id="app">
+        <h1>{{msg}}</h1>
+        <h2>{{msg}}</h1>
+        <h3>{{msg}}</h1>
+        <h4>{{msg}}</h1>
+        <h5>{{msg}}</h1>
+        <h6>{{msg}}</h1>
+        <input type="text" v-model='msg'>
+        <child/>
+    </div>
+    <div id="extend">
+      {{firstName}}
+
+    </div>
+    <template id='child'>
+      <div>
+        {{childMsg}}
+      </div>
+    </template>
+
+<script type="text/javascript" src='vue.js'></script>
+<script type="text/javascript">
+
+  Vue.component('child',{
+    template: '#child',
+    data() {
+      return {
+        childMsg: 'child'
+      }
+    },
+    created() {
+      this.$emit('a', 'HEHEH')
+
+    }
+  })
+
+    new Vue({
+        el: '#app',
+        data: {
+            msg: '123'
+        },
+        watch: {
+          msg: function(v) {
+            console.log(v)
+          }
+        },
+        methods: {
+          test () {
+
+
+          },
+        },
+        created() {
+
+            console.log('-------------实例' ,this, '实例-------------')
+
+            this.$watch(function () {
+                return this.mSg
+            }, function(newV, old) {
+                console.log(newV, old)
+            },{
+                // immediate: true,
+                deep: true,
+                lazy: true
+            })
+        },
+        mounted() {
+          
+
+        }
+    })
+
+
+var Profile = Vue.extend({
+  template: '#extend',
+  data: function () {
+    return {
+      firstName: 'Walter',
+      lastName: 'White',
+      alias: 'Heisenberg'
+    }
+  }
+})
+
+new Profile()
+
+/*-------------------------------*/
+  // vm._c = (a, b, c, d) => createElement(vm, a, b, c, d, false)
+
+  
+</script>
+</body>
+</html>
