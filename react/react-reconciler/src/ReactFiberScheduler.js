@@ -1611,6 +1611,7 @@ function computeExpirationForFiber(currentTime: ExpirationTime, fiber: Fiber) {
     // performing work. Calculate a new expiration time.
     if (fiber.mode & ConcurrentMode) {
       if (isBatchingInteractiveUpdates) {
+          // 交互式更新
         // This is an interactive update
         expirationTime = computeInteractiveExpiration(currentTime);
       } else {
@@ -2083,8 +2084,7 @@ function requestCurrentTime() {
     nextFlushedExpirationTime === NoWork ||
     nextFlushedExpirationTime === Never
   ) {
-    // If there's no pending work, or if the pending work is offscreen, we can
-    // read the current time without risk of tearing.
+    // If there's no pending work, or if the pending work is offscreen, we can read the current time without risk of tearing.
     recomputeCurrentRendererTime();
     currentSchedulerTime = currentRendererTime;
     return currentSchedulerTime;

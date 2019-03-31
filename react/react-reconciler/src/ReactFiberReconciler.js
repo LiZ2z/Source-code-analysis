@@ -33,7 +33,7 @@ import {getPublicInstance} from './ReactFiberHostConfig';
 import {
   findCurrentUnmaskedContext,
   processChildContext,
-  emptyContextObject,
+  emptyContextObject, // {}
   isContextProvider as isLegacyContextProvider,
 } from './ReactFiberContext';
 import {createFiberRoot} from './ReactFiberRoot';
@@ -91,12 +91,12 @@ if (__DEV__) {
   didWarnAboutNestedUpdates = false;
   didWarnAboutFindNodeInStrictMode = {};
 }
-
+// callers: [updateContainerAtExpirationTime, ]
 function getContextForSubtree(
   parentComponent: ?React$Component<any, any>,
 ): Object {
   if (!parentComponent) {
-    return emptyContextObject;
+    return emptyContextObject; // {}
   }
 
   const fiber = getInstance(parentComponent);
@@ -111,7 +111,10 @@ function getContextForSubtree(
 
   return parentContext;
 }
-
+/**
+ * @caller: [updateContainerAtExpirationTime](就在下面)
+ * 
+ */
 function scheduleRootUpdate(
   current: Fiber,
   element: ReactNodeList,
@@ -158,7 +161,11 @@ function scheduleRootUpdate(
 
   return expirationTime;
 }
-
+/**
+ * @caller: [updateContainer](294)
+ * @params: [ReactNodeList, root {FiberRoot} ,null, work._onCommit]
+ * 
+ */
 export function updateContainerAtExpirationTime(
   element: ReactNodeList,
   container: OpaqueRoot,
@@ -180,7 +187,7 @@ export function updateContainerAtExpirationTime(
       }
     }
   }
-
+  // 返回值： {} ||
   const context = getContextForSubtree(parentComponent);
   if (container.context === null) {
     container.context = context;
@@ -272,6 +279,11 @@ function findHostInstanceWithWarning(
   return findHostInstance(component);
 }
 
+/**
+ * @caller: [ReactRoot.prototype.render](@react-dom/src/client/ReactDOM.js)
+ * @params: [div, false,false]
+ * @return: root {FiberRoot}
+ */
 export function createContainer(
   containerInfo: Container,
   isConcurrent: boolean,
@@ -279,7 +291,11 @@ export function createContainer(
 ): OpaqueRoot {
   return createFiberRoot(containerInfo, isConcurrent, hydrate);
 }
-
+/**
+ * @caller: [ReactRoot.prototype.render](@react-dom/src/client/ReactDOM.js)
+ * @params: [ReactNodeList, root {FiberRoot} ,null, work._onCommit]
+ * @return: 
+ */
 export function updateContainer(
   element: ReactNodeList,
   container: OpaqueRoot,

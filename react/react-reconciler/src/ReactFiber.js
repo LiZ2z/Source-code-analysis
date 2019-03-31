@@ -19,35 +19,36 @@ import type {HookType} from './ReactFiberHooks';
 
 import invariant from 'shared/invariant';
 import warningWithoutStack from 'shared/warningWithoutStack';
+// __PROFILE__   Trace which interactions trigger each commit.
 import {enableProfilerTimer} from 'shared/ReactFeatureFlags';
 import {NoEffect} from 'shared/ReactSideEffectTags';
 import {
   IndeterminateComponent,
-  ClassComponent,
-  HostRoot,
-  HostComponent,
-  HostText,
-  HostPortal,
-  ForwardRef,
-  Fragment,
-  Mode,
-  ContextProvider,
-  ContextConsumer,
-  Profiler,
-  SuspenseComponent,
-  FunctionComponent,
-  MemoComponent,
-  LazyComponent,
+  ClassComponent, // 1
+  HostRoot, // 3
+  HostComponent,// 5
+  HostText, // 6
+  HostPortal, //4
+  ForwardRef, // 11
+  Fragment, // 7
+  Mode, // 8
+  ContextProvider, // 10
+  ContextConsumer, // 9
+  Profiler,  // 12
+  SuspenseComponent, // 13
+  FunctionComponent, // 0
+  MemoComponent, // 14
+  LazyComponent, // 16
 } from 'shared/ReactWorkTags';
 import getComponentName from 'shared/getComponentName';
 
 import {isDevToolsPresent} from './ReactFiberDevToolsHook';
 import {NoWork} from './ReactFiberExpirationTime';
 import {
-  NoContext,
-  ConcurrentMode,
-  ProfileMode,
-  StrictMode,
+  NoContext, // 0b000
+  ConcurrentMode, // 0b001
+  ProfileMode, // 0b100
+  StrictMode, // 0b010
 } from './ReactTypeOfMode';
 import {
   REACT_FORWARD_REF_TYPE,
@@ -424,7 +425,9 @@ export function createWorkInProgress(
   return workInProgress;
 }
 
+
 export function createHostRootFiber(isConcurrent: boolean): Fiber {
+    //   同时发生的           1               2    1|2 === 3   0
   let mode = isConcurrent ? ConcurrentMode | StrictMode : NoContext;
 
   if (enableProfilerTimer && isDevToolsPresent) {
@@ -433,7 +436,7 @@ export function createHostRootFiber(isConcurrent: boolean): Fiber {
     // Without some nodes in the tree having empty base times.
     mode |= ProfileMode;
   }
-
+    //  HostRoot = 3;  Root of a host tree. Could be nested inside another node.
   return createFiber(HostRoot, null, null, mode);
 }
 

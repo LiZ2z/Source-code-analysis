@@ -1,12 +1,6 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- *
- * @flow
+ * Hydrate 用于服务端渲染
  */
-
 import type {ReactNodeList} from 'shared/ReactTypes';
 // TODO: This type is shared between the reconciler and ReactDOM, but will
 // eventually be lifted out to the renderer.
@@ -361,14 +355,17 @@ ReactWork.prototype._onCommit = function(): void {
     callback();
   }
 };
-
+/**
+ * @caller: legacyCreateRootFromDOMContainer
+ * @params: [ div, false, false ]
+ */
 function ReactRoot(
   container: DOMContainer,
   isConcurrent: boolean,
   hydrate: boolean,
 ) {
   const root = createContainer(container, isConcurrent, hydrate);
-  this._internalRoot = root;
+  this._internalRoot = root;  // internal 本质的
 }
 ReactRoot.prototype.render = function(
   children: ReactNodeList,
@@ -492,13 +489,20 @@ setBatchingImplementation(
 
 let warnedAboutHydrateAPI = false;
 
+
+/**
+ * @caller: legacyRenderSubtreeIntoContainer
+ * @params: [div, false]
+ */
 function legacyCreateRootFromDOMContainer(
   container: DOMContainer,
   forceHydrate: boolean,
 ): Root {
+    // 对于普通的div 返回 false
   const shouldHydrate =
     forceHydrate || shouldHydrateDueToLegacyHeuristic(container);
-  // First clear any existing content.
+//   First clear any existing content.
+  // 清除所有container中的内容（节点）
   if (!shouldHydrate) {
     let warned = false;
     let rootSibling;
@@ -536,7 +540,11 @@ function legacyCreateRootFromDOMContainer(
   const isConcurrent = false;
   return new ReactRoot(container, isConcurrent, shouldHydrate);
 }
-
+// L.S
+/**
+ * @caller: ReactDOM.render
+ * @params: [null,React$Element, div, false, callback]
+ */
 function legacyRenderSubtreeIntoContainer(
   parentComponent: ?React$Component<any, any>,
   children: ReactNodeList,
@@ -551,6 +559,7 @@ function legacyRenderSubtreeIntoContainer(
   // TODO: Without `any` type, Flow says "Property cannot be accessed on any
   // member of intersection type." Whyyyyyy.
   let root: Root = (container._reactRootContainer: any);
+  // container._reactRootContainer 不存在，第一次挂载
   if (!root) {
     // Initial mount
     root = container._reactRootContainer = legacyCreateRootFromDOMContainer(
@@ -564,7 +573,7 @@ function legacyRenderSubtreeIntoContainer(
         originalCallback.call(instance);
       };
     }
-    // Initial mount should not be batched.
+    // Initial mount should not be batched. //batched 批处理
     unbatchedUpdates(() => {
       if (parentComponent != null) {
         root.legacy_renderSubtreeIntoContainer(
@@ -576,7 +585,9 @@ function legacyRenderSubtreeIntoContainer(
         root.render(children, callback);
       }
     });
-  } else {
+  } 
+  // 如果 container._reactRootContainer 存在
+  else {
     if (typeof callback === 'function') {
       const originalCallback = callback;
       callback = function() {
@@ -669,7 +680,7 @@ const ReactDOM: Object = {
       callback,
     );
   },
-
+  // ReactDOM.render
   render(
     element: React$Element<any>,
     container: DOMContainer,

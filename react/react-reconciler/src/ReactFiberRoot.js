@@ -15,6 +15,7 @@ import type {Interaction} from 'scheduler/src/Tracing';
 
 import {noTimeout} from './ReactFiberHostConfig';
 import {createHostRootFiber} from './ReactFiber';
+// export const NoWork = 0;
 import {NoWork} from './ReactFiberExpirationTime';
 import {enableSchedulerTracing} from 'shared/ReactFeatureFlags';
 import {unstable_getThreadID} from 'scheduler/tracing';
@@ -105,9 +106,14 @@ export type FiberRoot = {
   ...ProfilingOnlyFiberRootProperties,
 };
 
+/**
+ * @caller: [createContainer](react-reconciler\src\ReactFiberReconciler.js)
+ * @params: [div, false,false]
+ * @return: root {FiberRoot}
+ */
 export function createFiberRoot(
   containerInfo: any,
-  isConcurrent: boolean,
+  isConcurrent: boolean, // 同时发生的; 同时完成的; 同时存在的; 共点; 同时发生的事件
   hydrate: boolean,
 ): FiberRoot {
   // Cyclic construction. This cheats the type system right now because
@@ -146,7 +152,9 @@ export function createFiberRoot(
       memoizedInteractions: new Set(),
       pendingInteractionMap: new Map(),
     }: FiberRoot);
-  } else {
+  } 
+  
+  else {
     root = ({
       current: uninitializedFiber,
       containerInfo: containerInfo,

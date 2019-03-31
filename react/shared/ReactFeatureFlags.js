@@ -29,6 +29,7 @@ export const warnAboutDeprecatedLifecycles = false;
 export const enableProfilerTimer = __PROFILE__;
 
 // Trace which interactions trigger each commit.
+// 跟踪每次 commit 触发的交互
 export const enableSchedulerTracing = __PROFILE__;
 
 // Only used in www builds.
