@@ -152,7 +152,9 @@ if (__DEV__) {
     currentlyProcessingQueue = null;
   };
 }
-
+/**
+ * @caller: [enqueueUpdate](226)
+ */
 export function createUpdateQueue<State>(baseState: State): UpdateQueue<State> {
   const queue: UpdateQueue<State> = {
     baseState,
@@ -190,11 +192,14 @@ function cloneUpdateQueue<State>(
   return queue;
 }
 
+/**
+ * @caller: [scheduleRootUpdate](./ReactFiberReconciler.js:118)
+ */
 export function createUpdate(expirationTime: ExpirationTime): Update<*> {
   return {
     expirationTime: expirationTime,
 
-    tag: UpdateState,
+    tag: UpdateState, // 0
     payload: null,
     callback: null,
 
@@ -202,7 +207,9 @@ export function createUpdate(expirationTime: ExpirationTime): Update<*> {
     nextEffect: null,
   };
 }
-
+/**
+ * @caller: [enqueueUpdate](226)
+ */
 function appendUpdateToQueue<State>(
   queue: UpdateQueue<State>,
   update: Update<State>,
@@ -217,6 +224,9 @@ function appendUpdateToQueue<State>(
   }
 }
 
+/**
+ * @caller: [scheduleRootUpdate](./ReactFiberReconciler.js:118)
+ */
 export function enqueueUpdate<State>(fiber: Fiber, update: Update<State>) {
   // Update queues are created lazily.
   const alternate = fiber.alternate;

@@ -597,6 +597,9 @@ function markLegacyErrorBoundaryAsFailed(instance: mixed) {
   }
 }
 
+/**
+ * @caller: [scheduleRootUpdate]('./ReactFiberReconciler.js:118')
+ */
 function flushPassiveEffects() {
   if (passiveEffectCallbackHandle !== null) {
     cancelCallback(passiveEffectCallbackHandle);
@@ -1845,7 +1848,11 @@ export function warnIfNotCurrentlyBatchingInDev(fiber: Fiber): void {
     }
   }
 }
-
+/**
+ * @caller: [scheduleRootUpdate](./ReactFiberReconciler.js:118)
+ * @param {*} fiber 
+ * @param {*} expirationTime 
+ */
 function scheduleWork(fiber: Fiber, expirationTime: ExpirationTime) {
   const root = scheduleWorkToRoot(fiber, expirationTime);
   if (root === null) {
