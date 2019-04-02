@@ -85,6 +85,7 @@ function getClientEnvironment(publicUrl) {
       env[key] = JSON.stringify(raw[key]);
       return env;
     }, {}),
+    '__REACT_DEVTOOLS_GLOBAL_HOOK__': JSON.stringify(true)
   };
 
   return { raw, stringified };

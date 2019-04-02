@@ -1,19 +1,8 @@
-/** @license React v16.8.6
- * react-dom-unstable-fire.development.js
- *
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
-'use strict';
-
-(function (global, factory) {
-	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react')) :
-	typeof define === 'function' && define.amd ? define(['react'], factory) :
-	(global.ReactFire = factory(global.React));
-}(this, (function (React) { 'use strict';
+var React = require('react');
+var _assign = require('object-assign');
+var checkPropTypes = require('prop-types/checkPropTypes');
+var scheduler = require('scheduler');
+var tracing = require('scheduler/tracing');
 
 /**
  * Use invariant() to assert state which your program assumes to be true.
@@ -29,189 +18,190 @@
 var validateFormat = function () {};
 
 {
-  validateFormat = function (format) {
-    if (format === undefined) {
-      throw new Error('invariant requires an error message argument');
-    }
-  };
+    validateFormat = function (format) {
+        if (format === undefined) {
+            throw new Error('invariant requires an error message argument');
+        }
+    };
 }
 
 function invariant(condition, format, a, b, c, d, e, f) {
-  validateFormat(format);
+    validateFormat(format);
 
-  if (!condition) {
-    var error = void 0;
-    if (format === undefined) {
-      error = new Error('Minified exception occurred; use the non-minified dev environment ' + 'for the full error message and additional helpful warnings.');
-    } else {
-      var args = [a, b, c, d, e, f];
-      var argIndex = 0;
-      error = new Error(format.replace(/%s/g, function () {
-        return args[argIndex++];
-      }));
-      error.name = 'Invariant Violation';
+    if (!condition) {
+        var error = undefined;
+        if (format === undefined) {
+            error = new Error('Minified exception occurred; use the non-minified dev environment ' + 'for the full error message and additional helpful warnings.');
+        } else {
+            var args = [a, b, c, d, e, f];
+            var argIndex = 0;
+            error = new Error(format.replace(/%s/g, function () {
+                return args[argIndex++];
+            }));
+            error.name = 'Invariant Violation';
+        }
+
+        error.framesToPop = 1; // we don't care about invariant's own frame
+        throw error;
     }
-
-    error.framesToPop = 1; // we don't care about invariant's own frame
-    throw error;
-  }
 }
 
 // Relying on the `invariant()` implementation lets us
 // preserve the format and params in the www builds.
 
-!React ? invariant(false, 'ReactDOM was loaded before React. Make sure you load the React package before loading ReactDOM.') : void 0;
+!React ? invariant(false, 'ReactDOM was loaded before React. Make sure you load the React package before loading ReactDOM.') : undefined;
 
 var invokeGuardedCallbackImpl = function (name, func, context, a, b, c, d, e, f) {
-  var funcArgs = Array.prototype.slice.call(arguments, 3);
-  try {
-    func.apply(context, funcArgs);
-  } catch (error) {
-    this.onError(error);
-  }
+    var funcArgs = Array.prototype.slice.call(arguments, 3);
+    try {
+        func.apply(context, funcArgs);
+    } catch (error) {
+        this.onError(error);
+    }
 };
 
 {
-  // In DEV mode, we swap out invokeGuardedCallback for a special version
-  // that plays more nicely with the browser's DevTools. The idea is to preserve
-  // "Pause on exceptions" behavior. Because React wraps all user-provided
-  // functions in invokeGuardedCallback, and the production version of
-  // invokeGuardedCallback uses a try-catch, all user exceptions are treated
-  // like caught exceptions, and the DevTools won't pause unless the developer
-  // takes the extra step of enabling pause on caught exceptions. This is
-  // unintuitive, though, because even though React has caught the error, from
-  // the developer's perspective, the error is uncaught.
-  //
-  // To preserve the expected "Pause on exceptions" behavior, we don't use a
-  // try-catch in DEV. Instead, we synchronously dispatch a fake event to a fake
-  // DOM node, and call the user-provided callback from inside an event handler
-  // for that fake event. If the callback throws, the error is "captured" using
-  // a global event handler. But because the error happens in a different
-  // event loop context, it does not interrupt the normal program flow.
-  // Effectively, this gives us try-catch behavior without actually using
-  // try-catch. Neat!
+    // In DEV mode, we swap out invokeGuardedCallback for a special version
+    // that plays more nicely with the browser's DevTools. The idea is to preserve
+    // "Pause on exceptions" behavior. Because React wraps all user-provided
+    // functions in invokeGuardedCallback, and the production version of
+    // invokeGuardedCallback uses a try-catch, all user exceptions are treated
+    // like caught exceptions, and the DevTools won't pause unless the developer
+    // takes the extra step of enabling pause on caught exceptions. This is
+    // unintuitive, though, because even though React has caught the error, from
+    // the developer's perspective, the error is uncaught.
+    //
+    // To preserve the expected "Pause on exceptions" behavior, we don't use a
+    // try-catch in DEV. Instead, we synchronously dispatch a fake event to a fake
+    // DOM node, and call the user-provided callback from inside an event handler
+    // for that fake event. If the callback throws, the error is "captured" using
+    // a global event handler. But because the error happens in a different
+    // event loop context, it does not interrupt the normal program flow.
+    // Effectively, this gives us try-catch behavior without actually using
+    // try-catch. Neat!
 
-  // Check that the browser supports the APIs we need to implement our special
-  // DEV version of invokeGuardedCallback
-  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof document !== 'undefined' && typeof document.createEvent === 'function') {
-    var fakeNode = document.createElement('react');
+    // Check that the browser supports the APIs we need to implement our special
+    // DEV version of invokeGuardedCallback
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof document !== 'undefined' && typeof document.createEvent === 'function') {
+        var fakeNode = document.createElement('react');
 
-    var invokeGuardedCallbackDev = function (name, func, context, a, b, c, d, e, f) {
-      // If document doesn't exist we know for sure we will crash in this method
-      // when we call document.createEvent(). However this can cause confusing
-      // errors: https://github.com/facebookincubator/create-react-app/issues/3482
-      // So we preemptively throw with a better message instead.
-      !(typeof document !== 'undefined') ? invariant(false, 'The `document` global was defined when React was initialized, but is not defined anymore. This can happen in a test environment if a component schedules an update from an asynchronous callback, but the test has already finished running. To solve this, you can either unmount the component at the end of your test (and ensure that any asynchronous operations get canceled in `componentWillUnmount`), or you can change the test itself to be asynchronous.') : void 0;
-      var evt = document.createEvent('Event');
+        var invokeGuardedCallbackDev = function (name, func, context, a, b, c, d, e, f) {
+            // If document doesn't exist we know for sure we will crash in this method
+            // when we call document.createEvent(). However this can cause confusing
+            // errors: https://github.com/facebookincubator/create-react-app/issues/3482
+            // So we preemptively throw with a better message instead.
+            !(typeof document !== 'undefined') ? invariant(false, 'The `document` global was defined when React was initialized, but is not defined anymore. This can happen in a test environment if a component schedules an update from an asynchronous callback, but the test has already finished running. To solve this, you can either unmount the component at the end of your test (and ensure that any asynchronous operations get canceled in `componentWillUnmount`), or you can change the test itself to be asynchronous.'): undefined;
+            var evt = document.createEvent('Event');
 
-      // Keeps track of whether the user-provided callback threw an error. We
-      // set this to true at the beginning, then set it to false right after
-      // calling the function. If the function errors, `didError` will never be
-      // set to false. This strategy works even if the browser is flaky and
-      // fails to call our global error handler, because it doesn't rely on
-      // the error event at all.
-      var didError = true;
+            // Keeps track of whether the user-provided callback threw an error. We
+            // set this to true at the beginning, then set it to false right after
+            // calling the function. If the function errors, `didError` will never be
+            // set to false. This strategy works even if the browser is flaky and
+            // fails to call our global error handler, because it doesn't rely on
+            // the error event at all.
+            var didError = true;
 
-      // Keeps track of the value of window.event so that we can reset it
-      // during the callback to let user code access window.event in the
-      // browsers that support it.
-      var windowEvent = window.event;
+            // Keeps track of the value of window.event so that we can reset it
+            // during the callback to let user code access window.event in the
+            // browsers that support it.
+            var windowEvent = window.event;
 
-      // Keeps track of the descriptor of window.event to restore it after event
-      // dispatching: https://github.com/facebook/react/issues/13688
-      var windowEventDescriptor = Object.getOwnPropertyDescriptor(window, 'event');
+            // Keeps track of the descriptor of window.event to restore it after event
+            // dispatching: https://github.com/facebook/react/issues/13688
+            var windowEventDescriptor = Object.getOwnPropertyDescriptor(window, 'event');
 
-      // Create an event handler for our fake event. We will synchronously
-      // dispatch our fake event using `dispatchEvent`. Inside the handler, we
-      // call the user-provided callback.
-      var funcArgs = Array.prototype.slice.call(arguments, 3);
-      function callCallback() {
-        // We immediately remove the callback from event listeners so that
-        // nested `invokeGuardedCallback` calls do not clash. Otherwise, a
-        // nested call would trigger the fake event handlers of any call higher
-        // in the stack.
-        fakeNode.removeEventListener(evtType, callCallback, false);
+            // Create an event handler for our fake event. We will synchronously
+            // dispatch our fake event using `dispatchEvent`. Inside the handler, we
+            // call the user-provided callback.
+            var funcArgs = Array.prototype.slice.call(arguments, 3);
 
-        // We check for window.hasOwnProperty('event') to prevent the
-        // window.event assignment in both IE <= 10 as they throw an error
-        // "Member not found" in strict mode, and in Firefox which does not
-        // support window.event.
-        if (typeof window.event !== 'undefined' && window.hasOwnProperty('event')) {
-          window.event = windowEvent;
-        }
+            function callCallback() {
+                // We immediately remove the callback from event listeners so that
+                // nested `invokeGuardedCallback` calls do not clash. Otherwise, a
+                // nested call would trigger the fake event handlers of any call higher
+                // in the stack.
+                fakeNode.removeEventListener(evtType, callCallback, false);
 
-        func.apply(context, funcArgs);
-        didError = false;
-      }
+                // We check for window.hasOwnProperty('event') to prevent the
+                // window.event assignment in both IE <= 10 as they throw an error
+                // "Member not found" in strict mode, and in Firefox which does not
+                // support window.event.
+                if (typeof window.event !== 'undefined' && window.hasOwnProperty('event')) {
+                    window.event = windowEvent;
+                }
 
-      // Create a global error event handler. We use this to capture the value
-      // that was thrown. It's possible that this error handler will fire more
-      // than once; for example, if non-React code also calls `dispatchEvent`
-      // and a handler for that event throws. We should be resilient to most of
-      // those cases. Even if our error event handler fires more than once, the
-      // last error event is always used. If the callback actually does error,
-      // we know that the last error event is the correct one, because it's not
-      // possible for anything else to have happened in between our callback
-      // erroring and the code that follows the `dispatchEvent` call below. If
-      // the callback doesn't error, but the error event was fired, we know to
-      // ignore it because `didError` will be false, as described above.
-      var error = void 0;
-      // Use this to track whether the error event is ever called.
-      var didSetError = false;
-      var isCrossOriginError = false;
-
-      function handleWindowError(event) {
-        error = event.error;
-        didSetError = true;
-        if (error === null && event.colno === 0 && event.lineno === 0) {
-          isCrossOriginError = true;
-        }
-        if (event.defaultPrevented) {
-          // Some other error handler has prevented default.
-          // Browsers silence the error report if this happens.
-          // We'll remember this to later decide whether to log it or not.
-          if (error != null && typeof error === 'object') {
-            try {
-              error._suppressLogging = true;
-            } catch (inner) {
-              // Ignore.
+                func.apply(context, funcArgs);
+                didError = false;
             }
-          }
-        }
-      }
 
-      // Create a fake event type.
-      var evtType = 'react-' + (name ? name : 'invokeguardedcallback');
+            // Create a global error event handler. We use this to capture the value
+            // that was thrown. It's possible that this error handler will fire more
+            // than once; for example, if non-React code also calls `dispatchEvent`
+            // and a handler for that event throws. We should be resilient to most of
+            // those cases. Even if our error event handler fires more than once, the
+            // last error event is always used. If the callback actually does error,
+            // we know that the last error event is the correct one, because it's not
+            // possible for anything else to have happened in between our callback
+            // erroring and the code that follows the `dispatchEvent` call below. If
+            // the callback doesn't error, but the error event was fired, we know to
+            // ignore it because `didError` will be false, as described above.
+            var error = undefined;
+            // Use this to track whether the error event is ever called.
+            var didSetError = false;
+            var isCrossOriginError = false;
 
-      // Attach our event handlers
-      window.addEventListener('error', handleWindowError);
-      fakeNode.addEventListener(evtType, callCallback, false);
+            function handleWindowError(event) {
+                error = event.error;
+                didSetError = true;
+                if (error === null && event.colno === 0 && event.lineno === 0) {
+                    isCrossOriginError = true;
+                }
+                if (event.defaultPrevented) {
+                    // Some other error handler has prevented default.
+                    // Browsers silence the error report if this happens.
+                    // We'll remember this to later decide whether to log it or not.
+                    if (error != null && typeof error === 'object') {
+                        try {
+                            error._suppressLogging = true;
+                        } catch (inner) {
+                            // Ignore.
+                        }
+                    }
+                }
+            }
 
-      // Synchronously dispatch our fake event. If the user-provided function
-      // errors, it will trigger our global error handler.
-      evt.initEvent(evtType, false, false);
-      fakeNode.dispatchEvent(evt);
+            // Create a fake event type.
+            var evtType = 'react-' + (name ? name : 'invokeguardedcallback');
 
-      if (windowEventDescriptor) {
-        Object.defineProperty(window, 'event', windowEventDescriptor);
-      }
+            // Attach our event handlers
+            window.addEventListener('error', handleWindowError);
+            fakeNode.addEventListener(evtType, callCallback, false);
 
-      if (didError) {
-        if (!didSetError) {
-          // The callback errored, but the error event never fired.
-          error = new Error('An error was thrown inside one of your components, but React ' + "doesn't know what it was. This is likely due to browser " + 'flakiness. React does its best to preserve the "Pause on ' + 'exceptions" behavior of the DevTools, which requires some ' + "DEV-mode only tricks. It's possible that these don't work in " + 'your browser. Try triggering the error in production mode, ' + 'or switching to a modern browser. If you suspect that this is ' + 'actually an issue with React, please file an issue.');
-        } else if (isCrossOriginError) {
-          error = new Error("A cross-origin error was thrown. React doesn't have access to " + 'the actual error object in development. ' + 'See https://fb.me/react-crossorigin-error for more information.');
-        }
-        this.onError(error);
-      }
+            // Synchronously dispatch our fake event. If the user-provided function
+            // errors, it will trigger our global error handler.
+            evt.initEvent(evtType, false, false);
+            fakeNode.dispatchEvent(evt);
 
-      // Remove our event listeners
-      window.removeEventListener('error', handleWindowError);
-    };
+            if (windowEventDescriptor) {
+                Object.defineProperty(window, 'event', windowEventDescriptor);
+            }
 
-    invokeGuardedCallbackImpl = invokeGuardedCallbackDev;
-  }
+            if (didError) {
+                if (!didSetError) {
+                    // The callback errored, but the error event never fired.
+                    error = new Error('An error was thrown inside one of your components, but React ' + "doesn't know what it was. This is likely due to browser " + 'flakiness. React does its best to preserve the "Pause on ' + 'exceptions" behavior of the DevTools, which requires some ' + "DEV-mode only tricks. It's possible that these don't work in " + 'your browser. Try triggering the error in production mode, ' + 'or switching to a modern browser. If you suspect that this is ' + 'actually an issue with React, please file an issue.');
+                } else if (isCrossOriginError) {
+                    error = new Error("A cross-origin error was thrown. React doesn't have access to " + 'the actual error object in development. ' + 'See https://fb.me/react-crossorigin-error for more information.');
+                }
+                this.onError(error);
+            }
+
+            // Remove our event listeners
+            window.removeEventListener('error', handleWindowError);
+        };
+
+        invokeGuardedCallbackImpl = invokeGuardedCallbackDev;
+    }
 }
 
 var invokeGuardedCallbackImpl$1 = invokeGuardedCallbackImpl;
@@ -225,10 +215,10 @@ var hasRethrowError = false;
 var rethrowError = null;
 
 var reporter = {
-  onError: function (error) {
-    hasError = true;
-    caughtError = error;
-  }
+    onError: function (error) {
+        hasError = true;
+        caughtError = error;
+    }
 };
 
 /**
@@ -245,9 +235,9 @@ var reporter = {
  * @param {...*} args Arguments for function
  */
 function invokeGuardedCallback(name, func, context, a, b, c, d, e, f) {
-  hasError = false;
-  caughtError = null;
-  invokeGuardedCallbackImpl$1.apply(reporter, arguments);
+    hasError = false;
+    caughtError = null;
+    invokeGuardedCallbackImpl$1.apply(reporter, arguments);
 }
 
 /**
@@ -261,14 +251,14 @@ function invokeGuardedCallback(name, func, context, a, b, c, d, e, f) {
  * @param {...*} args Arguments for function
  */
 function invokeGuardedCallbackAndCatchFirstError(name, func, context, a, b, c, d, e, f) {
-  invokeGuardedCallback.apply(this, arguments);
-  if (hasError) {
-    var error = clearCaughtError();
-    if (!hasRethrowError) {
-      hasRethrowError = true;
-      rethrowError = error;
+    invokeGuardedCallback.apply(this, arguments);
+    if (hasError) {
+        var error = clearCaughtError();
+        if (!hasRethrowError) {
+            hasRethrowError = true;
+            rethrowError = error;
+        }
     }
-  }
 }
 
 /**
@@ -276,27 +266,27 @@ function invokeGuardedCallbackAndCatchFirstError(name, func, context, a, b, c, d
  * we will rethrow to be handled by the top level error handler.
  */
 function rethrowCaughtError() {
-  if (hasRethrowError) {
-    var error = rethrowError;
-    hasRethrowError = false;
-    rethrowError = null;
-    throw error;
-  }
+    if (hasRethrowError) {
+        var error = rethrowError;
+        hasRethrowError = false;
+        rethrowError = null;
+        throw error;
+    }
 }
 
 function hasCaughtError() {
-  return hasError;
+    return hasError;
 }
 
 function clearCaughtError() {
-  if (hasError) {
-    var error = caughtError;
-    hasError = false;
-    caughtError = null;
-    return error;
-  } else {
-    invariant(false, 'clearCaughtError was called but no error was captured. This error is likely caused by a bug in React. Please file an issue.');
-  }
+    if (hasError) {
+        var error = caughtError;
+        hasError = false;
+        caughtError = null;
+        return error;
+    } else {
+        invariant(false, 'clearCaughtError was called but no error was captured. This error is likely caused by a bug in React. Please file an issue.');
+    }
 }
 
 /**
@@ -315,24 +305,23 @@ var namesToPlugins = {};
  * @private
  */
 function recomputePluginOrdering() {
-  if (!eventPluginOrder) {
-    // Wait until an `eventPluginOrder` is injected.
-    return;
-  }
-  for (var pluginName in namesToPlugins) {
-    var pluginModule = namesToPlugins[pluginName];
-    var pluginIndex = eventPluginOrder.indexOf(pluginName);
-    !(pluginIndex > -1) ? invariant(false, 'EventPluginRegistry: Cannot inject event plugins that do not exist in the plugin ordering, `%s`.', pluginName) : void 0;
-    if (plugins[pluginIndex]) {
-      continue;
+    if (!eventPluginOrder) {
+        // Wait until an `eventPluginOrder` is injected.
+        return;
     }
-    !pluginModule.extractEvents ? invariant(false, 'EventPluginRegistry: Event plugins must implement an `extractEvents` method, but `%s` does not.', pluginName) : void 0;
-    plugins[pluginIndex] = pluginModule;
-    var publishedEvents = pluginModule.eventTypes;
-    for (var eventName in publishedEvents) {
-      !publishEventForPlugin(publishedEvents[eventName], pluginModule, eventName) ? invariant(false, 'EventPluginRegistry: Failed to publish event `%s` for plugin `%s`.', eventName, pluginName) : void 0;
+    for (var pluginName in namesToPlugins) {
+        var pluginModule = namesToPlugins[pluginName];
+        var pluginIndex = eventPluginOrder.indexOf(pluginName);
+        !(pluginIndex > -1) ? invariant(false, 'EventPluginRegistry: Cannot inject event plugins that do not exist in the plugin ordering, `%s`.', pluginName): undefined;
+        if (plugins[pluginIndex]) {
+            continue;
+        }!pluginModule.extractEvents ? invariant(false, 'EventPluginRegistry: Event plugins must implement an `extractEvents` method, but `%s` does not.', pluginName) : undefined;
+        plugins[pluginIndex] = pluginModule;
+        var publishedEvents = pluginModule.eventTypes;
+        for (var eventName in publishedEvents) {
+            !publishEventForPlugin(publishedEvents[eventName], pluginModule, eventName) ? invariant(false, 'EventPluginRegistry: Failed to publish event `%s` for plugin `%s`.', eventName, pluginName) : undefined;
+        }
     }
-  }
 }
 
 /**
@@ -344,23 +333,23 @@ function recomputePluginOrdering() {
  * @private
  */
 function publishEventForPlugin(dispatchConfig, pluginModule, eventName) {
-  !!eventNameDispatchConfigs.hasOwnProperty(eventName) ? invariant(false, 'EventPluginHub: More than one plugin attempted to publish the same event name, `%s`.', eventName) : void 0;
-  eventNameDispatchConfigs[eventName] = dispatchConfig;
+    !!eventNameDispatchConfigs.hasOwnProperty(eventName) ? invariant(false, 'EventPluginHub: More than one plugin attempted to publish the same event name, `%s`.', eventName) : undefined;
+    eventNameDispatchConfigs[eventName] = dispatchConfig;
 
-  var phasedRegistrationNames = dispatchConfig.phasedRegistrationNames;
-  if (phasedRegistrationNames) {
-    for (var phaseName in phasedRegistrationNames) {
-      if (phasedRegistrationNames.hasOwnProperty(phaseName)) {
-        var phasedRegistrationName = phasedRegistrationNames[phaseName];
-        publishRegistrationName(phasedRegistrationName, pluginModule, eventName);
-      }
+    var phasedRegistrationNames = dispatchConfig.phasedRegistrationNames;
+    if (phasedRegistrationNames) {
+        for (var phaseName in phasedRegistrationNames) {
+            if (phasedRegistrationNames.hasOwnProperty(phaseName)) {
+                var phasedRegistrationName = phasedRegistrationNames[phaseName];
+                publishRegistrationName(phasedRegistrationName, pluginModule, eventName);
+            }
+        }
+        return true;
+    } else if (dispatchConfig.registrationName) {
+        publishRegistrationName(dispatchConfig.registrationName, pluginModule, eventName);
+        return true;
     }
-    return true;
-  } else if (dispatchConfig.registrationName) {
-    publishRegistrationName(dispatchConfig.registrationName, pluginModule, eventName);
-    return true;
-  }
-  return false;
+    return false;
 }
 
 /**
@@ -371,18 +360,18 @@ function publishEventForPlugin(dispatchConfig, pluginModule, eventName) {
  * @private
  */
 function publishRegistrationName(registrationName, pluginModule, eventName) {
-  !!registrationNameModules[registrationName] ? invariant(false, 'EventPluginHub: More than one plugin attempted to publish the same registration name, `%s`.', registrationName) : void 0;
-  registrationNameModules[registrationName] = pluginModule;
-  registrationNameDependencies[registrationName] = pluginModule.eventTypes[eventName].dependencies;
+    !!registrationNameModules[registrationName] ? invariant(false, 'EventPluginHub: More than one plugin attempted to publish the same registration name, `%s`.', registrationName) : undefined;
+    registrationNameModules[registrationName] = pluginModule;
+    registrationNameDependencies[registrationName] = pluginModule.eventTypes[eventName].dependencies;
 
-  {
-    var lowerCasedName = registrationName.toLowerCase();
-    possibleRegistrationNames[lowerCasedName] = registrationName;
+    {
+        var lowerCasedName = registrationName.toLowerCase();
+        possibleRegistrationNames[lowerCasedName] = registrationName;
 
-    if (registrationName === 'onDoubleClick') {
-      possibleRegistrationNames.ondblclick = registrationName;
+        if (registrationName === 'onDoubleClick') {
+            possibleRegistrationNames.ondblclick = registrationName;
+        }
     }
-  }
 }
 
 /**
@@ -430,10 +419,10 @@ var possibleRegistrationNames = {};
  * @see {EventPluginHub.injection.injectEventPluginOrder}
  */
 function injectEventPluginOrder(injectedEventPluginOrder) {
-  !!eventPluginOrder ? invariant(false, 'EventPluginRegistry: Cannot inject event plugin ordering more than once. You are likely trying to load more than one copy of React.') : void 0;
-  // Clone the ordering so it cannot be dynamically mutated.
-  eventPluginOrder = Array.prototype.slice.call(injectedEventPluginOrder);
-  recomputePluginOrdering();
+    !!eventPluginOrder ? invariant(false, 'EventPluginRegistry: Cannot inject event plugin ordering more than once. You are likely trying to load more than one copy of React.') : undefined;
+    // Clone the ordering so it cannot be dynamically mutated.
+    eventPluginOrder = Array.prototype.slice.call(injectedEventPluginOrder);
+    recomputePluginOrdering();
 }
 
 /**
@@ -447,21 +436,21 @@ function injectEventPluginOrder(injectedEventPluginOrder) {
  * @see {EventPluginHub.injection.injectEventPluginsByName}
  */
 function injectEventPluginsByName(injectedNamesToPlugins) {
-  var isOrderingDirty = false;
-  for (var pluginName in injectedNamesToPlugins) {
-    if (!injectedNamesToPlugins.hasOwnProperty(pluginName)) {
-      continue;
+    var isOrderingDirty = false;
+    for (var pluginName in injectedNamesToPlugins) {
+        if (!injectedNamesToPlugins.hasOwnProperty(pluginName)) {
+            continue;
+        }
+        var pluginModule = injectedNamesToPlugins[pluginName];
+        if (!namesToPlugins.hasOwnProperty(pluginName) || namesToPlugins[pluginName] !== pluginModule) {
+            !!namesToPlugins[pluginName] ? invariant(false, 'EventPluginRegistry: Cannot inject two different event plugins using the same name, `%s`.', pluginName) : undefined;
+            namesToPlugins[pluginName] = pluginModule;
+            isOrderingDirty = true;
+        }
     }
-    var pluginModule = injectedNamesToPlugins[pluginName];
-    if (!namesToPlugins.hasOwnProperty(pluginName) || namesToPlugins[pluginName] !== pluginModule) {
-      !!namesToPlugins[pluginName] ? invariant(false, 'EventPluginRegistry: Cannot inject two different event plugins using the same name, `%s`.', pluginName) : void 0;
-      namesToPlugins[pluginName] = pluginModule;
-      isOrderingDirty = true;
+    if (isOrderingDirty) {
+        recomputePluginOrdering();
     }
-  }
-  if (isOrderingDirty) {
-    recomputePluginOrdering();
-  }
 }
 
 /**
@@ -474,42 +463,42 @@ function injectEventPluginsByName(injectedNamesToPlugins) {
 var warningWithoutStack = function () {};
 
 {
-  warningWithoutStack = function (condition, format) {
-    for (var _len = arguments.length, args = Array(_len > 2 ? _len - 2 : 0), _key = 2; _key < _len; _key++) {
-      args[_key - 2] = arguments[_key];
-    }
+    warningWithoutStack = function (condition, format) {
+        for (var _len = arguments.length, args = Array(_len > 2 ? _len - 2 : 0), _key = 2; _key < _len; _key++) {
+            args[_key - 2] = arguments[_key];
+        }
 
-    if (format === undefined) {
-      throw new Error('`warningWithoutStack(condition, format, ...args)` requires a warning ' + 'message argument');
-    }
-    if (args.length > 8) {
-      // Check before the condition to catch violations early.
-      throw new Error('warningWithoutStack() currently supports at most 8 arguments.');
-    }
-    if (condition) {
-      return;
-    }
-    if (typeof console !== 'undefined') {
-      var argsWithFormat = args.map(function (item) {
-        return '' + item;
-      });
-      argsWithFormat.unshift('Warning: ' + format);
+        if (format === undefined) {
+            throw new Error('`warningWithoutStack(condition, format, ...args)` requires a warning ' + 'message argument');
+        }
+        if (args.length > 8) {
+            // Check before the condition to catch violations early.
+            throw new Error('warningWithoutStack() currently supports at most 8 arguments.');
+        }
+        if (condition) {
+            return;
+        }
+        if (typeof console !== 'undefined') {
+            var argsWithFormat = args.map(function (item) {
+                return '' + item;
+            });
+            argsWithFormat.unshift('Warning: ' + format);
 
-      // We intentionally don't use spread (or .apply) directly because it
-      // breaks IE9: https://github.com/facebook/react/issues/13610
-      Function.prototype.apply.call(console.error, console, argsWithFormat);
-    }
-    try {
-      // --- Welcome to debugging React ---
-      // This error was thrown as a convenience so that you can use this stack
-      // to find the callsite that caused this warning to fire.
-      var argIndex = 0;
-      var message = 'Warning: ' + format.replace(/%s/g, function () {
-        return args[argIndex++];
-      });
-      throw new Error(message);
-    } catch (x) {}
-  };
+            // We intentionally don't use spread (or .apply) directly because it
+            // breaks IE9: https://github.com/facebook/react/issues/13610
+            Function.prototype.apply.call(console.error, console, argsWithFormat);
+        }
+        try {
+            // --- Welcome to debugging React ---
+            // This error was thrown as a convenience so that you can use this stack
+            // to find the callsite that caused this warning to fire.
+            var argIndex = 0;
+            var message = 'Warning: ' + format.replace(/%s/g, function () {
+                return args[argIndex++];
+            });
+            throw new Error(message);
+        } catch (x) {}
+    };
 }
 
 var warningWithoutStack$1 = warningWithoutStack;
@@ -519,28 +508,26 @@ var getInstanceFromNode = null;
 var getNodeFromInstance = null;
 
 function setComponentTree(getFiberCurrentPropsFromNodeImpl, getInstanceFromNodeImpl, getNodeFromInstanceImpl) {
-  getFiberCurrentPropsFromNode = getFiberCurrentPropsFromNodeImpl;
-  getInstanceFromNode = getInstanceFromNodeImpl;
-  getNodeFromInstance = getNodeFromInstanceImpl;
-  {
-    !(getNodeFromInstance && getInstanceFromNode) ? warningWithoutStack$1(false, 'EventPluginUtils.setComponentTree(...): Injected ' + 'module is missing getNodeFromInstance or getInstanceFromNode.') : void 0;
-  }
+    getFiberCurrentPropsFromNode = getFiberCurrentPropsFromNodeImpl;
+    getInstanceFromNode = getInstanceFromNodeImpl;
+    getNodeFromInstance = getNodeFromInstanceImpl; {
+        !(getNodeFromInstance && getInstanceFromNode) ? warningWithoutStack$1(false, 'EventPluginUtils.setComponentTree(...): Injected ' + 'module is missing getNodeFromInstance or getInstanceFromNode.'): undefined;
+    }
 }
 
-var validateEventDispatches = void 0;
-{
-  validateEventDispatches = function (event) {
-    var dispatchListeners = event._dispatchListeners;
-    var dispatchInstances = event._dispatchInstances;
+var validateEventDispatches = undefined; {
+    validateEventDispatches = function (event) {
+        var dispatchListeners = event._dispatchListeners;
+        var dispatchInstances = event._dispatchInstances;
 
-    var listenersIsArr = Array.isArray(dispatchListeners);
-    var listenersLen = listenersIsArr ? dispatchListeners.length : dispatchListeners ? 1 : 0;
+        var listenersIsArr = Array.isArray(dispatchListeners);
+        var listenersLen = listenersIsArr ? dispatchListeners.length : dispatchListeners ? 1 : 0;
 
-    var instancesIsArr = Array.isArray(dispatchInstances);
-    var instancesLen = instancesIsArr ? dispatchInstances.length : dispatchInstances ? 1 : 0;
+        var instancesIsArr = Array.isArray(dispatchInstances);
+        var instancesLen = instancesIsArr ? dispatchInstances.length : dispatchInstances ? 1 : 0;
 
-    !(instancesIsArr === listenersIsArr && instancesLen === listenersLen) ? warningWithoutStack$1(false, 'EventPluginUtils: Invalid `event`.') : void 0;
-  };
+        !(instancesIsArr === listenersIsArr && instancesLen === listenersLen) ? warningWithoutStack$1(false, 'EventPluginUtils: Invalid `event`.'): undefined;
+    };
 }
 
 /**
@@ -550,34 +537,33 @@ var validateEventDispatches = void 0;
  * @param {*} inst Internal component instance
  */
 function executeDispatch(event, listener, inst) {
-  var type = event.type || 'unknown-event';
-  event.currentTarget = getNodeFromInstance(inst);
-  invokeGuardedCallbackAndCatchFirstError(type, listener, undefined, event);
-  event.currentTarget = null;
+    var type = event.type || 'unknown-event';
+    event.currentTarget = getNodeFromInstance(inst);
+    invokeGuardedCallbackAndCatchFirstError(type, listener, undefined, event);
+    event.currentTarget = null;
 }
 
 /**
  * Standard/simple iteration through an event's collected dispatches.
  */
 function executeDispatchesInOrder(event) {
-  var dispatchListeners = event._dispatchListeners;
-  var dispatchInstances = event._dispatchInstances;
-  {
-    validateEventDispatches(event);
-  }
-  if (Array.isArray(dispatchListeners)) {
-    for (var i = 0; i < dispatchListeners.length; i++) {
-      if (event.isPropagationStopped()) {
-        break;
-      }
-      // Listeners and Instances are two parallel arrays that are always in sync.
-      executeDispatch(event, dispatchListeners[i], dispatchInstances[i]);
+    var dispatchListeners = event._dispatchListeners;
+    var dispatchInstances = event._dispatchInstances; {
+        validateEventDispatches(event);
     }
-  } else if (dispatchListeners) {
-    executeDispatch(event, dispatchListeners, dispatchInstances);
-  }
-  event._dispatchListeners = null;
-  event._dispatchInstances = null;
+    if (Array.isArray(dispatchListeners)) {
+        for (var i = 0; i < dispatchListeners.length; i++) {
+            if (event.isPropagationStopped()) {
+                break;
+            }
+            // Listeners and Instances are two parallel arrays that are always in sync.
+            executeDispatch(event, dispatchListeners[i], dispatchInstances[i]);
+        }
+    } else if (dispatchListeners) {
+        executeDispatch(event, dispatchListeners, dispatchInstances);
+    }
+    event._dispatchListeners = null;
+    event._dispatchInstances = null;
 }
 
 /**
@@ -615,29 +601,29 @@ function executeDispatchesInOrder(event) {
  */
 
 function accumulateInto(current, next) {
-  !(next != null) ? invariant(false, 'accumulateInto(...): Accumulated items must not be null or undefined.') : void 0;
+    !(next != null) ? invariant(false, 'accumulateInto(...): Accumulated items must not be null or undefined.'): undefined;
 
-  if (current == null) {
-    return next;
-  }
-
-  // Both are not empty. Warning: Never call x.concat(y) when you are not
-  // certain that x is an Array (x could be a string with concat method).
-  if (Array.isArray(current)) {
-    if (Array.isArray(next)) {
-      current.push.apply(current, next);
-      return current;
+    if (current == null) {
+        return next;
     }
-    current.push(next);
-    return current;
-  }
 
-  if (Array.isArray(next)) {
-    // A bit too dangerous to mutate `next`.
-    return [current].concat(next);
-  }
+    // Both are not empty. Warning: Never call x.concat(y) when you are not
+    // certain that x is an Array (x could be a string with concat method).
+    if (Array.isArray(current)) {
+        if (Array.isArray(next)) {
+            current.push.apply(current, next);
+            return current;
+        }
+        current.push(next);
+        return current;
+    }
 
-  return [current, next];
+    if (Array.isArray(next)) {
+        // A bit too dangerous to mutate `next`.
+        return [current].concat(next);
+    }
+
+    return [current, next];
 }
 
 /**
@@ -650,11 +636,11 @@ function accumulateInto(current, next) {
  * @param {?} [scope] Scope used as `this` in a callback.
  */
 function forEachAccumulated(arr, cb, scope) {
-  if (Array.isArray(arr)) {
-    arr.forEach(cb, scope);
-  } else if (arr) {
-    cb.call(scope, arr);
-  }
+    if (Array.isArray(arr)) {
+        arr.forEach(cb, scope);
+    } else if (arr) {
+        cb.call(scope, arr);
+    }
 }
 
 /**
@@ -670,38 +656,38 @@ var eventQueue = null;
  * @private
  */
 var executeDispatchesAndRelease = function (event) {
-  if (event) {
-    executeDispatchesInOrder(event);
+    if (event) {
+        executeDispatchesInOrder(event);
 
-    if (!event.isPersistent()) {
-      event.constructor.release(event);
+        if (!event.isPersistent()) {
+            event.constructor.release(event);
+        }
     }
-  }
 };
 var executeDispatchesAndReleaseTopLevel = function (e) {
-  return executeDispatchesAndRelease(e);
+    return executeDispatchesAndRelease(e);
 };
 
 function isInteractive(tag) {
-  return tag === 'button' || tag === 'input' || tag === 'select' || tag === 'textarea';
+    return tag === 'button' || tag === 'input' || tag === 'select' || tag === 'textarea';
 }
 
 function shouldPreventMouseEvent(name, type, props) {
-  switch (name) {
-    case 'onClick':
-    case 'onClickCapture':
-    case 'onDoubleClick':
-    case 'onDoubleClickCapture':
-    case 'onMouseDown':
-    case 'onMouseDownCapture':
-    case 'onMouseMove':
-    case 'onMouseMoveCapture':
-    case 'onMouseUp':
-    case 'onMouseUpCapture':
-      return !!(props.disabled && isInteractive(type));
-    default:
-      return false;
-  }
+    switch (name) {
+        case 'onClick':
+        case 'onClickCapture':
+        case 'onDoubleClick':
+        case 'onDoubleClickCapture':
+        case 'onMouseDown':
+        case 'onMouseDownCapture':
+        case 'onMouseMove':
+        case 'onMouseMoveCapture':
+        case 'onMouseUp':
+        case 'onMouseUpCapture':
+            return !!(props.disabled && isInteractive(type));
+        default:
+            return false;
+    }
 }
 
 /**
@@ -731,16 +717,16 @@ function shouldPreventMouseEvent(name, type, props) {
  * Methods for injecting dependencies.
  */
 var injection = {
-  /**
-   * @param {array} InjectedEventPluginOrder
-   * @public
-   */
-  injectEventPluginOrder: injectEventPluginOrder,
+    /**
+     * @param {array} InjectedEventPluginOrder
+     * @public
+     */
+    injectEventPluginOrder: injectEventPluginOrder,
 
-  /**
-   * @param {object} injectedNamesToPlugins Map from names to plugin modules.
-   */
-  injectEventPluginsByName: injectEventPluginsByName
+    /**
+     * @param {object} injectedNamesToPlugins Map from names to plugin modules.
+     */
+    injectEventPluginsByName: injectEventPluginsByName
 };
 
 /**
@@ -749,26 +735,25 @@ var injection = {
  * @return {?function} The stored callback.
  */
 function getListener(inst, registrationName) {
-  var listener = void 0;
+    var listener = undefined;
 
-  // TODO: shouldPreventMouseEvent is DOM-specific and definitely should not
-  // live here; needs to be moved to a better place soon
-  var stateNode = inst.stateNode;
-  if (!stateNode) {
-    // Work in progress (ex: onload events in incremental mode).
-    return null;
-  }
-  var props = getFiberCurrentPropsFromNode(stateNode);
-  if (!props) {
-    // Work in progress.
-    return null;
-  }
-  listener = props[registrationName];
-  if (shouldPreventMouseEvent(registrationName, inst.type, props)) {
-    return null;
-  }
-  !(!listener || typeof listener === 'function') ? invariant(false, 'Expected `%s` listener to be a function, instead got a value of `%s` type.', registrationName, typeof listener) : void 0;
-  return listener;
+    // TODO: shouldPreventMouseEvent is DOM-specific and definitely should not
+    // live here; needs to be moved to a better place soon
+    var stateNode = inst.stateNode;
+    if (!stateNode) {
+        // Work in progress (ex: onload events in incremental mode).
+        return null;
+    }
+    var props = getFiberCurrentPropsFromNode(stateNode);
+    if (!props) {
+        // Work in progress.
+        return null;
+    }
+    listener = props[registrationName];
+    if (shouldPreventMouseEvent(registrationName, inst.type, props)) {
+        return null;
+    }!(!listener || typeof listener === 'function') ? invariant(false, 'Expected `%s` listener to be a function, instead got a value of `%s` type.', registrationName, typeof listener): undefined;
+    return listener;
 }
 
 /**
@@ -779,43 +764,43 @@ function getListener(inst, registrationName) {
  * @internal
  */
 function extractEvents(topLevelType, targetInst, nativeEvent, nativeEventTarget) {
-  var events = null;
-  for (var i = 0; i < plugins.length; i++) {
-    // Not every plugin in the ordering may be loaded at runtime.
-    var possiblePlugin = plugins[i];
-    if (possiblePlugin) {
-      var extractedEvents = possiblePlugin.extractEvents(topLevelType, targetInst, nativeEvent, nativeEventTarget);
-      if (extractedEvents) {
-        events = accumulateInto(events, extractedEvents);
-      }
+    var events = null;
+    for (var i = 0; i < plugins.length; i++) {
+        // Not every plugin in the ordering may be loaded at runtime.
+        var possiblePlugin = plugins[i];
+        if (possiblePlugin) {
+            var extractedEvents = possiblePlugin.extractEvents(topLevelType, targetInst, nativeEvent, nativeEventTarget);
+            if (extractedEvents) {
+                events = accumulateInto(events, extractedEvents);
+            }
+        }
     }
-  }
-  return events;
+    return events;
 }
 
 function runEventsInBatch(events) {
-  if (events !== null) {
-    eventQueue = accumulateInto(eventQueue, events);
-  }
+    if (events !== null) {
+        eventQueue = accumulateInto(eventQueue, events);
+    }
 
-  // Set `eventQueue` to null before processing it so that we can tell if more
-  // events get enqueued while processing.
-  var processingEventQueue = eventQueue;
-  eventQueue = null;
+    // Set `eventQueue` to null before processing it so that we can tell if more
+    // events get enqueued while processing.
+    var processingEventQueue = eventQueue;
+    eventQueue = null;
 
-  if (!processingEventQueue) {
-    return;
-  }
+    if (!processingEventQueue) {
+        return;
+    }
 
-  forEachAccumulated(processingEventQueue, executeDispatchesAndReleaseTopLevel);
-  !!eventQueue ? invariant(false, 'processEventQueue(): Additional events were enqueued while processing an event queue. Support for this has not yet been implemented.') : void 0;
-  // This would be a good time to rethrow if any of the event handlers threw.
-  rethrowCaughtError();
+    forEachAccumulated(processingEventQueue, executeDispatchesAndReleaseTopLevel);
+    !!eventQueue ? invariant(false, 'processEventQueue(): Additional events were enqueued while processing an event queue. Support for this has not yet been implemented.') : undefined;
+    // This would be a good time to rethrow if any of the event handlers threw.
+    rethrowCaughtError();
 }
 
 function runExtractedEventsInBatch(topLevelType, targetInst, nativeEvent, nativeEventTarget) {
-  var events = extractEvents(topLevelType, targetInst, nativeEvent, nativeEventTarget);
-  runEventsInBatch(events);
+    var events = extractEvents(topLevelType, targetInst, nativeEvent, nativeEventTarget);
+    runEventsInBatch(events);
 }
 
 var FunctionComponent = 0;
@@ -843,7 +828,7 @@ var internalInstanceKey = '__reactInternalInstance$' + randomKey;
 var internalEventHandlersKey = '__reactEventHandlers$' + randomKey;
 
 function precacheFiberNode(hostInst, node) {
-  node[internalInstanceKey] = hostInst;
+    node[internalInstanceKey] = hostInst;
 }
 
 /**
@@ -851,27 +836,27 @@ function precacheFiberNode(hostInst, node) {
  * ReactDOMTextComponent instance ancestor.
  */
 function getClosestInstanceFromNode(node) {
-  if (node[internalInstanceKey]) {
-    return node[internalInstanceKey];
-  }
-
-  while (!node[internalInstanceKey]) {
-    if (node.parentNode) {
-      node = node.parentNode;
-    } else {
-      // Top of the tree. This node must not be part of a React tree (or is
-      // unmounted, potentially).
-      return null;
+    if (node[internalInstanceKey]) {
+        return node[internalInstanceKey];
     }
-  }
 
-  var inst = node[internalInstanceKey];
-  if (inst.tag === HostComponent || inst.tag === HostText) {
-    // In Fiber, this will always be the deepest root.
-    return inst;
-  }
+    while (!node[internalInstanceKey]) {
+        if (node.parentNode) {
+            node = node.parentNode;
+        } else {
+            // Top of the tree. This node must not be part of a React tree (or is
+            // unmounted, potentially).
+            return null;
+        }
+    }
 
-  return null;
+    var inst = node[internalInstanceKey];
+    if (inst.tag === HostComponent || inst.tag === HostText) {
+        // In Fiber, this will always be the deepest root.
+        return inst;
+    }
+
+    return null;
 }
 
 /**
@@ -879,15 +864,15 @@ function getClosestInstanceFromNode(node) {
  * instance, or null if the node was not rendered by this React.
  */
 function getInstanceFromNode$1(node) {
-  var inst = node[internalInstanceKey];
-  if (inst) {
-    if (inst.tag === HostComponent || inst.tag === HostText) {
-      return inst;
-    } else {
-      return null;
+    var inst = node[internalInstanceKey];
+    if (inst) {
+        if (inst.tag === HostComponent || inst.tag === HostText) {
+            return inst;
+        } else {
+            return null;
+        }
     }
-  }
-  return null;
+    return null;
 }
 
 /**
@@ -895,38 +880,38 @@ function getInstanceFromNode$1(node) {
  * DOM node.
  */
 function getNodeFromInstance$1(inst) {
-  if (inst.tag === HostComponent || inst.tag === HostText) {
-    // In Fiber this, is just the state node right now. We assume it will be
-    // a host component or host text.
-    return inst.stateNode;
-  }
+    if (inst.tag === HostComponent || inst.tag === HostText) {
+        // In Fiber this, is just the state node right now. We assume it will be
+        // a host component or host text.
+        return inst.stateNode;
+    }
 
-  // Without this first invariant, passing a non-DOM-component triggers the next
-  // invariant for a missing parent, which is super confusing.
-  invariant(false, 'getNodeFromInstance: Invalid argument.');
+    // Without this first invariant, passing a non-DOM-component triggers the next
+    // invariant for a missing parent, which is super confusing.
+    invariant(false, 'getNodeFromInstance: Invalid argument.');
 }
 
 function getFiberCurrentPropsFromNode$1(node) {
-  return node[internalEventHandlersKey] || null;
+    return node[internalEventHandlersKey] || null;
 }
 
 function updateFiberProps(node, props) {
-  node[internalEventHandlersKey] = props;
+    node[internalEventHandlersKey] = props;
 }
 
 function getParent(inst) {
-  do {
-    inst = inst.return;
-    // TODO: If this is a HostRoot we might want to bail out.
-    // That is depending on if we want nested subtrees (layers) to bubble
-    // events to their parent. We could also go through parentNode on the
-    // host node but that wouldn't work for React Native and doesn't let us
-    // do the portal feature.
-  } while (inst && inst.tag !== HostComponent);
-  if (inst) {
-    return inst;
-  }
-  return null;
+    do {
+        inst = inst.return;
+        // TODO: If this is a HostRoot we might want to bail out.
+        // That is depending on if we want nested subtrees (layers) to bubble
+        // events to their parent. We could also go through parentNode on the
+        // host node but that wouldn't work for React Native and doesn't let us
+        // do the portal feature.
+    } while (inst && inst.tag !== HostComponent);
+    if (inst) {
+        return inst;
+    }
+    return null;
 }
 
 /**
@@ -934,37 +919,37 @@ function getParent(inst) {
  * different trees.
  */
 function getLowestCommonAncestor(instA, instB) {
-  var depthA = 0;
-  for (var tempA = instA; tempA; tempA = getParent(tempA)) {
-    depthA++;
-  }
-  var depthB = 0;
-  for (var tempB = instB; tempB; tempB = getParent(tempB)) {
-    depthB++;
-  }
-
-  // If A is deeper, crawl up.
-  while (depthA - depthB > 0) {
-    instA = getParent(instA);
-    depthA--;
-  }
-
-  // If B is deeper, crawl up.
-  while (depthB - depthA > 0) {
-    instB = getParent(instB);
-    depthB--;
-  }
-
-  // Walk in lockstep until we find a match.
-  var depth = depthA;
-  while (depth--) {
-    if (instA === instB || instA === instB.alternate) {
-      return instA;
+    var depthA = 0;
+    for (var tempA = instA; tempA; tempA = getParent(tempA)) {
+        depthA++;
     }
-    instA = getParent(instA);
-    instB = getParent(instB);
-  }
-  return null;
+    var depthB = 0;
+    for (var tempB = instB; tempB; tempB = getParent(tempB)) {
+        depthB++;
+    }
+
+    // If A is deeper, crawl up.
+    while (depthA - depthB > 0) {
+        instA = getParent(instA);
+        depthA--;
+    }
+
+    // If B is deeper, crawl up.
+    while (depthB - depthA > 0) {
+        instB = getParent(instB);
+        depthB--;
+    }
+
+    // Walk in lockstep until we find a match.
+    var depth = depthA;
+    while (depth--) {
+        if (instA === instB || instA === instB.alternate) {
+            return instA;
+        }
+        instA = getParent(instA);
+        instB = getParent(instB);
+    }
+    return null;
 }
 
 /**
@@ -981,18 +966,18 @@ function getLowestCommonAncestor(instA, instB) {
  * Simulates the traversal of a two-phase, capture/bubble event dispatch.
  */
 function traverseTwoPhase(inst, fn, arg) {
-  var path = [];
-  while (inst) {
-    path.push(inst);
-    inst = getParent(inst);
-  }
-  var i = void 0;
-  for (i = path.length; i-- > 0;) {
-    fn(path[i], 'captured', arg);
-  }
-  for (i = 0; i < path.length; i++) {
-    fn(path[i], 'bubbled', arg);
-  }
+    var path = [];
+    while (inst) {
+        path.push(inst);
+        inst = getParent(inst);
+    }
+    var i = undefined;
+    for (i = path.length; i-- > 0;) {
+        fn(path[i], 'captured', arg);
+    }
+    for (i = 0; i < path.length; i++) {
+        fn(path[i], 'bubbled', arg);
+    }
 }
 
 /**
@@ -1003,43 +988,43 @@ function traverseTwoPhase(inst, fn, arg) {
  * "entered" or "left" that element.
  */
 function traverseEnterLeave(from, to, fn, argFrom, argTo) {
-  var common = from && to ? getLowestCommonAncestor(from, to) : null;
-  var pathFrom = [];
-  while (true) {
-    if (!from) {
-      break;
+    var common = from && to ? getLowestCommonAncestor(from, to) : null;
+    var pathFrom = [];
+    while (true) {
+        if (!from) {
+            break;
+        }
+        if (from === common) {
+            break;
+        }
+        var alternate = from.alternate;
+        if (alternate !== null && alternate === common) {
+            break;
+        }
+        pathFrom.push(from);
+        from = getParent(from);
     }
-    if (from === common) {
-      break;
+    var pathTo = [];
+    while (true) {
+        if (!to) {
+            break;
+        }
+        if (to === common) {
+            break;
+        }
+        var _alternate = to.alternate;
+        if (_alternate !== null && _alternate === common) {
+            break;
+        }
+        pathTo.push(to);
+        to = getParent(to);
     }
-    var alternate = from.alternate;
-    if (alternate !== null && alternate === common) {
-      break;
+    for (var i = 0; i < pathFrom.length; i++) {
+        fn(pathFrom[i], 'bubbled', argFrom);
     }
-    pathFrom.push(from);
-    from = getParent(from);
-  }
-  var pathTo = [];
-  while (true) {
-    if (!to) {
-      break;
+    for (var _i = pathTo.length; _i-- > 0;) {
+        fn(pathTo[_i], 'captured', argTo);
     }
-    if (to === common) {
-      break;
-    }
-    var _alternate = to.alternate;
-    if (_alternate !== null && _alternate === common) {
-      break;
-    }
-    pathTo.push(to);
-    to = getParent(to);
-  }
-  for (var i = 0; i < pathFrom.length; i++) {
-    fn(pathFrom[i], 'bubbled', argFrom);
-  }
-  for (var _i = pathTo.length; _i-- > 0;) {
-    fn(pathTo[_i], 'captured', argTo);
-  }
 }
 
 /**
@@ -1047,8 +1032,8 @@ function traverseEnterLeave(from, to, fn, argFrom, argTo) {
  * "phases" of propagation. This finds listeners by a given phase.
  */
 function listenerAtPhase(inst, event, propagationPhase) {
-  var registrationName = event.dispatchConfig.phasedRegistrationNames[propagationPhase];
-  return getListener(inst, registrationName);
+    var registrationName = event.dispatchConfig.phasedRegistrationNames[propagationPhase];
+    return getListener(inst, registrationName);
 }
 
 /**
@@ -1068,14 +1053,14 @@ function listenerAtPhase(inst, event, propagationPhase) {
  * "dispatch" object that pairs the event with the listener.
  */
 function accumulateDirectionalDispatches(inst, phase, event) {
-  {
-    !inst ? warningWithoutStack$1(false, 'Dispatching inst must not be null') : void 0;
-  }
-  var listener = listenerAtPhase(inst, event, phase);
-  if (listener) {
-    event._dispatchListeners = accumulateInto(event._dispatchListeners, listener);
-    event._dispatchInstances = accumulateInto(event._dispatchInstances, inst);
-  }
+    {
+        !inst ? warningWithoutStack$1(false, 'Dispatching inst must not be null') : undefined;
+    }
+    var listener = listenerAtPhase(inst, event, phase);
+    if (listener) {
+        event._dispatchListeners = accumulateInto(event._dispatchListeners, listener);
+        event._dispatchInstances = accumulateInto(event._dispatchInstances, inst);
+    }
 }
 
 /**
@@ -1086,9 +1071,9 @@ function accumulateDirectionalDispatches(inst, phase, event) {
  * have a different target.
  */
 function accumulateTwoPhaseDispatchesSingle(event) {
-  if (event && event.dispatchConfig.phasedRegistrationNames) {
-    traverseTwoPhase(event._targetInst, accumulateDirectionalDispatches, event);
-  }
+    if (event && event.dispatchConfig.phasedRegistrationNames) {
+        traverseTwoPhase(event._targetInst, accumulateDirectionalDispatches, event);
+    }
 }
 
 /**
@@ -1097,14 +1082,14 @@ function accumulateTwoPhaseDispatchesSingle(event) {
  * requiring that the `dispatchMarker` be the same as the dispatched ID.
  */
 function accumulateDispatches(inst, ignoredDirection, event) {
-  if (inst && event && event.dispatchConfig.registrationName) {
-    var registrationName = event.dispatchConfig.registrationName;
-    var listener = getListener(inst, registrationName);
-    if (listener) {
-      event._dispatchListeners = accumulateInto(event._dispatchListeners, listener);
-      event._dispatchInstances = accumulateInto(event._dispatchInstances, inst);
+    if (inst && event && event.dispatchConfig.registrationName) {
+        var registrationName = event.dispatchConfig.registrationName;
+        var listener = getListener(inst, registrationName);
+        if (listener) {
+            event._dispatchListeners = accumulateInto(event._dispatchListeners, listener);
+            event._dispatchInstances = accumulateInto(event._dispatchInstances, inst);
+        }
     }
-  }
 }
 
 /**
@@ -1113,23 +1098,23 @@ function accumulateDispatches(inst, ignoredDirection, event) {
  * @param {SyntheticEvent} event
  */
 function accumulateDirectDispatchesSingle(event) {
-  if (event && event.dispatchConfig.registrationName) {
-    accumulateDispatches(event._targetInst, null, event);
-  }
+    if (event && event.dispatchConfig.registrationName) {
+        accumulateDispatches(event._targetInst, null, event);
+    }
 }
 
 function accumulateTwoPhaseDispatches(events) {
-  forEachAccumulated(events, accumulateTwoPhaseDispatchesSingle);
+    forEachAccumulated(events, accumulateTwoPhaseDispatchesSingle);
 }
 
 
 
 function accumulateEnterLeaveDispatches(leave, enter, from, to) {
-  traverseEnterLeave(from, to, accumulateDispatches, leave, enter);
+    traverseEnterLeave(from, to, accumulateDispatches, leave, enter);
 }
 
 function accumulateDirectDispatches(events) {
-  forEachAccumulated(events, accumulateDirectDispatchesSingle);
+    forEachAccumulated(events, accumulateDirectDispatchesSingle);
 }
 
 var canUseDOM = !!(typeof window !== 'undefined' && window.document && window.document.createElement);
@@ -1139,11 +1124,11 @@ var canUseDOM = !!(typeof window !== 'undefined' && window.document && window.do
 // (It is the only module that is allowed to access these methods.)
 
 function unsafeCastStringToDOMTopLevelType(topLevelType) {
-  return topLevelType;
+    return topLevelType;
 }
 
 function unsafeCastDOMTopLevelTypeToString(topLevelType) {
-  return topLevelType;
+    return topLevelType;
 }
 
 /**
@@ -1154,23 +1139,23 @@ function unsafeCastDOMTopLevelTypeToString(topLevelType) {
  * @returns {object}
  */
 function makePrefixMap(styleProp, eventName) {
-  var prefixes = {};
+    var prefixes = {};
 
-  prefixes[styleProp.toLowerCase()] = eventName.toLowerCase();
-  prefixes['Webkit' + styleProp] = 'webkit' + eventName;
-  prefixes['Moz' + styleProp] = 'moz' + eventName;
+    prefixes[styleProp.toLowerCase()] = eventName.toLowerCase();
+    prefixes['Webkit' + styleProp] = 'webkit' + eventName;
+    prefixes['Moz' + styleProp] = 'moz' + eventName;
 
-  return prefixes;
+    return prefixes;
 }
 
 /**
  * A list of event names to a configurable list of vendor prefixes.
  */
 var vendorPrefixes = {
-  animationend: makePrefixMap('Animation', 'AnimationEnd'),
-  animationiteration: makePrefixMap('Animation', 'AnimationIteration'),
-  animationstart: makePrefixMap('Animation', 'AnimationStart'),
-  transitionend: makePrefixMap('Transition', 'TransitionEnd')
+    animationend: makePrefixMap('Animation', 'AnimationEnd'),
+    animationiteration: makePrefixMap('Animation', 'AnimationIteration'),
+    animationstart: makePrefixMap('Animation', 'AnimationStart'),
+    transitionend: makePrefixMap('Transition', 'TransitionEnd')
 };
 
 /**
@@ -1187,22 +1172,22 @@ var style = {};
  * Bootstrap if a DOM exists.
  */
 if (canUseDOM) {
-  style = document.createElement('div').style;
+    style = document.createElement('div').style;
 
-  // On some platforms, in particular some releases of Android 4.x,
-  // the un-prefixed "animation" and "transition" properties are defined on the
-  // style object but the events that fire will still be prefixed, so we need
-  // to check if the un-prefixed events are usable, and if not remove them from the map.
-  if (!('AnimationEvent' in window)) {
-    delete vendorPrefixes.animationend.animation;
-    delete vendorPrefixes.animationiteration.animation;
-    delete vendorPrefixes.animationstart.animation;
-  }
+    // On some platforms, in particular some releases of Android 4.x,
+    // the un-prefixed "animation" and "transition" properties are defined on the
+    // style object but the events that fire will still be prefixed, so we need
+    // to check if the un-prefixed events are usable, and if not remove them from the map.
+    if (!('AnimationEvent' in window)) {
+        delete vendorPrefixes.animationend.animation;
+        delete vendorPrefixes.animationiteration.animation;
+        delete vendorPrefixes.animationstart.animation;
+    }
 
-  // Same as above
-  if (!('TransitionEvent' in window)) {
-    delete vendorPrefixes.transitionend.transition;
-  }
+    // Same as above
+    if (!('TransitionEvent' in window)) {
+        delete vendorPrefixes.transitionend.transition;
+    }
 }
 
 /**
@@ -1212,21 +1197,21 @@ if (canUseDOM) {
  * @returns {string}
  */
 function getVendorPrefixedEventName(eventName) {
-  if (prefixedEventNames[eventName]) {
-    return prefixedEventNames[eventName];
-  } else if (!vendorPrefixes[eventName]) {
-    return eventName;
-  }
-
-  var prefixMap = vendorPrefixes[eventName];
-
-  for (var styleProp in prefixMap) {
-    if (prefixMap.hasOwnProperty(styleProp) && styleProp in style) {
-      return prefixedEventNames[eventName] = prefixMap[styleProp];
+    if (prefixedEventNames[eventName]) {
+        return prefixedEventNames[eventName];
+    } else if (!vendorPrefixes[eventName]) {
+        return eventName;
     }
-  }
 
-  return eventName;
+    var prefixMap = vendorPrefixes[eventName];
+
+    for (var styleProp in prefixMap) {
+        if (prefixMap.hasOwnProperty(styleProp) && styleProp in style) {
+            return prefixedEventNames[eventName] = prefixMap[styleProp];
+        }
+    }
+
+    return eventName;
 }
 
 /**
@@ -1325,7 +1310,7 @@ var TOP_WHEEL = unsafeCastStringToDOMTopLevelType('wheel');
 var mediaEventTypes = [TOP_ABORT, TOP_CAN_PLAY, TOP_CAN_PLAY_THROUGH, TOP_DURATION_CHANGE, TOP_EMPTIED, TOP_ENCRYPTED, TOP_ENDED, TOP_ERROR, TOP_LOADED_DATA, TOP_LOADED_METADATA, TOP_LOAD_START, TOP_PAUSE, TOP_PLAY, TOP_PLAYING, TOP_PROGRESS, TOP_RATE_CHANGE, TOP_SEEKED, TOP_SEEKING, TOP_STALLED, TOP_SUSPEND, TOP_TIME_UPDATE, TOP_VOLUME_CHANGE, TOP_WAITING];
 
 function getRawEventName(topLevelType) {
-  return unsafeCastDOMTopLevelTypeToString(topLevelType);
+    return unsafeCastDOMTopLevelTypeToString(topLevelType);
 }
 
 /**
@@ -1345,57 +1330,53 @@ var startText = null;
 var fallbackText = null;
 
 function initialize(nativeEventTarget) {
-  root = nativeEventTarget;
-  startText = getText();
-  return true;
+    root = nativeEventTarget;
+    startText = getText();
+    return true;
 }
 
 function reset() {
-  root = null;
-  startText = null;
-  fallbackText = null;
+    root = null;
+    startText = null;
+    fallbackText = null;
 }
 
 function getData() {
-  if (fallbackText) {
+    if (fallbackText) {
+        return fallbackText;
+    }
+
+    var start = undefined;
+    var startValue = startText;
+    var startLength = startValue.length;
+    var end = undefined;
+    var endValue = getText();
+    var endLength = endValue.length;
+
+    for (start = 0; start < startLength; start++) {
+        if (startValue[start] !== endValue[start]) {
+            break;
+        }
+    }
+
+    var minEnd = startLength - start;
+    for (end = 1; end <= minEnd; end++) {
+        if (startValue[startLength - end] !== endValue[endLength - end]) {
+            break;
+        }
+    }
+
+    var sliceTail = end > 1 ? 1 - end : undefined;
+    fallbackText = endValue.slice(start, sliceTail);
     return fallbackText;
-  }
-
-  var start = void 0;
-  var startValue = startText;
-  var startLength = startValue.length;
-  var end = void 0;
-  var endValue = getText();
-  var endLength = endValue.length;
-
-  for (start = 0; start < startLength; start++) {
-    if (startValue[start] !== endValue[start]) {
-      break;
-    }
-  }
-
-  var minEnd = startLength - start;
-  for (end = 1; end <= minEnd; end++) {
-    if (startValue[startLength - end] !== endValue[endLength - end]) {
-      break;
-    }
-  }
-
-  var sliceTail = end > 1 ? 1 - end : undefined;
-  fallbackText = endValue.slice(start, sliceTail);
-  return fallbackText;
 }
 
 function getText() {
-  if ('value' in root) {
-    return root.value;
-  }
-  return root.textContent;
+    if ('value' in root) {
+        return root.value;
+    }
+    return root.textContent;
 }
-
-var ReactInternals = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
-
-var _assign = ReactInternals.assign;
 
 /* eslint valid-typeof: 0 */
 
@@ -1406,28 +1387,28 @@ var EVENT_POOL_SIZE = 10;
  * @see http://www.w3.org/TR/DOM-Level-3-Events/
  */
 var EventInterface = {
-  type: null,
-  target: null,
-  // currentTarget is set when dispatching; no use in copying it here
-  currentTarget: function () {
-    return null;
-  },
-  eventPhase: null,
-  bubbles: null,
-  cancelable: null,
-  timeStamp: function (event) {
-    return event.timeStamp || Date.now();
-  },
-  defaultPrevented: null,
-  isTrusted: null
+    type: null,
+    target: null,
+    // currentTarget is set when dispatching; no use in copying it here
+    currentTarget: function () {
+        return null;
+    },
+    eventPhase: null,
+    bubbles: null,
+    cancelable: null,
+    timeStamp: function (event) {
+        return event.timeStamp || Date.now();
+    },
+    defaultPrevented: null,
+    isTrusted: null
 };
 
 function functionThatReturnsTrue() {
-  return true;
+    return true;
 }
 
 function functionThatReturnsFalse() {
-  return false;
+    return false;
 }
 
 /**
@@ -1449,126 +1430,124 @@ function functionThatReturnsFalse() {
  * @param {DOMEventTarget} nativeEventTarget Target node.
  */
 function SyntheticEvent(dispatchConfig, targetInst, nativeEvent, nativeEventTarget) {
-  {
-    // these have a getter/setter for warnings
-    delete this.nativeEvent;
-    delete this.preventDefault;
-    delete this.stopPropagation;
-    delete this.isDefaultPrevented;
-    delete this.isPropagationStopped;
-  }
-
-  this.dispatchConfig = dispatchConfig;
-  this._targetInst = targetInst;
-  this.nativeEvent = nativeEvent;
-
-  var Interface = this.constructor.Interface;
-  for (var propName in Interface) {
-    if (!Interface.hasOwnProperty(propName)) {
-      continue;
-    }
     {
-      delete this[propName]; // this has a getter/setter for warnings
+        // these have a getter/setter for warnings
+        delete this.nativeEvent;
+        delete this.preventDefault;
+        delete this.stopPropagation;
+        delete this.isDefaultPrevented;
+        delete this.isPropagationStopped;
     }
-    var normalize = Interface[propName];
-    if (normalize) {
-      this[propName] = normalize(nativeEvent);
-    } else {
-      if (propName === 'target') {
-        this.target = nativeEventTarget;
-      } else {
-        this[propName] = nativeEvent[propName];
-      }
-    }
-  }
 
-  var defaultPrevented = nativeEvent.defaultPrevented != null ? nativeEvent.defaultPrevented : nativeEvent.returnValue === false;
-  if (defaultPrevented) {
-    this.isDefaultPrevented = functionThatReturnsTrue;
-  } else {
-    this.isDefaultPrevented = functionThatReturnsFalse;
-  }
-  this.isPropagationStopped = functionThatReturnsFalse;
-  return this;
+    this.dispatchConfig = dispatchConfig;
+    this._targetInst = targetInst;
+    this.nativeEvent = nativeEvent;
+
+    var Interface = this.constructor.Interface;
+    for (var propName in Interface) {
+        if (!Interface.hasOwnProperty(propName)) {
+            continue;
+        } {
+            delete this[propName]; // this has a getter/setter for warnings
+        }
+        var normalize = Interface[propName];
+        if (normalize) {
+            this[propName] = normalize(nativeEvent);
+        } else {
+            if (propName === 'target') {
+                this.target = nativeEventTarget;
+            } else {
+                this[propName] = nativeEvent[propName];
+            }
+        }
+    }
+
+    var defaultPrevented = nativeEvent.defaultPrevented != null ? nativeEvent.defaultPrevented : nativeEvent.returnValue === false;
+    if (defaultPrevented) {
+        this.isDefaultPrevented = functionThatReturnsTrue;
+    } else {
+        this.isDefaultPrevented = functionThatReturnsFalse;
+    }
+    this.isPropagationStopped = functionThatReturnsFalse;
+    return this;
 }
 
 _assign(SyntheticEvent.prototype, {
-  preventDefault: function () {
-    this.defaultPrevented = true;
-    var event = this.nativeEvent;
-    if (!event) {
-      return;
+    preventDefault: function () {
+        this.defaultPrevented = true;
+        var event = this.nativeEvent;
+        if (!event) {
+            return;
+        }
+
+        if (event.preventDefault) {
+            event.preventDefault();
+        } else if (typeof event.returnValue !== 'unknown') {
+            event.returnValue = false;
+        }
+        this.isDefaultPrevented = functionThatReturnsTrue;
+    },
+
+    stopPropagation: function () {
+        var event = this.nativeEvent;
+        if (!event) {
+            return;
+        }
+
+        if (event.stopPropagation) {
+            event.stopPropagation();
+        } else if (typeof event.cancelBubble !== 'unknown') {
+            // The ChangeEventPlugin registers a "propertychange" event for
+            // IE. This event does not support bubbling or cancelling, and
+            // any references to cancelBubble throw "Member not found".  A
+            // typeof check of "unknown" circumvents this issue (and is also
+            // IE specific).
+            event.cancelBubble = true;
+        }
+
+        this.isPropagationStopped = functionThatReturnsTrue;
+    },
+
+    /**
+     * We release all dispatched `SyntheticEvent`s after each event loop, adding
+     * them back into the pool. This allows a way to hold onto a reference that
+     * won't be added back into the pool.
+     */
+    persist: function () {
+        this.isPersistent = functionThatReturnsTrue;
+    },
+
+    /**
+     * Checks if this event should be released back into the pool.
+     *
+     * @return {boolean} True if this should not be released, false otherwise.
+     */
+    isPersistent: functionThatReturnsFalse,
+
+    /**
+     * `PooledClass` looks for `destructor` on each instance it releases.
+     */
+    destructor: function () {
+        var Interface = this.constructor.Interface;
+        for (var propName in Interface) {
+            {
+                Object.defineProperty(this, propName, getPooledWarningPropertyDefinition(propName, Interface[propName]));
+            }
+        }
+        this.dispatchConfig = null;
+        this._targetInst = null;
+        this.nativeEvent = null;
+        this.isDefaultPrevented = functionThatReturnsFalse;
+        this.isPropagationStopped = functionThatReturnsFalse;
+        this._dispatchListeners = null;
+        this._dispatchInstances = null; {
+            Object.defineProperty(this, 'nativeEvent', getPooledWarningPropertyDefinition('nativeEvent', null));
+            Object.defineProperty(this, 'isDefaultPrevented', getPooledWarningPropertyDefinition('isDefaultPrevented', functionThatReturnsFalse));
+            Object.defineProperty(this, 'isPropagationStopped', getPooledWarningPropertyDefinition('isPropagationStopped', functionThatReturnsFalse));
+            Object.defineProperty(this, 'preventDefault', getPooledWarningPropertyDefinition('preventDefault', function () {}));
+            Object.defineProperty(this, 'stopPropagation', getPooledWarningPropertyDefinition('stopPropagation', function () {}));
+        }
     }
-
-    if (event.preventDefault) {
-      event.preventDefault();
-    } else if (typeof event.returnValue !== 'unknown') {
-      event.returnValue = false;
-    }
-    this.isDefaultPrevented = functionThatReturnsTrue;
-  },
-
-  stopPropagation: function () {
-    var event = this.nativeEvent;
-    if (!event) {
-      return;
-    }
-
-    if (event.stopPropagation) {
-      event.stopPropagation();
-    } else if (typeof event.cancelBubble !== 'unknown') {
-      // The ChangeEventPlugin registers a "propertychange" event for
-      // IE. This event does not support bubbling or cancelling, and
-      // any references to cancelBubble throw "Member not found".  A
-      // typeof check of "unknown" circumvents this issue (and is also
-      // IE specific).
-      event.cancelBubble = true;
-    }
-
-    this.isPropagationStopped = functionThatReturnsTrue;
-  },
-
-  /**
-   * We release all dispatched `SyntheticEvent`s after each event loop, adding
-   * them back into the pool. This allows a way to hold onto a reference that
-   * won't be added back into the pool.
-   */
-  persist: function () {
-    this.isPersistent = functionThatReturnsTrue;
-  },
-
-  /**
-   * Checks if this event should be released back into the pool.
-   *
-   * @return {boolean} True if this should not be released, false otherwise.
-   */
-  isPersistent: functionThatReturnsFalse,
-
-  /**
-   * `PooledClass` looks for `destructor` on each instance it releases.
-   */
-  destructor: function () {
-    var Interface = this.constructor.Interface;
-    for (var propName in Interface) {
-      {
-        Object.defineProperty(this, propName, getPooledWarningPropertyDefinition(propName, Interface[propName]));
-      }
-    }
-    this.dispatchConfig = null;
-    this._targetInst = null;
-    this.nativeEvent = null;
-    this.isDefaultPrevented = functionThatReturnsFalse;
-    this.isPropagationStopped = functionThatReturnsFalse;
-    this._dispatchListeners = null;
-    this._dispatchInstances = null;
-    {
-      Object.defineProperty(this, 'nativeEvent', getPooledWarningPropertyDefinition('nativeEvent', null));
-      Object.defineProperty(this, 'isDefaultPrevented', getPooledWarningPropertyDefinition('isDefaultPrevented', functionThatReturnsFalse));
-      Object.defineProperty(this, 'isPropagationStopped', getPooledWarningPropertyDefinition('isPropagationStopped', functionThatReturnsFalse));
-      Object.defineProperty(this, 'preventDefault', getPooledWarningPropertyDefinition('preventDefault', function () {}));
-      Object.defineProperty(this, 'stopPropagation', getPooledWarningPropertyDefinition('stopPropagation', function () {}));
-    }
-  }
 });
 
 SyntheticEvent.Interface = EventInterface;
@@ -1577,24 +1556,24 @@ SyntheticEvent.Interface = EventInterface;
  * Helper to reduce boilerplate when creating subclasses.
  */
 SyntheticEvent.extend = function (Interface) {
-  var Super = this;
+    var Super = this;
 
-  var E = function () {};
-  E.prototype = Super.prototype;
-  var prototype = new E();
+    var E = function () {};
+    E.prototype = Super.prototype;
+    var prototype = new E();
 
-  function Class() {
-    return Super.apply(this, arguments);
-  }
-  _assign(prototype, Class.prototype);
-  Class.prototype = prototype;
-  Class.prototype.constructor = Class;
+    function Class() {
+        return Super.apply(this, arguments);
+    }
+    _assign(prototype, Class.prototype);
+    Class.prototype = prototype;
+    Class.prototype.constructor = Class;
 
-  Class.Interface = _assign({}, Super.Interface, Interface);
-  Class.extend = Super.extend;
-  addEventPoolingTo(Class);
+    Class.Interface = _assign({}, Super.Interface, Interface);
+    Class.extend = Super.extend;
+    addEventPoolingTo(Class);
 
-  return Class;
+    return Class;
 };
 
 addEventPoolingTo(SyntheticEvent);
@@ -1607,55 +1586,55 @@ addEventPoolingTo(SyntheticEvent);
  * @return {object} defineProperty object
  */
 function getPooledWarningPropertyDefinition(propName, getVal) {
-  var isFunction = typeof getVal === 'function';
-  return {
-    configurable: true,
-    set: set,
-    get: get
-  };
+    var isFunction = typeof getVal === 'function';
+    return {
+        configurable: true,
+        set: set,
+        get: get
+    };
 
-  function set(val) {
-    var action = isFunction ? 'setting the method' : 'setting the property';
-    warn(action, 'This is effectively a no-op');
-    return val;
-  }
+    function set(val) {
+        var action = isFunction ? 'setting the method' : 'setting the property';
+        warn(action, 'This is effectively a no-op');
+        return val;
+    }
 
-  function get() {
-    var action = isFunction ? 'accessing the method' : 'accessing the property';
-    var result = isFunction ? 'This is a no-op function' : 'This is set to null';
-    warn(action, result);
-    return getVal;
-  }
+    function get() {
+        var action = isFunction ? 'accessing the method' : 'accessing the property';
+        var result = isFunction ? 'This is a no-op function' : 'This is set to null';
+        warn(action, result);
+        return getVal;
+    }
 
-  function warn(action, result) {
-    var warningCondition = false;
-    !warningCondition ? warningWithoutStack$1(false, "This synthetic event is reused for performance reasons. If you're seeing this, " + "you're %s `%s` on a released/nullified synthetic event. %s. " + 'If you must keep the original synthetic event around, use event.persist(). ' + 'See https://fb.me/react-event-pooling for more information.', action, propName, result) : void 0;
-  }
+    function warn(action, result) {
+        var warningCondition = false;
+        !warningCondition ? warningWithoutStack$1(false, "This synthetic event is reused for performance reasons. If you're seeing this, " + "you're %s `%s` on a released/nullified synthetic event. %s. " + 'If you must keep the original synthetic event around, use event.persist(). ' + 'See https://fb.me/react-event-pooling for more information.', action, propName, result) : undefined;
+    }
 }
 
 function getPooledEvent(dispatchConfig, targetInst, nativeEvent, nativeInst) {
-  var EventConstructor = this;
-  if (EventConstructor.eventPool.length) {
-    var instance = EventConstructor.eventPool.pop();
-    EventConstructor.call(instance, dispatchConfig, targetInst, nativeEvent, nativeInst);
-    return instance;
-  }
-  return new EventConstructor(dispatchConfig, targetInst, nativeEvent, nativeInst);
+    var EventConstructor = this;
+    if (EventConstructor.eventPool.length) {
+        var instance = EventConstructor.eventPool.pop();
+        EventConstructor.call(instance, dispatchConfig, targetInst, nativeEvent, nativeInst);
+        return instance;
+    }
+    return new EventConstructor(dispatchConfig, targetInst, nativeEvent, nativeInst);
 }
 
 function releasePooledEvent(event) {
-  var EventConstructor = this;
-  !(event instanceof EventConstructor) ? invariant(false, 'Trying to release an event instance into a pool of a different type.') : void 0;
-  event.destructor();
-  if (EventConstructor.eventPool.length < EVENT_POOL_SIZE) {
-    EventConstructor.eventPool.push(event);
-  }
+    var EventConstructor = this;
+    !(event instanceof EventConstructor) ? invariant(false, 'Trying to release an event instance into a pool of a different type.'): undefined;
+    event.destructor();
+    if (EventConstructor.eventPool.length < EVENT_POOL_SIZE) {
+        EventConstructor.eventPool.push(event);
+    }
 }
 
 function addEventPoolingTo(EventConstructor) {
-  EventConstructor.eventPool = [];
-  EventConstructor.getPooled = getPooledEvent;
-  EventConstructor.release = releasePooledEvent;
+    EventConstructor.eventPool = [];
+    EventConstructor.getPooled = getPooledEvent;
+    EventConstructor.release = releasePooledEvent;
 }
 
 /**
@@ -1663,7 +1642,7 @@ function addEventPoolingTo(EventConstructor) {
  * @see http://www.w3.org/TR/DOM-Level-3-Events/#events-compositionevents
  */
 var SyntheticCompositionEvent = SyntheticEvent.extend({
-  data: null
+    data: null
 });
 
 /**
@@ -1672,7 +1651,7 @@ var SyntheticCompositionEvent = SyntheticEvent.extend({
  *      /#events-inputevents
  */
 var SyntheticInputEvent = SyntheticEvent.extend({
-  data: null
+    data: null
 });
 
 var END_KEYCODES = [9, 13, 27, 32]; // Tab, Return, Esc, Space
@@ -1682,7 +1661,7 @@ var canUseCompositionEvent = canUseDOM && 'CompositionEvent' in window;
 
 var documentMode = null;
 if (canUseDOM && 'documentMode' in document) {
-  documentMode = document.documentMode;
+    documentMode = document.documentMode;
 }
 
 // Webkit offers a very useful `textInput` event that can be used to
@@ -1700,34 +1679,34 @@ var SPACEBAR_CHAR = String.fromCharCode(SPACEBAR_CODE);
 
 // Events and their corresponding property names.
 var eventTypes = {
-  beforeInput: {
-    phasedRegistrationNames: {
-      bubbled: 'onBeforeInput',
-      captured: 'onBeforeInputCapture'
+    beforeInput: {
+        phasedRegistrationNames: {
+            bubbled: 'onBeforeInput',
+            captured: 'onBeforeInputCapture'
+        },
+        dependencies: [TOP_COMPOSITION_END, TOP_KEY_PRESS, TOP_TEXT_INPUT, TOP_PASTE]
     },
-    dependencies: [TOP_COMPOSITION_END, TOP_KEY_PRESS, TOP_TEXT_INPUT, TOP_PASTE]
-  },
-  compositionEnd: {
-    phasedRegistrationNames: {
-      bubbled: 'onCompositionEnd',
-      captured: 'onCompositionEndCapture'
+    compositionEnd: {
+        phasedRegistrationNames: {
+            bubbled: 'onCompositionEnd',
+            captured: 'onCompositionEndCapture'
+        },
+        dependencies: [TOP_BLUR, TOP_COMPOSITION_END, TOP_KEY_DOWN, TOP_KEY_PRESS, TOP_KEY_UP, TOP_MOUSE_DOWN]
     },
-    dependencies: [TOP_BLUR, TOP_COMPOSITION_END, TOP_KEY_DOWN, TOP_KEY_PRESS, TOP_KEY_UP, TOP_MOUSE_DOWN]
-  },
-  compositionStart: {
-    phasedRegistrationNames: {
-      bubbled: 'onCompositionStart',
-      captured: 'onCompositionStartCapture'
+    compositionStart: {
+        phasedRegistrationNames: {
+            bubbled: 'onCompositionStart',
+            captured: 'onCompositionStartCapture'
+        },
+        dependencies: [TOP_BLUR, TOP_COMPOSITION_START, TOP_KEY_DOWN, TOP_KEY_PRESS, TOP_KEY_UP, TOP_MOUSE_DOWN]
     },
-    dependencies: [TOP_BLUR, TOP_COMPOSITION_START, TOP_KEY_DOWN, TOP_KEY_PRESS, TOP_KEY_UP, TOP_MOUSE_DOWN]
-  },
-  compositionUpdate: {
-    phasedRegistrationNames: {
-      bubbled: 'onCompositionUpdate',
-      captured: 'onCompositionUpdateCapture'
-    },
-    dependencies: [TOP_BLUR, TOP_COMPOSITION_UPDATE, TOP_KEY_DOWN, TOP_KEY_PRESS, TOP_KEY_UP, TOP_MOUSE_DOWN]
-  }
+    compositionUpdate: {
+        phasedRegistrationNames: {
+            bubbled: 'onCompositionUpdate',
+            captured: 'onCompositionUpdateCapture'
+        },
+        dependencies: [TOP_BLUR, TOP_COMPOSITION_UPDATE, TOP_KEY_DOWN, TOP_KEY_PRESS, TOP_KEY_UP, TOP_MOUSE_DOWN]
+    }
 };
 
 // Track whether we've ever handled a keypress on the space key.
@@ -1739,9 +1718,9 @@ var hasSpaceKeypress = false;
  * (cut, copy, select-all, etc.) even though no character is inserted.
  */
 function isKeypressCommand(nativeEvent) {
-  return (nativeEvent.ctrlKey || nativeEvent.altKey || nativeEvent.metaKey) &&
-  // ctrlKey && altKey is equivalent to AltGr, and is not a command.
-  !(nativeEvent.ctrlKey && nativeEvent.altKey);
+    return (nativeEvent.ctrlKey || nativeEvent.altKey || nativeEvent.metaKey) &&
+        // ctrlKey && altKey is equivalent to AltGr, and is not a command.
+        !(nativeEvent.ctrlKey && nativeEvent.altKey);
 }
 
 /**
@@ -1751,14 +1730,14 @@ function isKeypressCommand(nativeEvent) {
  * @return {object}
  */
 function getCompositionEventType(topLevelType) {
-  switch (topLevelType) {
-    case TOP_COMPOSITION_START:
-      return eventTypes.compositionStart;
-    case TOP_COMPOSITION_END:
-      return eventTypes.compositionEnd;
-    case TOP_COMPOSITION_UPDATE:
-      return eventTypes.compositionUpdate;
-  }
+    switch (topLevelType) {
+        case TOP_COMPOSITION_START:
+            return eventTypes.compositionStart;
+        case TOP_COMPOSITION_END:
+            return eventTypes.compositionEnd;
+        case TOP_COMPOSITION_UPDATE:
+            return eventTypes.compositionUpdate;
+    }
 }
 
 /**
@@ -1770,7 +1749,7 @@ function getCompositionEventType(topLevelType) {
  * @return {boolean}
  */
 function isFallbackCompositionStart(topLevelType, nativeEvent) {
-  return topLevelType === TOP_KEY_DOWN && nativeEvent.keyCode === START_KEYCODE;
+    return topLevelType === TOP_KEY_DOWN && nativeEvent.keyCode === START_KEYCODE;
 }
 
 /**
@@ -1781,22 +1760,22 @@ function isFallbackCompositionStart(topLevelType, nativeEvent) {
  * @return {boolean}
  */
 function isFallbackCompositionEnd(topLevelType, nativeEvent) {
-  switch (topLevelType) {
-    case TOP_KEY_UP:
-      // Command keys insert or clear IME input.
-      return END_KEYCODES.indexOf(nativeEvent.keyCode) !== -1;
-    case TOP_KEY_DOWN:
-      // Expect IME keyCode on each keydown. If we get any other
-      // code we must have exited earlier.
-      return nativeEvent.keyCode !== START_KEYCODE;
-    case TOP_KEY_PRESS:
-    case TOP_MOUSE_DOWN:
-    case TOP_BLUR:
-      // Events are not possible without cancelling IME.
-      return true;
-    default:
-      return false;
-  }
+    switch (topLevelType) {
+        case TOP_KEY_UP:
+            // Command keys insert or clear IME input.
+            return END_KEYCODES.indexOf(nativeEvent.keyCode) !== -1;
+        case TOP_KEY_DOWN:
+            // Expect IME keyCode on each keydown. If we get any other
+            // code we must have exited earlier.
+            return nativeEvent.keyCode !== START_KEYCODE;
+        case TOP_KEY_PRESS:
+        case TOP_MOUSE_DOWN:
+        case TOP_BLUR:
+            // Events are not possible without cancelling IME.
+            return true;
+        default:
+            return false;
+    }
 }
 
 /**
@@ -1809,11 +1788,11 @@ function isFallbackCompositionEnd(topLevelType, nativeEvent) {
  * @return {?string}
  */
 function getDataFromCustomEvent(nativeEvent) {
-  var detail = nativeEvent.detail;
-  if (typeof detail === 'object' && 'data' in detail) {
-    return detail.data;
-  }
-  return null;
+    var detail = nativeEvent.detail;
+    if (typeof detail === 'object' && 'data' in detail) {
+        return detail.data;
+    }
+    return null;
 }
 
 /**
@@ -1827,7 +1806,7 @@ function getDataFromCustomEvent(nativeEvent) {
  * @return {boolean}
  */
 function isUsingKoreanIME(nativeEvent) {
-  return nativeEvent.locale === 'ko';
+    return nativeEvent.locale === 'ko';
 }
 
 // Track the current IME composition status, if any.
@@ -1837,50 +1816,50 @@ var isComposing = false;
  * @return {?object} A SyntheticCompositionEvent.
  */
 function extractCompositionEvent(topLevelType, targetInst, nativeEvent, nativeEventTarget) {
-  var eventType = void 0;
-  var fallbackData = void 0;
+    var eventType = undefined;
+    var fallbackData = undefined;
 
-  if (canUseCompositionEvent) {
-    eventType = getCompositionEventType(topLevelType);
-  } else if (!isComposing) {
-    if (isFallbackCompositionStart(topLevelType, nativeEvent)) {
-      eventType = eventTypes.compositionStart;
+    if (canUseCompositionEvent) {
+        eventType = getCompositionEventType(topLevelType);
+    } else if (!isComposing) {
+        if (isFallbackCompositionStart(topLevelType, nativeEvent)) {
+            eventType = eventTypes.compositionStart;
+        }
+    } else if (isFallbackCompositionEnd(topLevelType, nativeEvent)) {
+        eventType = eventTypes.compositionEnd;
     }
-  } else if (isFallbackCompositionEnd(topLevelType, nativeEvent)) {
-    eventType = eventTypes.compositionEnd;
-  }
 
-  if (!eventType) {
-    return null;
-  }
-
-  if (useFallbackCompositionData && !isUsingKoreanIME(nativeEvent)) {
-    // The current composition is stored statically and must not be
-    // overwritten while composition continues.
-    if (!isComposing && eventType === eventTypes.compositionStart) {
-      isComposing = initialize(nativeEventTarget);
-    } else if (eventType === eventTypes.compositionEnd) {
-      if (isComposing) {
-        fallbackData = getData();
-      }
+    if (!eventType) {
+        return null;
     }
-  }
 
-  var event = SyntheticCompositionEvent.getPooled(eventType, targetInst, nativeEvent, nativeEventTarget);
-
-  if (fallbackData) {
-    // Inject data generated from fallback path into the synthetic event.
-    // This matches the property of native CompositionEventInterface.
-    event.data = fallbackData;
-  } else {
-    var customData = getDataFromCustomEvent(nativeEvent);
-    if (customData !== null) {
-      event.data = customData;
+    if (useFallbackCompositionData && !isUsingKoreanIME(nativeEvent)) {
+        // The current composition is stored statically and must not be
+        // overwritten while composition continues.
+        if (!isComposing && eventType === eventTypes.compositionStart) {
+            isComposing = initialize(nativeEventTarget);
+        } else if (eventType === eventTypes.compositionEnd) {
+            if (isComposing) {
+                fallbackData = getData();
+            }
+        }
     }
-  }
 
-  accumulateTwoPhaseDispatches(event);
-  return event;
+    var event = SyntheticCompositionEvent.getPooled(eventType, targetInst, nativeEvent, nativeEventTarget);
+
+    if (fallbackData) {
+        // Inject data generated from fallback path into the synthetic event.
+        // This matches the property of native CompositionEventInterface.
+        event.data = fallbackData;
+    } else {
+        var customData = getDataFromCustomEvent(nativeEvent);
+        if (customData !== null) {
+            event.data = customData;
+        }
+    }
+
+    accumulateTwoPhaseDispatches(event);
+    return event;
 }
 
 /**
@@ -1889,49 +1868,49 @@ function extractCompositionEvent(topLevelType, targetInst, nativeEvent, nativeEv
  * @return {?string} The string corresponding to this `beforeInput` event.
  */
 function getNativeBeforeInputChars(topLevelType, nativeEvent) {
-  switch (topLevelType) {
-    case TOP_COMPOSITION_END:
-      return getDataFromCustomEvent(nativeEvent);
-    case TOP_KEY_PRESS:
-      /**
-       * If native `textInput` events are available, our goal is to make
-       * use of them. However, there is a special case: the spacebar key.
-       * In Webkit, preventing default on a spacebar `textInput` event
-       * cancels character insertion, but it *also* causes the browser
-       * to fall back to its default spacebar behavior of scrolling the
-       * page.
-       *
-       * Tracking at:
-       * https://code.google.com/p/chromium/issues/detail?id=355103
-       *
-       * To avoid this issue, use the keypress event as if no `textInput`
-       * event is available.
-       */
-      var which = nativeEvent.which;
-      if (which !== SPACEBAR_CODE) {
-        return null;
-      }
+    switch (topLevelType) {
+        case TOP_COMPOSITION_END:
+            return getDataFromCustomEvent(nativeEvent);
+        case TOP_KEY_PRESS:
+            /**
+             * If native `textInput` events are available, our goal is to make
+             * use of them. However, there is a special case: the spacebar key.
+             * In Webkit, preventing default on a spacebar `textInput` event
+             * cancels character insertion, but it *also* causes the browser
+             * to fall back to its default spacebar behavior of scrolling the
+             * page.
+             *
+             * Tracking at:
+             * https://code.google.com/p/chromium/issues/detail?id=355103
+             *
+             * To avoid this issue, use the keypress event as if no `textInput`
+             * event is available.
+             */
+            var which = nativeEvent.which;
+            if (which !== SPACEBAR_CODE) {
+                return null;
+            }
 
-      hasSpaceKeypress = true;
-      return SPACEBAR_CHAR;
+            hasSpaceKeypress = true;
+            return SPACEBAR_CHAR;
 
-    case TOP_TEXT_INPUT:
-      // Record the characters to be added to the DOM.
-      var chars = nativeEvent.data;
+        case TOP_TEXT_INPUT:
+            // Record the characters to be added to the DOM.
+            var chars = nativeEvent.data;
 
-      // If it's a spacebar character, assume that we have already handled
-      // it at the keypress level and bail immediately. Android Chrome
-      // doesn't give us keycodes, so we need to ignore it.
-      if (chars === SPACEBAR_CHAR && hasSpaceKeypress) {
-        return null;
-      }
+            // If it's a spacebar character, assume that we have already handled
+            // it at the keypress level and bail immediately. Android Chrome
+            // doesn't give us keycodes, so we need to ignore it.
+            if (chars === SPACEBAR_CHAR && hasSpaceKeypress) {
+                return null;
+            }
 
-      return chars;
+            return chars;
 
-    default:
-      // For other native event types, do nothing.
-      return null;
-  }
+        default:
+            // For other native event types, do nothing.
+            return null;
+    }
 }
 
 /**
@@ -1943,61 +1922,61 @@ function getNativeBeforeInputChars(topLevelType, nativeEvent) {
  * @return {?string} The fallback string for this `beforeInput` event.
  */
 function getFallbackBeforeInputChars(topLevelType, nativeEvent) {
-  // If we are currently composing (IME) and using a fallback to do so,
-  // try to extract the composed characters from the fallback object.
-  // If composition event is available, we extract a string only at
-  // compositionevent, otherwise extract it at fallback events.
-  if (isComposing) {
-    if (topLevelType === TOP_COMPOSITION_END || !canUseCompositionEvent && isFallbackCompositionEnd(topLevelType, nativeEvent)) {
-      var chars = getData();
-      reset();
-      isComposing = false;
-      return chars;
-    }
-    return null;
-  }
-
-  switch (topLevelType) {
-    case TOP_PASTE:
-      // If a paste event occurs after a keypress, throw out the input
-      // chars. Paste events should not lead to BeforeInput events.
-      return null;
-    case TOP_KEY_PRESS:
-      /**
-       * As of v27, Firefox may fire keypress events even when no character
-       * will be inserted. A few possibilities:
-       *
-       * - `which` is `0`. Arrow keys, Esc key, etc.
-       *
-       * - `which` is the pressed key code, but no char is available.
-       *   Ex: 'AltGr + d` in Polish. There is no modified character for
-       *   this key combination and no character is inserted into the
-       *   document, but FF fires the keypress for char code `100` anyway.
-       *   No `input` event will occur.
-       *
-       * - `which` is the pressed key code, but a command combination is
-       *   being used. Ex: `Cmd+C`. No character is inserted, and no
-       *   `input` event will occur.
-       */
-      if (!isKeypressCommand(nativeEvent)) {
-        // IE fires the `keypress` event when a user types an emoji via
-        // Touch keyboard of Windows.  In such a case, the `char` property
-        // holds an emoji character like `\uD83D\uDE0A`.  Because its length
-        // is 2, the property `which` does not represent an emoji correctly.
-        // In such a case, we directly return the `char` property instead of
-        // using `which`.
-        if (nativeEvent.char && nativeEvent.char.length > 1) {
-          return nativeEvent.char;
-        } else if (nativeEvent.which) {
-          return String.fromCharCode(nativeEvent.which);
+    // If we are currently composing (IME) and using a fallback to do so,
+    // try to extract the composed characters from the fallback object.
+    // If composition event is available, we extract a string only at
+    // compositionevent, otherwise extract it at fallback events.
+    if (isComposing) {
+        if (topLevelType === TOP_COMPOSITION_END || !canUseCompositionEvent && isFallbackCompositionEnd(topLevelType, nativeEvent)) {
+            var chars = getData();
+            reset();
+            isComposing = false;
+            return chars;
         }
-      }
-      return null;
-    case TOP_COMPOSITION_END:
-      return useFallbackCompositionData && !isUsingKoreanIME(nativeEvent) ? null : nativeEvent.data;
-    default:
-      return null;
-  }
+        return null;
+    }
+
+    switch (topLevelType) {
+        case TOP_PASTE:
+            // If a paste event occurs after a keypress, throw out the input
+            // chars. Paste events should not lead to BeforeInput events.
+            return null;
+        case TOP_KEY_PRESS:
+            /**
+             * As of v27, Firefox may fire keypress events even when no character
+             * will be inserted. A few possibilities:
+             *
+             * - `which` is `0`. Arrow keys, Esc key, etc.
+             *
+             * - `which` is the pressed key code, but no char is available.
+             *   Ex: 'AltGr + d` in Polish. There is no modified character for
+             *   this key combination and no character is inserted into the
+             *   document, but FF fires the keypress for char code `100` anyway.
+             *   No `input` event will occur.
+             *
+             * - `which` is the pressed key code, but a command combination is
+             *   being used. Ex: `Cmd+C`. No character is inserted, and no
+             *   `input` event will occur.
+             */
+            if (!isKeypressCommand(nativeEvent)) {
+                // IE fires the `keypress` event when a user types an emoji via
+                // Touch keyboard of Windows.  In such a case, the `char` property
+                // holds an emoji character like `\uD83D\uDE0A`.  Because its length
+                // is 2, the property `which` does not represent an emoji correctly.
+                // In such a case, we directly return the `char` property instead of
+                // using `which`.
+                if (nativeEvent.char && nativeEvent.char.length > 1) {
+                    return nativeEvent.char;
+                } else if (nativeEvent.which) {
+                    return String.fromCharCode(nativeEvent.which);
+                }
+            }
+            return null;
+        case TOP_COMPOSITION_END:
+            return useFallbackCompositionData && !isUsingKoreanIME(nativeEvent) ? null : nativeEvent.data;
+        default:
+            return null;
+    }
 }
 
 /**
@@ -2007,25 +1986,25 @@ function getFallbackBeforeInputChars(topLevelType, nativeEvent) {
  * @return {?object} A SyntheticInputEvent.
  */
 function extractBeforeInputEvent(topLevelType, targetInst, nativeEvent, nativeEventTarget) {
-  var chars = void 0;
+    var chars = undefined;
 
-  if (canUseTextInputEvent) {
-    chars = getNativeBeforeInputChars(topLevelType, nativeEvent);
-  } else {
-    chars = getFallbackBeforeInputChars(topLevelType, nativeEvent);
-  }
+    if (canUseTextInputEvent) {
+        chars = getNativeBeforeInputChars(topLevelType, nativeEvent);
+    } else {
+        chars = getFallbackBeforeInputChars(topLevelType, nativeEvent);
+    }
 
-  // If no characters are being inserted, no BeforeInput event should
-  // be fired.
-  if (!chars) {
-    return null;
-  }
+    // If no characters are being inserted, no BeforeInput event should
+    // be fired.
+    if (!chars) {
+        return null;
+    }
 
-  var event = SyntheticInputEvent.getPooled(eventTypes.beforeInput, targetInst, nativeEvent, nativeEventTarget);
+    var event = SyntheticInputEvent.getPooled(eventTypes.beforeInput, targetInst, nativeEvent, nativeEventTarget);
 
-  event.data = chars;
-  accumulateTwoPhaseDispatches(event);
-  return event;
+    event.data = chars;
+    accumulateTwoPhaseDispatches(event);
+    return event;
 }
 
 /**
@@ -2047,23 +2026,23 @@ function extractBeforeInputEvent(topLevelType, targetInst, nativeEvent, nativeEv
  * `composition` event types.
  */
 var BeforeInputEventPlugin = {
-  eventTypes: eventTypes,
+    eventTypes: eventTypes,
 
-  extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
-    var composition = extractCompositionEvent(topLevelType, targetInst, nativeEvent, nativeEventTarget);
+    extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
+        var composition = extractCompositionEvent(topLevelType, targetInst, nativeEvent, nativeEventTarget);
 
-    var beforeInput = extractBeforeInputEvent(topLevelType, targetInst, nativeEvent, nativeEventTarget);
+        var beforeInput = extractBeforeInputEvent(topLevelType, targetInst, nativeEvent, nativeEventTarget);
 
-    if (composition === null) {
-      return beforeInput;
+        if (composition === null) {
+            return beforeInput;
+        }
+
+        if (beforeInput === null) {
+            return composition;
+        }
+
+        return [composition, beforeInput];
     }
-
-    if (beforeInput === null) {
-      return composition;
-    }
-
-    return [composition, beforeInput];
-  }
 };
 
 // Use to restore controlled state after a change event has fired.
@@ -2073,53 +2052,52 @@ var restoreTarget = null;
 var restoreQueue = null;
 
 function restoreStateOfTarget(target) {
-  // We perform this translation at the end of the event loop so that we
-  // always receive the correct fiber here
-  var internalInstance = getInstanceFromNode(target);
-  if (!internalInstance) {
-    // Unmounted
-    return;
-  }
-  !(typeof restoreImpl === 'function') ? invariant(false, 'setRestoreImplementation() needs to be called to handle a target for controlled events. This error is likely caused by a bug in React. Please file an issue.') : void 0;
-  var props = getFiberCurrentPropsFromNode(internalInstance.stateNode);
-  restoreImpl(internalInstance.stateNode, internalInstance.type, props);
+    // We perform this translation at the end of the event loop so that we
+    // always receive the correct fiber here
+    var internalInstance = getInstanceFromNode(target);
+    if (!internalInstance) {
+        // Unmounted
+        return;
+    }!(typeof restoreImpl === 'function') ? invariant(false, 'setRestoreImplementation() needs to be called to handle a target for controlled events. This error is likely caused by a bug in React. Please file an issue.'): undefined;
+    var props = getFiberCurrentPropsFromNode(internalInstance.stateNode);
+    restoreImpl(internalInstance.stateNode, internalInstance.type, props);
 }
 
 function setRestoreImplementation(impl) {
-  restoreImpl = impl;
+    restoreImpl = impl;
 }
 
 function enqueueStateRestore(target) {
-  if (restoreTarget) {
-    if (restoreQueue) {
-      restoreQueue.push(target);
+    if (restoreTarget) {
+        if (restoreQueue) {
+            restoreQueue.push(target);
+        } else {
+            restoreQueue = [target];
+        }
     } else {
-      restoreQueue = [target];
+        restoreTarget = target;
     }
-  } else {
-    restoreTarget = target;
-  }
 }
 
 function needsStateRestore() {
-  return restoreTarget !== null || restoreQueue !== null;
+    return restoreTarget !== null || restoreQueue !== null;
 }
 
 function restoreStateIfNeeded() {
-  if (!restoreTarget) {
-    return;
-  }
-  var target = restoreTarget;
-  var queuedTargets = restoreQueue;
-  restoreTarget = null;
-  restoreQueue = null;
-
-  restoreStateOfTarget(target);
-  if (queuedTargets) {
-    for (var i = 0; i < queuedTargets.length; i++) {
-      restoreStateOfTarget(queuedTargets[i]);
+    if (!restoreTarget) {
+        return;
     }
-  }
+    var target = restoreTarget;
+    var queuedTargets = restoreQueue;
+    restoreTarget = null;
+    restoreQueue = null;
+
+    restoreStateOfTarget(target);
+    if (queuedTargets) {
+        for (var i = 0; i < queuedTargets.length; i++) {
+            restoreStateOfTarget(queuedTargets[i]);
+        }
+    }
 }
 
 // Used as a way to call batchedUpdates when we don't have a reference to
@@ -2130,85 +2108,86 @@ function restoreStateIfNeeded() {
 
 // Defaults
 var _batchedUpdatesImpl = function (fn, bookkeeping) {
-  return fn(bookkeeping);
+    return fn(bookkeeping);
 };
 var _interactiveUpdatesImpl = function (fn, a, b) {
-  return fn(a, b);
+    return fn(a, b);
 };
 var _flushInteractiveUpdatesImpl = function () {};
 
 var isBatching = false;
+
 function batchedUpdates(fn, bookkeeping) {
-  if (isBatching) {
-    // If we are currently inside another batch, we need to wait until it
-    // fully completes before restoring state.
-    return fn(bookkeeping);
-  }
-  isBatching = true;
-  try {
-    return _batchedUpdatesImpl(fn, bookkeeping);
-  } finally {
-    // Here we wait until all updates have propagated, which is important
-    // when using controlled components within layers:
-    // https://github.com/facebook/react/issues/1698
-    // Then we restore state of any controlled component.
-    isBatching = false;
-    var controlledComponentsHavePendingUpdates = needsStateRestore();
-    if (controlledComponentsHavePendingUpdates) {
-      // If a controlled event was fired, we may need to restore the state of
-      // the DOM node back to the controlled value. This is necessary when React
-      // bails out of the update without touching the DOM.
-      _flushInteractiveUpdatesImpl();
-      restoreStateIfNeeded();
+    if (isBatching) {
+        // If we are currently inside another batch, we need to wait until it
+        // fully completes before restoring state.
+        return fn(bookkeeping);
     }
-  }
+    isBatching = true;
+    try {
+        return _batchedUpdatesImpl(fn, bookkeeping);
+    } finally {
+        // Here we wait until all updates have propagated, which is important
+        // when using controlled components within layers:
+        // https://github.com/facebook/react/issues/1698
+        // Then we restore state of any controlled component.
+        isBatching = false;
+        var controlledComponentsHavePendingUpdates = needsStateRestore();
+        if (controlledComponentsHavePendingUpdates) {
+            // If a controlled event was fired, we may need to restore the state of
+            // the DOM node back to the controlled value. This is necessary when React
+            // bails out of the update without touching the DOM.
+            _flushInteractiveUpdatesImpl();
+            restoreStateIfNeeded();
+        }
+    }
 }
 
 function interactiveUpdates(fn, a, b) {
-  return _interactiveUpdatesImpl(fn, a, b);
+    return _interactiveUpdatesImpl(fn, a, b);
 }
 
 
 
 function setBatchingImplementation(batchedUpdatesImpl, interactiveUpdatesImpl, flushInteractiveUpdatesImpl) {
-  _batchedUpdatesImpl = batchedUpdatesImpl;
-  _interactiveUpdatesImpl = interactiveUpdatesImpl;
-  _flushInteractiveUpdatesImpl = flushInteractiveUpdatesImpl;
+    _batchedUpdatesImpl = batchedUpdatesImpl;
+    _interactiveUpdatesImpl = interactiveUpdatesImpl;
+    _flushInteractiveUpdatesImpl = flushInteractiveUpdatesImpl;
 }
 
 /**
  * @see http://www.whatwg.org/specs/web-apps/current-work/multipage/the-input-element.html#input-type-attr-summary
  */
 var supportedInputTypes = {
-  color: true,
-  date: true,
-  datetime: true,
-  'datetime-local': true,
-  email: true,
-  month: true,
-  number: true,
-  password: true,
-  range: true,
-  search: true,
-  tel: true,
-  text: true,
-  time: true,
-  url: true,
-  week: true
+    color: true,
+    date: true,
+    datetime: true,
+    'datetime-local': true,
+    email: true,
+    month: true,
+    number: true,
+    password: true,
+    range: true,
+    search: true,
+    tel: true,
+    text: true,
+    time: true,
+    url: true,
+    week: true
 };
 
 function isTextInputElement(elem) {
-  var nodeName = elem && elem.nodeName && elem.nodeName.toLowerCase();
+    var nodeName = elem && elem.nodeName && elem.nodeName.toLowerCase();
 
-  if (nodeName === 'input') {
-    return !!supportedInputTypes[elem.type];
-  }
+    if (nodeName === 'input') {
+        return !!supportedInputTypes[elem.type];
+    }
 
-  if (nodeName === 'textarea') {
-    return true;
-  }
+    if (nodeName === 'textarea') {
+        return true;
+    }
 
-  return false;
+    return false;
 }
 
 /**
@@ -2229,18 +2208,18 @@ var DOCUMENT_FRAGMENT_NODE = 11;
  * @return {DOMEventTarget} Target node.
  */
 function getEventTarget(nativeEvent) {
-  // Fallback to nativeEvent.srcElement for IE9
-  // https://github.com/facebook/react/issues/12506
-  var target = nativeEvent.target || nativeEvent.srcElement || window;
+    // Fallback to nativeEvent.srcElement for IE9
+    // https://github.com/facebook/react/issues/12506
+    var target = nativeEvent.target || nativeEvent.srcElement || window;
 
-  // Normalize SVG <use> element events #4963
-  if (target.correspondingUseElement) {
-    target = target.correspondingUseElement;
-  }
+    // Normalize SVG <use> element events #4963
+    if (target.correspondingUseElement) {
+        target = target.correspondingUseElement;
+    }
 
-  // Safari may fire events on text nodes (Node.TEXT_NODE is 3).
-  // @see http://www.quirksmode.org/js/events_properties.html
-  return target.nodeType === TEXT_NODE ? target.parentNode : target;
+    // Safari may fire events on text nodes (Node.TEXT_NODE is 3).
+    // @see http://www.quirksmode.org/js/events_properties.html
+    return target.nodeType === TEXT_NODE ? target.parentNode : target;
 }
 
 /**
@@ -2257,128 +2236,128 @@ function getEventTarget(nativeEvent) {
  * @license Modernizr 3.0.0pre (Custom Build) | MIT
  */
 function isEventSupported(eventNameSuffix) {
-  if (!canUseDOM) {
-    return false;
-  }
+    if (!canUseDOM) {
+        return false;
+    }
 
-  var eventName = 'on' + eventNameSuffix;
-  var isSupported = eventName in document;
+    var eventName = 'on' + eventNameSuffix;
+    var isSupported = eventName in document;
 
-  if (!isSupported) {
-    var element = document.createElement('div');
-    element.setAttribute(eventName, 'return;');
-    isSupported = typeof element[eventName] === 'function';
-  }
+    if (!isSupported) {
+        var element = document.createElement('div');
+        element.setAttribute(eventName, 'return;');
+        isSupported = typeof element[eventName] === 'function';
+    }
 
-  return isSupported;
+    return isSupported;
 }
 
 function isCheckable(elem) {
-  var type = elem.type;
-  var nodeName = elem.nodeName;
-  return nodeName && nodeName.toLowerCase() === 'input' && (type === 'checkbox' || type === 'radio');
+    var type = elem.type;
+    var nodeName = elem.nodeName;
+    return nodeName && nodeName.toLowerCase() === 'input' && (type === 'checkbox' || type === 'radio');
 }
 
 function getTracker(node) {
-  return node._valueTracker;
+    return node._valueTracker;
 }
 
 function detachTracker(node) {
-  node._valueTracker = null;
+    node._valueTracker = null;
 }
 
 function getValueFromNode(node) {
-  var value = '';
-  if (!node) {
+    var value = '';
+    if (!node) {
+        return value;
+    }
+
+    if (isCheckable(node)) {
+        value = node.checked ? 'true' : 'false';
+    } else {
+        value = node.value;
+    }
+
     return value;
-  }
-
-  if (isCheckable(node)) {
-    value = node.checked ? 'true' : 'false';
-  } else {
-    value = node.value;
-  }
-
-  return value;
 }
 
 function trackValueOnNode(node) {
-  var valueField = isCheckable(node) ? 'checked' : 'value';
-  var descriptor = Object.getOwnPropertyDescriptor(node.constructor.prototype, valueField);
+    var valueField = isCheckable(node) ? 'checked' : 'value';
+    var descriptor = Object.getOwnPropertyDescriptor(node.constructor.prototype, valueField);
 
-  var currentValue = '' + node[valueField];
+    var currentValue = '' + node[valueField];
 
-  // if someone has already defined a value or Safari, then bail
-  // and don't track value will cause over reporting of changes,
-  // but it's better then a hard failure
-  // (needed for certain tests that spyOn input values and Safari)
-  if (node.hasOwnProperty(valueField) || typeof descriptor === 'undefined' || typeof descriptor.get !== 'function' || typeof descriptor.set !== 'function') {
-    return;
-  }
-  var get = descriptor.get,
-      set = descriptor.set;
-
-  Object.defineProperty(node, valueField, {
-    configurable: true,
-    get: function () {
-      return get.call(this);
-    },
-    set: function (value) {
-      currentValue = '' + value;
-      set.call(this, value);
+    // if someone has already defined a value or Safari, then bail
+    // and don't track value will cause over reporting of changes,
+    // but it's better then a hard failure
+    // (needed for certain tests that spyOn input values and Safari)
+    if (node.hasOwnProperty(valueField) || typeof descriptor === 'undefined' || typeof descriptor.get !== 'function' || typeof descriptor.set !== 'function') {
+        return;
     }
-  });
-  // We could've passed this the first time
-  // but it triggers a bug in IE11 and Edge 14/15.
-  // Calling defineProperty() again should be equivalent.
-  // https://github.com/facebook/react/issues/11768
-  Object.defineProperty(node, valueField, {
-    enumerable: descriptor.enumerable
-  });
+    var get = descriptor.get,
+        set = descriptor.set;
 
-  var tracker = {
-    getValue: function () {
-      return currentValue;
-    },
-    setValue: function (value) {
-      currentValue = '' + value;
-    },
-    stopTracking: function () {
-      detachTracker(node);
-      delete node[valueField];
-    }
-  };
-  return tracker;
+    Object.defineProperty(node, valueField, {
+        configurable: true,
+        get: function () {
+            return get.call(this);
+        },
+        set: function (value) {
+            currentValue = '' + value;
+            set.call(this, value);
+        }
+    });
+    // We could've passed this the first time
+    // but it triggers a bug in IE11 and Edge 14/15.
+    // Calling defineProperty() again should be equivalent.
+    // https://github.com/facebook/react/issues/11768
+    Object.defineProperty(node, valueField, {
+        enumerable: descriptor.enumerable
+    });
+
+    var tracker = {
+        getValue: function () {
+            return currentValue;
+        },
+        setValue: function (value) {
+            currentValue = '' + value;
+        },
+        stopTracking: function () {
+            detachTracker(node);
+            delete node[valueField];
+        }
+    };
+    return tracker;
 }
 
 function track(node) {
-  if (getTracker(node)) {
-    return;
-  }
+    if (getTracker(node)) {
+        return;
+    }
 
-  // TODO: Once it's just Fiber we can move this to node._wrapperState
-  node._valueTracker = trackValueOnNode(node);
+    // TODO: Once it's just Fiber we can move this to node._wrapperState
+    node._valueTracker = trackValueOnNode(node);
 }
 
 function updateValueIfChanged(node) {
-  if (!node) {
+    if (!node) {
+        return false;
+    }
+
+    var tracker = getTracker(node);
+    // if there is no tracker at this point it's unlikely
+    // that trying again will succeed
+    if (!tracker) {
+        return true;
+    }
+
+    var lastValue = tracker.getValue();
+    var nextValue = getValueFromNode(node);
+    if (nextValue !== lastValue) {
+        tracker.setValue(nextValue);
+        return true;
+    }
     return false;
-  }
-
-  var tracker = getTracker(node);
-  // if there is no tracker at this point it's unlikely
-  // that trying again will succeed
-  if (!tracker) {
-    return true;
-  }
-
-  var lastValue = tracker.getValue();
-  var nextValue = getValueFromNode(node);
-  if (nextValue !== lastValue) {
-    tracker.setValue(nextValue);
-    return true;
-  }
-  return false;
 }
 
 var ReactSharedInternals = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
@@ -2387,37 +2366,36 @@ var ReactSharedInternals = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FI
 // Current owner and dispatcher used to share the same ref,
 // but PR #14548 split them out to better support the react-debug-tools package.
 if (!ReactSharedInternals.hasOwnProperty('ReactCurrentDispatcher')) {
-  ReactSharedInternals.ReactCurrentDispatcher = {
-    current: null
-  };
+    ReactSharedInternals.ReactCurrentDispatcher = {
+        current: null
+    };
 }
 
 var BEFORE_SLASH_RE = /^(.*)[\\\/]/;
 
 var describeComponentFrame = function (name, source, ownerName) {
-  var sourceInfo = '';
-  if (source) {
-    var path = source.fileName;
-    var fileName = path.replace(BEFORE_SLASH_RE, '');
-    {
-      // In DEV, include code for a common special case:
-      // prefer "folder/index.js" instead of just "index.js".
-      if (/^index\./.test(fileName)) {
-        var match = path.match(BEFORE_SLASH_RE);
-        if (match) {
-          var pathBeforeSlash = match[1];
-          if (pathBeforeSlash) {
-            var folderName = pathBeforeSlash.replace(BEFORE_SLASH_RE, '');
-            fileName = folderName + '/' + fileName;
-          }
+    var sourceInfo = '';
+    if (source) {
+        var path = source.fileName;
+        var fileName = path.replace(BEFORE_SLASH_RE, ''); {
+            // In DEV, include code for a common special case:
+            // prefer "folder/index.js" instead of just "index.js".
+            if (/^index\./.test(fileName)) {
+                var match = path.match(BEFORE_SLASH_RE);
+                if (match) {
+                    var pathBeforeSlash = match[1];
+                    if (pathBeforeSlash) {
+                        var folderName = pathBeforeSlash.replace(BEFORE_SLASH_RE, '');
+                        fileName = folderName + '/' + fileName;
+                    }
+                }
+            }
         }
-      }
+        sourceInfo = ' (at ' + fileName + ':' + source.lineNumber + ')';
+    } else if (ownerName) {
+        sourceInfo = ' (created by ' + ownerName + ')';
     }
-    sourceInfo = ' (at ' + fileName + ':' + source.lineNumber + ')';
-  } else if (ownerName) {
-    sourceInfo = ' (created by ' + ownerName + ')';
-  }
-  return '\n    in ' + (name || 'Unknown') + sourceInfo;
+    return '\n    in ' + (name || 'Unknown') + sourceInfo;
 };
 
 // The Symbol used to tag the ReactElement-like types. If there is no native Symbol
@@ -2442,14 +2420,14 @@ var MAYBE_ITERATOR_SYMBOL = typeof Symbol === 'function' && Symbol.iterator;
 var FAUX_ITERATOR_SYMBOL = '@@iterator';
 
 function getIteratorFn(maybeIterable) {
-  if (maybeIterable === null || typeof maybeIterable !== 'object') {
+    if (maybeIterable === null || typeof maybeIterable !== 'object') {
+        return null;
+    }
+    var maybeIterator = MAYBE_ITERATOR_SYMBOL && maybeIterable[MAYBE_ITERATOR_SYMBOL] || maybeIterable[FAUX_ITERATOR_SYMBOL];
+    if (typeof maybeIterator === 'function') {
+        return maybeIterator;
+    }
     return null;
-  }
-  var maybeIterator = MAYBE_ITERATOR_SYMBOL && maybeIterable[MAYBE_ITERATOR_SYMBOL] || maybeIterable[FAUX_ITERATOR_SYMBOL];
-  if (typeof maybeIterator === 'function') {
-    return maybeIterator;
-  }
-  return null;
 }
 
 var Pending = 0;
@@ -2457,148 +2435,147 @@ var Resolved = 1;
 var Rejected = 2;
 
 function refineResolvedLazyComponent(lazyComponent) {
-  return lazyComponent._status === Resolved ? lazyComponent._result : null;
+    return lazyComponent._status === Resolved ? lazyComponent._result : null;
 }
 
 function getWrappedName(outerType, innerType, wrapperName) {
-  var functionName = innerType.displayName || innerType.name || '';
-  return outerType.displayName || (functionName !== '' ? wrapperName + '(' + functionName + ')' : wrapperName);
+    var functionName = innerType.displayName || innerType.name || '';
+    return outerType.displayName || (functionName !== '' ? wrapperName + '(' + functionName + ')' : wrapperName);
 }
 
 function getComponentName(type) {
-  if (type == null) {
-    // Host root, text node or just invalid type.
-    return null;
-  }
-  {
-    if (typeof type.tag === 'number') {
-      warningWithoutStack$1(false, 'Received an unexpected object in getComponentName(). ' + 'This is likely a bug in React. Please file an issue.');
-    }
-  }
-  if (typeof type === 'function') {
-    return type.displayName || type.name || null;
-  }
-  if (typeof type === 'string') {
-    return type;
-  }
-  switch (type) {
-    case REACT_CONCURRENT_MODE_TYPE:
-      return 'ConcurrentMode';
-    case REACT_FRAGMENT_TYPE:
-      return 'Fragment';
-    case REACT_PORTAL_TYPE:
-      return 'Portal';
-    case REACT_PROFILER_TYPE:
-      return 'Profiler';
-    case REACT_STRICT_MODE_TYPE:
-      return 'StrictMode';
-    case REACT_SUSPENSE_TYPE:
-      return 'Suspense';
-  }
-  if (typeof type === 'object') {
-    switch (type.$$typeof) {
-      case REACT_CONTEXT_TYPE:
-        return 'Context.Consumer';
-      case REACT_PROVIDER_TYPE:
-        return 'Context.Provider';
-      case REACT_FORWARD_REF_TYPE:
-        return getWrappedName(type, type.render, 'ForwardRef');
-      case REACT_MEMO_TYPE:
-        return getComponentName(type.type);
-      case REACT_LAZY_TYPE:
-        {
-          var thenable = type;
-          var resolvedThenable = refineResolvedLazyComponent(thenable);
-          if (resolvedThenable) {
-            return getComponentName(resolvedThenable);
-          }
+    if (type == null) {
+        // Host root, text node or just invalid type.
+        return null;
+    } {
+        if (typeof type.tag === 'number') {
+            warningWithoutStack$1(false, 'Received an unexpected object in getComponentName(). ' + 'This is likely a bug in React. Please file an issue.');
         }
     }
-  }
-  return null;
+    if (typeof type === 'function') {
+        return type.displayName || type.name || null;
+    }
+    if (typeof type === 'string') {
+        return type;
+    }
+    switch (type) {
+        case REACT_CONCURRENT_MODE_TYPE:
+            return 'ConcurrentMode';
+        case REACT_FRAGMENT_TYPE:
+            return 'Fragment';
+        case REACT_PORTAL_TYPE:
+            return 'Portal';
+        case REACT_PROFILER_TYPE:
+            return 'Profiler';
+        case REACT_STRICT_MODE_TYPE:
+            return 'StrictMode';
+        case REACT_SUSPENSE_TYPE:
+            return 'Suspense';
+    }
+    if (typeof type === 'object') {
+        switch (type.$$typeof) {
+            case REACT_CONTEXT_TYPE:
+                return 'Context.Consumer';
+            case REACT_PROVIDER_TYPE:
+                return 'Context.Provider';
+            case REACT_FORWARD_REF_TYPE:
+                return getWrappedName(type, type.render, 'ForwardRef');
+            case REACT_MEMO_TYPE:
+                return getComponentName(type.type);
+            case REACT_LAZY_TYPE:
+                {
+                    var thenable = type;
+                    var resolvedThenable = refineResolvedLazyComponent(thenable);
+                    if (resolvedThenable) {
+                        return getComponentName(resolvedThenable);
+                    }
+                }
+        }
+    }
+    return null;
 }
 
 var ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
 
 function describeFiber(fiber) {
-  switch (fiber.tag) {
-    case HostRoot:
-    case HostPortal:
-    case HostText:
-    case Fragment:
-    case ContextProvider:
-    case ContextConsumer:
-      return '';
-    default:
-      var owner = fiber._debugOwner;
-      var source = fiber._debugSource;
-      var name = getComponentName(fiber.type);
-      var ownerName = null;
-      if (owner) {
-        ownerName = getComponentName(owner.type);
-      }
-      return describeComponentFrame(name, source, ownerName);
-  }
+    switch (fiber.tag) {
+        case HostRoot:
+        case HostPortal:
+        case HostText:
+        case Fragment:
+        case ContextProvider:
+        case ContextConsumer:
+            return '';
+        default:
+            var owner = fiber._debugOwner;
+            var source = fiber._debugSource;
+            var name = getComponentName(fiber.type);
+            var ownerName = null;
+            if (owner) {
+                ownerName = getComponentName(owner.type);
+            }
+            return describeComponentFrame(name, source, ownerName);
+    }
 }
 
 function getStackByFiberInDevAndProd(workInProgress) {
-  var info = '';
-  var node = workInProgress;
-  do {
-    info += describeFiber(node);
-    node = node.return;
-  } while (node);
-  return info;
+    var info = '';
+    var node = workInProgress;
+    do {
+        info += describeFiber(node);
+        node = node.return;
+    } while (node);
+    return info;
 }
 
 var current = null;
 var phase = null;
 
 function getCurrentFiberOwnerNameInDevOrNull() {
-  {
-    if (current === null) {
-      return null;
+    {
+        if (current === null) {
+            return null;
+        }
+        var owner = current._debugOwner;
+        if (owner !== null && typeof owner !== 'undefined') {
+            return getComponentName(owner.type);
+        }
     }
-    var owner = current._debugOwner;
-    if (owner !== null && typeof owner !== 'undefined') {
-      return getComponentName(owner.type);
-    }
-  }
-  return null;
+    return null;
 }
 
 function getCurrentFiberStackInDev() {
-  {
-    if (current === null) {
-      return '';
+    {
+        if (current === null) {
+            return '';
+        }
+        // Safe because if current fiber exists, we are reconciling,
+        // and it is guaranteed to be the work-in-progress version.
+        return getStackByFiberInDevAndProd(current);
     }
-    // Safe because if current fiber exists, we are reconciling,
-    // and it is guaranteed to be the work-in-progress version.
-    return getStackByFiberInDevAndProd(current);
-  }
-  return '';
+    return '';
 }
 
 function resetCurrentFiber() {
-  {
-    ReactDebugCurrentFrame.getCurrentStack = null;
-    current = null;
-    phase = null;
-  }
+    {
+        ReactDebugCurrentFrame.getCurrentStack = null;
+        current = null;
+        phase = null;
+    }
 }
 
 function setCurrentFiber(fiber) {
-  {
-    ReactDebugCurrentFrame.getCurrentStack = getCurrentFiberStackInDev;
-    current = fiber;
-    phase = null;
-  }
+    {
+        ReactDebugCurrentFrame.getCurrentStack = getCurrentFiberStackInDev;
+        current = fiber;
+        phase = null;
+    }
 }
 
 function setCurrentPhase(lifeCyclePhase) {
-  {
-    phase = lifeCyclePhase;
-  }
+    {
+        phase = lifeCyclePhase;
+    }
 }
 
 /**
@@ -2611,20 +2588,20 @@ function setCurrentPhase(lifeCyclePhase) {
 var warning = warningWithoutStack$1;
 
 {
-  warning = function (condition, format) {
-    if (condition) {
-      return;
-    }
-    var ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
-    var stack = ReactDebugCurrentFrame.getStackAddendum();
-    // eslint-disable-next-line react-internal/warning-and-invariant-args
+    warning = function (condition, format) {
+        if (condition) {
+            return;
+        }
+        var ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
+        var stack = ReactDebugCurrentFrame.getStackAddendum();
+        // eslint-disable-next-line react-internal/warning-and-invariant-args
 
-    for (var _len = arguments.length, args = Array(_len > 2 ? _len - 2 : 0), _key = 2; _key < _len; _key++) {
-      args[_key - 2] = arguments[_key];
-    }
+        for (var _len = arguments.length, args = Array(_len > 2 ? _len - 2 : 0), _key = 2; _key < _len; _key++) {
+            args[_key - 2] = arguments[_key];
+        }
 
-    warningWithoutStack$1.apply(undefined, [false, format + '%s'].concat(args, [stack]));
-  };
+        warningWithoutStack$1.apply(undefined, [false, format + '%s'].concat(args, [stack]));
+    };
 }
 
 var warning$1 = warning;
@@ -2676,99 +2653,98 @@ var illegalAttributeNameCache = {};
 var validatedAttributeNameCache = {};
 
 function isAttributeNameSafe(attributeName) {
-  if (hasOwnProperty.call(validatedAttributeNameCache, attributeName)) {
-    return true;
-  }
-  if (hasOwnProperty.call(illegalAttributeNameCache, attributeName)) {
+    if (hasOwnProperty.call(validatedAttributeNameCache, attributeName)) {
+        return true;
+    }
+    if (hasOwnProperty.call(illegalAttributeNameCache, attributeName)) {
+        return false;
+    }
+    if (VALID_ATTRIBUTE_NAME_REGEX.test(attributeName)) {
+        validatedAttributeNameCache[attributeName] = true;
+        return true;
+    }
+    illegalAttributeNameCache[attributeName] = true; {
+        warning$1(false, 'Invalid attribute name: `%s`', attributeName);
+    }
     return false;
-  }
-  if (VALID_ATTRIBUTE_NAME_REGEX.test(attributeName)) {
-    validatedAttributeNameCache[attributeName] = true;
-    return true;
-  }
-  illegalAttributeNameCache[attributeName] = true;
-  {
-    warning$1(false, 'Invalid attribute name: `%s`', attributeName);
-  }
-  return false;
 }
 
 function shouldIgnoreAttribute(name, propertyInfo, isCustomComponentTag) {
-  if (propertyInfo !== null) {
-    return propertyInfo.type === RESERVED;
-  }
-  if (isCustomComponentTag) {
+    if (propertyInfo !== null) {
+        return propertyInfo.type === RESERVED;
+    }
+    if (isCustomComponentTag) {
+        return false;
+    }
+    if (name.length > 2 && (name[0] === 'o' || name[0] === 'O') && (name[1] === 'n' || name[1] === 'N')) {
+        return true;
+    }
     return false;
-  }
-  if (name.length > 2 && (name[0] === 'o' || name[0] === 'O') && (name[1] === 'n' || name[1] === 'N')) {
-    return true;
-  }
-  return false;
 }
 
 function shouldRemoveAttributeWithWarning(name, value, propertyInfo, isCustomComponentTag) {
-  if (propertyInfo !== null && propertyInfo.type === RESERVED) {
-    return false;
-  }
-  switch (typeof value) {
-    case 'function':
-    // $FlowIssue symbol is perfectly valid here
-    case 'symbol':
-      // eslint-disable-line
-      return true;
-    case 'boolean':
-      {
-        if (isCustomComponentTag) {
-          return false;
-        }
-        if (propertyInfo !== null) {
-          return !propertyInfo.acceptsBooleans;
-        } else {
-          var prefix = name.toLowerCase().slice(0, 5);
-          return prefix !== 'data-' && prefix !== 'aria-';
-        }
-      }
-    default:
-      return false;
-  }
+    if (propertyInfo !== null && propertyInfo.type === RESERVED) {
+        return false;
+    }
+    switch (typeof value) {
+        case 'function':
+            // $FlowIssue symbol is perfectly valid here
+        case 'symbol':
+            // eslint-disable-line
+            return true;
+        case 'boolean':
+            {
+                if (isCustomComponentTag) {
+                    return false;
+                }
+                if (propertyInfo !== null) {
+                    return !propertyInfo.acceptsBooleans;
+                } else {
+                    var prefix = name.toLowerCase().slice(0, 5);
+                    return prefix !== 'data-' && prefix !== 'aria-';
+                }
+            }
+        default:
+            return false;
+    }
 }
 
 function shouldRemoveAttribute(name, value, propertyInfo, isCustomComponentTag) {
-  if (value === null || typeof value === 'undefined') {
-    return true;
-  }
-  if (shouldRemoveAttributeWithWarning(name, value, propertyInfo, isCustomComponentTag)) {
-    return true;
-  }
-  if (isCustomComponentTag) {
-    return false;
-  }
-  if (propertyInfo !== null) {
-    switch (propertyInfo.type) {
-      case BOOLEAN:
-        return !value;
-      case OVERLOADED_BOOLEAN:
-        return value === false;
-      case NUMERIC:
-        return isNaN(value);
-      case POSITIVE_NUMERIC:
-        return isNaN(value) || value < 1;
+    if (value === null || typeof value === 'undefined') {
+        return true;
     }
-  }
-  return false;
+    if (shouldRemoveAttributeWithWarning(name, value, propertyInfo, isCustomComponentTag)) {
+        return true;
+    }
+    if (isCustomComponentTag) {
+        return false;
+    }
+    if (propertyInfo !== null) {
+        switch (propertyInfo.type) {
+            case BOOLEAN:
+                return !value;
+            case OVERLOADED_BOOLEAN:
+                return value === false;
+            case NUMERIC:
+                return isNaN(value);
+            case POSITIVE_NUMERIC:
+                return isNaN(value) || value < 1;
+        }
+    }
+    return false;
 }
 
 function getPropertyInfo(name) {
-  return properties.hasOwnProperty(name) ? properties[name] : null;
+    return properties.hasOwnProperty(name) ? properties[name] : null;
 }
 
 function PropertyInfoRecord(name, type, mustUseProperty, attributeName, attributeNamespace) {
-  this.acceptsBooleans = type === BOOLEANISH_STRING || type === BOOLEAN || type === OVERLOADED_BOOLEAN;
-  this.attributeName = attributeName;
-  this.attributeNamespace = attributeNamespace;
-  this.mustUseProperty = mustUseProperty;
-  this.propertyName = name;
-  this.type = type;
+    this.acceptsBooleans = type === BOOLEANISH_STRING || type === BOOLEAN || type === OVERLOADED_BOOLEAN;
+    this.attributeName = attributeName;
+    this.attributeNamespace = attributeNamespace;
+    this.mustUseProperty = mustUseProperty;
+    this.propertyName = name;
+    this.type = type;
 }
 
 // When adding attributes to this list, be sure to also add them to
@@ -2778,36 +2754,42 @@ var properties = {};
 
 // These props are reserved by React. They shouldn't be written to the DOM.
 ['children', 'dangerouslySetInnerHTML',
-// TODO: This prevents the assignment of defaultValue to regular
-// elements (not just inputs). Now that ReactDOMInput assigns to the
-// defaultValue property -- do we need this?
-'defaultValue', 'defaultChecked', 'innerHTML', 'suppressContentEditableWarning', 'suppressHydrationWarning', 'style'].forEach(function (name) {
-  properties[name] = new PropertyInfoRecord(name, RESERVED, false, // mustUseProperty
-  name, // attributeName
-  null);
-} // attributeNamespace
+    // TODO: This prevents the assignment of defaultValue to regular
+    // elements (not just inputs). Now that ReactDOMInput assigns to the
+    // defaultValue property -- do we need this?
+    'defaultValue', 'defaultChecked', 'innerHTML', 'suppressContentEditableWarning', 'suppressHydrationWarning', 'style'
+].forEach(function (name) {
+        properties[name] = new PropertyInfoRecord(name, RESERVED, false, // mustUseProperty
+            name, // attributeName
+            null);
+    } // attributeNamespace
 );
 
 // A few React string attributes have a different name.
 // This is a mapping from React prop names to the attribute names.
-[['acceptCharset', 'accept-charset'], ['className', 'class'], ['htmlFor', 'for'], ['httpEquiv', 'http-equiv']].forEach(function (_ref) {
-  var name = _ref[0],
-      attributeName = _ref[1];
+[
+    ['acceptCharset', 'accept-charset'],
+    ['className', 'class'],
+    ['htmlFor', 'for'],
+    ['httpEquiv', 'http-equiv']
+].forEach(function (_ref) {
+        var name = _ref[0],
+            attributeName = _ref[1];
 
-  properties[name] = new PropertyInfoRecord(name, STRING, false, // mustUseProperty
-  attributeName, // attributeName
-  null);
-} // attributeNamespace
+        properties[name] = new PropertyInfoRecord(name, STRING, false, // mustUseProperty
+            attributeName, // attributeName
+            null);
+    } // attributeNamespace
 );
 
 // These are "enumerated" HTML attributes that accept "true" and "false".
 // In React, we let users pass `true` and `false` even though technically
 // these aren't boolean attributes (they are coerced to strings).
 ['contentEditable', 'draggable', 'spellCheck', 'value'].forEach(function (name) {
-  properties[name] = new PropertyInfoRecord(name, BOOLEANISH_STRING, false, // mustUseProperty
-  name.toLowerCase(), // attributeName
-  null);
-} // attributeNamespace
+        properties[name] = new PropertyInfoRecord(name, BOOLEANISH_STRING, false, // mustUseProperty
+            name.toLowerCase(), // attributeName
+            null);
+    } // attributeNamespace
 );
 
 // These are "enumerated" SVG attributes that accept "true" and "false".
@@ -2815,65 +2797,67 @@ var properties = {};
 // these aren't boolean attributes (they are coerced to strings).
 // Since these are SVG attributes, their attribute names are case-sensitive.
 ['autoReverse', 'externalResourcesRequired', 'focusable', 'preserveAlpha'].forEach(function (name) {
-  properties[name] = new PropertyInfoRecord(name, BOOLEANISH_STRING, false, // mustUseProperty
-  name, // attributeName
-  null);
-} // attributeNamespace
+        properties[name] = new PropertyInfoRecord(name, BOOLEANISH_STRING, false, // mustUseProperty
+            name, // attributeName
+            null);
+    } // attributeNamespace
 );
 
 // These are HTML boolean attributes.
 ['allowFullScreen', 'async',
-// Note: there is a special case that prevents it from being written to the DOM
-// on the client side because the browsers are inconsistent. Instead we call focus().
-'autoFocus', 'autoPlay', 'controls', 'default', 'defer', 'disabled', 'formNoValidate', 'hidden', 'loop', 'noModule', 'noValidate', 'open', 'playsInline', 'readOnly', 'required', 'reversed', 'scoped', 'seamless',
-// Microdata
-'itemScope'].forEach(function (name) {
-  properties[name] = new PropertyInfoRecord(name, BOOLEAN, false, // mustUseProperty
-  name.toLowerCase(), // attributeName
-  null);
-} // attributeNamespace
+    // Note: there is a special case that prevents it from being written to the DOM
+    // on the client side because the browsers are inconsistent. Instead we call focus().
+    'autoFocus', 'autoPlay', 'controls', 'default', 'defer', 'disabled', 'formNoValidate', 'hidden', 'loop', 'noModule', 'noValidate', 'open', 'playsInline', 'readOnly', 'required', 'reversed', 'scoped', 'seamless',
+    // Microdata
+    'itemScope'
+].forEach(function (name) {
+        properties[name] = new PropertyInfoRecord(name, BOOLEAN, false, // mustUseProperty
+            name.toLowerCase(), // attributeName
+            null);
+    } // attributeNamespace
 );
 
 // These are the few React props that we set as DOM properties
 // rather than attributes. These are all booleans.
 ['checked',
-// Note: `option.selected` is not updated if `select.multiple` is
-// disabled with `removeAttribute`. We have special logic for handling this.
-'multiple', 'muted', 'selected'].forEach(function (name) {
-  properties[name] = new PropertyInfoRecord(name, BOOLEAN, true, // mustUseProperty
-  name, // attributeName
-  null);
-} // attributeNamespace
+    // Note: `option.selected` is not updated if `select.multiple` is
+    // disabled with `removeAttribute`. We have special logic for handling this.
+    'multiple', 'muted', 'selected'
+].forEach(function (name) {
+        properties[name] = new PropertyInfoRecord(name, BOOLEAN, true, // mustUseProperty
+            name, // attributeName
+            null);
+    } // attributeNamespace
 );
 
 // These are HTML attributes that are "overloaded booleans": they behave like
 // booleans, but can also accept a string value.
 ['capture', 'download'].forEach(function (name) {
-  properties[name] = new PropertyInfoRecord(name, OVERLOADED_BOOLEAN, false, // mustUseProperty
-  name, // attributeName
-  null);
-} // attributeNamespace
+        properties[name] = new PropertyInfoRecord(name, OVERLOADED_BOOLEAN, false, // mustUseProperty
+            name, // attributeName
+            null);
+    } // attributeNamespace
 );
 
 // These are HTML attributes that must be positive numbers.
 ['cols', 'rows', 'size', 'span'].forEach(function (name) {
-  properties[name] = new PropertyInfoRecord(name, POSITIVE_NUMERIC, false, // mustUseProperty
-  name, // attributeName
-  null);
-} // attributeNamespace
+        properties[name] = new PropertyInfoRecord(name, POSITIVE_NUMERIC, false, // mustUseProperty
+            name, // attributeName
+            null);
+    } // attributeNamespace
 );
 
 // These are HTML attributes that must be numbers.
 ['rowSpan', 'start'].forEach(function (name) {
-  properties[name] = new PropertyInfoRecord(name, NUMERIC, false, // mustUseProperty
-  name.toLowerCase(), // attributeName
-  null);
-} // attributeNamespace
+        properties[name] = new PropertyInfoRecord(name, NUMERIC, false, // mustUseProperty
+            name.toLowerCase(), // attributeName
+            null);
+    } // attributeNamespace
 );
 
 var CAMELIZE = /[\-\:]([a-z])/g;
 var capitalize = function (token) {
-  return token[1].toUpperCase();
+    return token[1].toUpperCase();
 };
 
 // This is a list of all SVG attributes that need special casing, namespacing,
@@ -2882,34 +2866,34 @@ var capitalize = function (token) {
 // Some of these attributes can be hard to find. This list was created by
 // scrapping the MDN documentation.
 ['accent-height', 'alignment-baseline', 'arabic-form', 'baseline-shift', 'cap-height', 'clip-path', 'clip-rule', 'color-interpolation', 'color-interpolation-filters', 'color-profile', 'color-rendering', 'dominant-baseline', 'enable-background', 'fill-opacity', 'fill-rule', 'flood-color', 'flood-opacity', 'font-family', 'font-size', 'font-size-adjust', 'font-stretch', 'font-style', 'font-variant', 'font-weight', 'glyph-name', 'glyph-orientation-horizontal', 'glyph-orientation-vertical', 'horiz-adv-x', 'horiz-origin-x', 'image-rendering', 'letter-spacing', 'lighting-color', 'marker-end', 'marker-mid', 'marker-start', 'overline-position', 'overline-thickness', 'paint-order', 'panose-1', 'pointer-events', 'rendering-intent', 'shape-rendering', 'stop-color', 'stop-opacity', 'strikethrough-position', 'strikethrough-thickness', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-opacity', 'stroke-width', 'text-anchor', 'text-decoration', 'text-rendering', 'underline-position', 'underline-thickness', 'unicode-bidi', 'unicode-range', 'units-per-em', 'v-alphabetic', 'v-hanging', 'v-ideographic', 'v-mathematical', 'vector-effect', 'vert-adv-y', 'vert-origin-x', 'vert-origin-y', 'word-spacing', 'writing-mode', 'xmlns:xlink', 'x-height'].forEach(function (attributeName) {
-  var name = attributeName.replace(CAMELIZE, capitalize);
-  properties[name] = new PropertyInfoRecord(name, STRING, false, // mustUseProperty
-  attributeName, null);
-} // attributeNamespace
+        var name = attributeName.replace(CAMELIZE, capitalize);
+        properties[name] = new PropertyInfoRecord(name, STRING, false, // mustUseProperty
+            attributeName, null);
+    } // attributeNamespace
 );
 
 // String SVG attributes with the xlink namespace.
 ['xlink:actuate', 'xlink:arcrole', 'xlink:href', 'xlink:role', 'xlink:show', 'xlink:title', 'xlink:type'].forEach(function (attributeName) {
-  var name = attributeName.replace(CAMELIZE, capitalize);
-  properties[name] = new PropertyInfoRecord(name, STRING, false, // mustUseProperty
-  attributeName, 'http://www.w3.org/1999/xlink');
+    var name = attributeName.replace(CAMELIZE, capitalize);
+    properties[name] = new PropertyInfoRecord(name, STRING, false, // mustUseProperty
+        attributeName, 'http://www.w3.org/1999/xlink');
 });
 
 // String SVG attributes with the xml namespace.
 ['xml:base', 'xml:lang', 'xml:space'].forEach(function (attributeName) {
-  var name = attributeName.replace(CAMELIZE, capitalize);
-  properties[name] = new PropertyInfoRecord(name, STRING, false, // mustUseProperty
-  attributeName, 'http://www.w3.org/XML/1998/namespace');
+    var name = attributeName.replace(CAMELIZE, capitalize);
+    properties[name] = new PropertyInfoRecord(name, STRING, false, // mustUseProperty
+        attributeName, 'http://www.w3.org/XML/1998/namespace');
 });
 
 // These attribute exists both in HTML and SVG.
 // The attribute name is case-sensitive in SVG so we can't just use
 // the React name like we do for attributes that exist only in HTML.
 ['tabIndex', 'crossOrigin'].forEach(function (attributeName) {
-  properties[attributeName] = new PropertyInfoRecord(attributeName, STRING, false, // mustUseProperty
-  attributeName.toLowerCase(), // attributeName
-  null);
-} // attributeNamespace
+        properties[attributeName] = new PropertyInfoRecord(attributeName, STRING, false, // mustUseProperty
+            attributeName.toLowerCase(), // attributeName
+            null);
+    } // attributeNamespace
 );
 
 /**
@@ -2918,57 +2902,57 @@ var capitalize = function (token) {
  * Some properties have multiple equivalent values.
  */
 function getValueForProperty(node, name, expected, propertyInfo) {
-  {
-    if (propertyInfo.mustUseProperty) {
-      var propertyName = propertyInfo.propertyName;
+    {
+        if (propertyInfo.mustUseProperty) {
+            var propertyName = propertyInfo.propertyName;
 
-      return node[propertyName];
-    } else {
-      var attributeName = propertyInfo.attributeName;
+            return node[propertyName];
+        } else {
+            var attributeName = propertyInfo.attributeName;
 
-      var stringValue = null;
+            var stringValue = null;
 
-      if (propertyInfo.type === OVERLOADED_BOOLEAN) {
-        if (node.hasAttribute(attributeName)) {
-          var value = node.getAttribute(attributeName);
-          if (value === '') {
-            return true;
-          }
-          if (shouldRemoveAttribute(name, expected, propertyInfo, false)) {
-            return value;
-          }
-          if (value === '' + expected) {
-            return expected;
-          }
-          return value;
+            if (propertyInfo.type === OVERLOADED_BOOLEAN) {
+                if (node.hasAttribute(attributeName)) {
+                    var value = node.getAttribute(attributeName);
+                    if (value === '') {
+                        return true;
+                    }
+                    if (shouldRemoveAttribute(name, expected, propertyInfo, false)) {
+                        return value;
+                    }
+                    if (value === '' + expected) {
+                        return expected;
+                    }
+                    return value;
+                }
+            } else if (node.hasAttribute(attributeName)) {
+                if (shouldRemoveAttribute(name, expected, propertyInfo, false)) {
+                    // We had an attribute but shouldn't have had one, so read it
+                    // for the error message.
+                    return node.getAttribute(attributeName);
+                }
+                if (propertyInfo.type === BOOLEAN) {
+                    // If this was a boolean, it doesn't matter what the value is
+                    // the fact that we have it is the same as the expected.
+                    return expected;
+                }
+                // Even if this property uses a namespace we use getAttribute
+                // because we assume its namespaced name is the same as our config.
+                // To use getAttributeNS we need the local name which we don't have
+                // in our config atm.
+                stringValue = node.getAttribute(attributeName);
+            }
+
+            if (shouldRemoveAttribute(name, expected, propertyInfo, false)) {
+                return stringValue === null ? expected : stringValue;
+            } else if (stringValue === '' + expected) {
+                return expected;
+            } else {
+                return stringValue;
+            }
         }
-      } else if (node.hasAttribute(attributeName)) {
-        if (shouldRemoveAttribute(name, expected, propertyInfo, false)) {
-          // We had an attribute but shouldn't have had one, so read it
-          // for the error message.
-          return node.getAttribute(attributeName);
-        }
-        if (propertyInfo.type === BOOLEAN) {
-          // If this was a boolean, it doesn't matter what the value is
-          // the fact that we have it is the same as the expected.
-          return expected;
-        }
-        // Even if this property uses a namespace we use getAttribute
-        // because we assume its namespaced name is the same as our config.
-        // To use getAttributeNS we need the local name which we don't have
-        // in our config atm.
-        stringValue = node.getAttribute(attributeName);
-      }
-
-      if (shouldRemoveAttribute(name, expected, propertyInfo, false)) {
-        return stringValue === null ? expected : stringValue;
-      } else if (stringValue === '' + expected) {
-        return expected;
-      } else {
-        return stringValue;
-      }
     }
-  }
 }
 
 /**
@@ -2977,19 +2961,19 @@ function getValueForProperty(node, name, expected, propertyInfo) {
  * attributes have multiple equivalent values.
  */
 function getValueForAttribute(node, name, expected) {
-  {
-    if (!isAttributeNameSafe(name)) {
-      return;
+    {
+        if (!isAttributeNameSafe(name)) {
+            return;
+        }
+        if (!node.hasAttribute(name)) {
+            return expected === undefined ? undefined : null;
+        }
+        var value = node.getAttribute(name);
+        if (value === '' + expected) {
+            return expected;
+        }
+        return value;
     }
-    if (!node.hasAttribute(name)) {
-      return expected === undefined ? undefined : null;
-    }
-    var value = node.getAttribute(name);
-    if (value === '' + expected) {
-      return expected;
-    }
-    return value;
-  }
 }
 
 /**
@@ -3000,233 +2984,128 @@ function getValueForAttribute(node, name, expected) {
  * @param {*} value
  */
 function setValueForProperty(node, name, value, isCustomComponentTag) {
-  var propertyInfo = getPropertyInfo(name);
-  if (shouldIgnoreAttribute(name, propertyInfo, isCustomComponentTag)) {
-    return;
-  }
-  if (shouldRemoveAttribute(name, value, propertyInfo, isCustomComponentTag)) {
-    value = null;
-  }
-  // If the prop isn't in the special list, treat it as a simple attribute.
-  if (isCustomComponentTag || propertyInfo === null) {
-    if (isAttributeNameSafe(name)) {
-      var _attributeName = name;
-      if (value === null) {
-        node.removeAttribute(_attributeName);
-      } else {
-        node.setAttribute(_attributeName, '' + value);
-      }
+    var propertyInfo = getPropertyInfo(name);
+    if (shouldIgnoreAttribute(name, propertyInfo, isCustomComponentTag)) {
+        return;
     }
-    return;
-  }
-  var mustUseProperty = propertyInfo.mustUseProperty;
+    if (shouldRemoveAttribute(name, value, propertyInfo, isCustomComponentTag)) {
+        value = null;
+    }
+    // If the prop isn't in the special list, treat it as a simple attribute.
+    if (isCustomComponentTag || propertyInfo === null) {
+        if (isAttributeNameSafe(name)) {
+            var _attributeName = name;
+            if (value === null) {
+                node.removeAttribute(_attributeName);
+            } else {
+                node.setAttribute(_attributeName, '' + value);
+            }
+        }
+        return;
+    }
+    var mustUseProperty = propertyInfo.mustUseProperty;
 
-  if (mustUseProperty) {
-    var propertyName = propertyInfo.propertyName;
+    if (mustUseProperty) {
+        var propertyName = propertyInfo.propertyName;
+
+        if (value === null) {
+            var type = propertyInfo.type;
+
+            node[propertyName] = type === BOOLEAN ? false : '';
+        } else {
+            // Contrary to `setAttribute`, object properties are properly
+            // `toString`ed by IE8/9.
+            node[propertyName] = value;
+        }
+        return;
+    }
+    // The rest are treated as attributes with special cases.
+    var attributeName = propertyInfo.attributeName,
+        attributeNamespace = propertyInfo.attributeNamespace;
 
     if (value === null) {
-      var type = propertyInfo.type;
-
-      node[propertyName] = type === BOOLEAN ? false : '';
+        node.removeAttribute(attributeName);
     } else {
-      // Contrary to `setAttribute`, object properties are properly
-      // `toString`ed by IE8/9.
-      node[propertyName] = value;
-    }
-    return;
-  }
-  // The rest are treated as attributes with special cases.
-  var attributeName = propertyInfo.attributeName,
-      attributeNamespace = propertyInfo.attributeNamespace;
+        var _type = propertyInfo.type;
 
-  if (value === null) {
-    node.removeAttribute(attributeName);
-  } else {
-    var _type = propertyInfo.type;
-
-    var attributeValue = void 0;
-    if (_type === BOOLEAN || _type === OVERLOADED_BOOLEAN && value === true) {
-      attributeValue = '';
-    } else {
-      // `setAttribute` with objects becomes only `[object]` in IE8/9,
-      // ('' + value) makes it output the correct toString()-value.
-      attributeValue = '' + value;
+        var attributeValue = undefined;
+        if (_type === BOOLEAN || _type === OVERLOADED_BOOLEAN && value === true) {
+            attributeValue = '';
+        } else {
+            // `setAttribute` with objects becomes only `[object]` in IE8/9,
+            // ('' + value) makes it output the correct toString()-value.
+            attributeValue = '' + value;
+        }
+        if (attributeNamespace) {
+            node.setAttributeNS(attributeNamespace, attributeName, attributeValue);
+        } else {
+            node.setAttribute(attributeName, attributeValue);
+        }
     }
-    if (attributeNamespace) {
-      node.setAttributeNS(attributeNamespace, attributeName, attributeValue);
-    } else {
-      node.setAttribute(attributeName, attributeValue);
-    }
-  }
 }
 
 // Flow does not allow string concatenation of most non-string types. To work
 // around this limitation, we use an opaque type that can only be obtained by
 // passing the value through getToStringValue first.
 function toString(value) {
-  return '' + value;
+    return '' + value;
 }
 
 function getToStringValue(value) {
-  switch (typeof value) {
-    case 'boolean':
-    case 'number':
-    case 'object':
-    case 'string':
-    case 'undefined':
-      return value;
-    default:
-      // function, symbol are assigned as empty strings
-      return '';
-  }
-}
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
-
-
-var ReactPropTypesSecret$1 = 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED';
-
-var ReactPropTypesSecret_1 = ReactPropTypesSecret$1;
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
-
-
-var printWarning = function() {};
-
-{
-  var ReactPropTypesSecret = ReactPropTypesSecret_1;
-  var loggedTypeFailures = {};
-
-  printWarning = function(text) {
-    var message = 'Warning: ' + text;
-    if (typeof console !== 'undefined') {
-      console.error(message);
+    switch (typeof value) {
+        case 'boolean':
+        case 'number':
+        case 'object':
+        case 'string':
+        case 'undefined':
+            return value;
+        default:
+            // function, symbol are assigned as empty strings
+            return '';
     }
-    try {
-      // --- Welcome to debugging React ---
-      // This error was thrown as a convenience so that you can use this stack
-      // to find the callsite that caused this warning to fire.
-      throw new Error(message);
-    } catch (x) {}
-  };
 }
-
-/**
- * Assert that the values match with the type specs.
- * Error messages are memorized and will only be shown once.
- *
- * @param {object} typeSpecs Map of name to a ReactPropType
- * @param {object} values Runtime values that need to be type-checked
- * @param {string} location e.g. "prop", "context", "child context"
- * @param {string} componentName Name of the component for error messages.
- * @param {?Function} getStack Returns the component stack.
- * @private
- */
-function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
-  {
-    for (var typeSpecName in typeSpecs) {
-      if (typeSpecs.hasOwnProperty(typeSpecName)) {
-        var error;
-        // Prop type validation may throw. In case they do, we don't want to
-        // fail the render phase where it didn't fail before. So we log it.
-        // After these have been cleaned up, we'll let them throw.
-        try {
-          // This is intentionally an invariant that gets caught. It's the same
-          // behavior as without this statement except with a better message.
-          if (typeof typeSpecs[typeSpecName] !== 'function') {
-            var err = Error(
-              (componentName || 'React class') + ': ' + location + ' type `' + typeSpecName + '` is invalid; ' +
-              'it must be a function, usually from the `prop-types` package, but received `' + typeof typeSpecs[typeSpecName] + '`.'
-            );
-            err.name = 'Invariant Violation';
-            throw err;
-          }
-          error = typeSpecs[typeSpecName](values, typeSpecName, componentName, location, null, ReactPropTypesSecret);
-        } catch (ex) {
-          error = ex;
-        }
-        if (error && !(error instanceof Error)) {
-          printWarning(
-            (componentName || 'React class') + ': type specification of ' +
-            location + ' `' + typeSpecName + '` is invalid; the type checker ' +
-            'function must return `null` or an `Error` but returned a ' + typeof error + '. ' +
-            'You may have forgotten to pass an argument to the type checker ' +
-            'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' +
-            'shape all require an argument).'
-          );
-
-        }
-        if (error instanceof Error && !(error.message in loggedTypeFailures)) {
-          // Only monitor this failure once because there tends to be a lot of the
-          // same error.
-          loggedTypeFailures[error.message] = true;
-
-          var stack = getStack ? getStack() : '';
-
-          printWarning(
-            'Failed ' + location + ' type: ' + error.message + (stack != null ? stack : '')
-          );
-        }
-      }
-    }
-  }
-}
-
-var checkPropTypes_1 = checkPropTypes;
 
 var ReactDebugCurrentFrame$1 = null;
 
 var ReactControlledValuePropTypes = {
-  checkPropTypes: null
+    checkPropTypes: null
 };
 
 {
-  ReactDebugCurrentFrame$1 = ReactSharedInternals.ReactDebugCurrentFrame;
+    ReactDebugCurrentFrame$1 = ReactSharedInternals.ReactDebugCurrentFrame;
 
-  var hasReadOnlyValue = {
-    button: true,
-    checkbox: true,
-    image: true,
-    hidden: true,
-    radio: true,
-    reset: true,
-    submit: true
-  };
+    var hasReadOnlyValue = {
+        button: true,
+        checkbox: true,
+        image: true,
+        hidden: true,
+        radio: true,
+        reset: true,
+        submit: true
+    };
 
-  var propTypes = {
-    value: function (props, propName, componentName) {
-      if (hasReadOnlyValue[props.type] || props.onChange || props.readOnly || props.disabled || props[propName] == null) {
-        return null;
-      }
-      return new Error('You provided a `value` prop to a form field without an ' + '`onChange` handler. This will render a read-only field. If ' + 'the field should be mutable use `defaultValue`. Otherwise, ' + 'set either `onChange` or `readOnly`.');
-    },
-    checked: function (props, propName, componentName) {
-      if (props.onChange || props.readOnly || props.disabled || props[propName] == null) {
-        return null;
-      }
-      return new Error('You provided a `checked` prop to a form field without an ' + '`onChange` handler. This will render a read-only field. If ' + 'the field should be mutable use `defaultChecked`. Otherwise, ' + 'set either `onChange` or `readOnly`.');
-    }
-  };
+    var propTypes = {
+        value: function (props, propName, componentName) {
+            if (hasReadOnlyValue[props.type] || props.onChange || props.readOnly || props.disabled || props[propName] == null) {
+                return null;
+            }
+            return new Error('You provided a `value` prop to a form field without an ' + '`onChange` handler. This will render a read-only field. If ' + 'the field should be mutable use `defaultValue`. Otherwise, ' + 'set either `onChange` or `readOnly`.');
+        },
+        checked: function (props, propName, componentName) {
+            if (props.onChange || props.readOnly || props.disabled || props[propName] == null) {
+                return null;
+            }
+            return new Error('You provided a `checked` prop to a form field without an ' + '`onChange` handler. This will render a read-only field. If ' + 'the field should be mutable use `defaultChecked`. Otherwise, ' + 'set either `onChange` or `readOnly`.');
+        }
+    };
 
-  /**
-   * Provide a linked `value` attribute for controlled forms. You should not use
-   * this outside of the ReactDOM controlled form components.
-   */
-  ReactControlledValuePropTypes.checkPropTypes = function (tagName, props) {
-    checkPropTypes_1(propTypes, props, 'prop', tagName, ReactDebugCurrentFrame$1.getStackAddendum);
-  };
+    /**
+     * Provide a linked `value` attribute for controlled forms. You should not use
+     * this outside of the ReactDOM controlled form components.
+     */
+    ReactControlledValuePropTypes.checkPropTypes = function (tagName, props) {
+        checkPropTypes(propTypes, props, 'prop', tagName, ReactDebugCurrentFrame$1.getStackAddendum);
+    };
 }
 
 var enableUserTimingAPI = true;
@@ -3279,8 +3158,8 @@ var didWarnControlledToUncontrolled = false;
 var didWarnUncontrolledToControlled = false;
 
 function isControlled(props) {
-  var usesChecked = props.type === 'checkbox' || props.type === 'radio';
-  return usesChecked ? props.checked != null : props.value != null;
+    var usesChecked = props.type === 'checkbox' || props.type === 'radio';
+    return usesChecked ? props.checked != null : props.value != null;
 }
 
 /**
@@ -3301,281 +3180,280 @@ function isControlled(props) {
  */
 
 function getHostProps(element, props) {
-  var node = element;
-  var checked = props.checked;
+    var node = element;
+    var checked = props.checked;
 
-  var hostProps = _assign({}, props, {
-    defaultChecked: undefined,
-    defaultValue: undefined,
-    value: undefined,
-    checked: checked != null ? checked : node._wrapperState.initialChecked
-  });
+    var hostProps = _assign({}, props, {
+        defaultChecked: undefined,
+        defaultValue: undefined,
+        value: undefined,
+        checked: checked != null ? checked : node._wrapperState.initialChecked
+    });
 
-  return hostProps;
+    return hostProps;
 }
 
 function initWrapperState(element, props) {
-  {
-    ReactControlledValuePropTypes.checkPropTypes('input', props);
+    {
+        ReactControlledValuePropTypes.checkPropTypes('input', props);
 
-    if (props.checked !== undefined && props.defaultChecked !== undefined && !didWarnCheckedDefaultChecked) {
-      warning$1(false, '%s contains an input of type %s with both checked and defaultChecked props. ' + 'Input elements must be either controlled or uncontrolled ' + '(specify either the checked prop, or the defaultChecked prop, but not ' + 'both). Decide between using a controlled or uncontrolled input ' + 'element and remove one of these props. More info: ' + 'https://fb.me/react-controlled-components', getCurrentFiberOwnerNameInDevOrNull() || 'A component', props.type);
-      didWarnCheckedDefaultChecked = true;
+        if (props.checked !== undefined && props.defaultChecked !== undefined && !didWarnCheckedDefaultChecked) {
+            warning$1(false, '%s contains an input of type %s with both checked and defaultChecked props. ' + 'Input elements must be either controlled or uncontrolled ' + '(specify either the checked prop, or the defaultChecked prop, but not ' + 'both). Decide between using a controlled or uncontrolled input ' + 'element and remove one of these props. More info: ' + 'https://fb.me/react-controlled-components', getCurrentFiberOwnerNameInDevOrNull() || 'A component', props.type);
+            didWarnCheckedDefaultChecked = true;
+        }
+        if (props.value !== undefined && props.defaultValue !== undefined && !didWarnValueDefaultValue) {
+            warning$1(false, '%s contains an input of type %s with both value and defaultValue props. ' + 'Input elements must be either controlled or uncontrolled ' + '(specify either the value prop, or the defaultValue prop, but not ' + 'both). Decide between using a controlled or uncontrolled input ' + 'element and remove one of these props. More info: ' + 'https://fb.me/react-controlled-components', getCurrentFiberOwnerNameInDevOrNull() || 'A component', props.type);
+            didWarnValueDefaultValue = true;
+        }
     }
-    if (props.value !== undefined && props.defaultValue !== undefined && !didWarnValueDefaultValue) {
-      warning$1(false, '%s contains an input of type %s with both value and defaultValue props. ' + 'Input elements must be either controlled or uncontrolled ' + '(specify either the value prop, or the defaultValue prop, but not ' + 'both). Decide between using a controlled or uncontrolled input ' + 'element and remove one of these props. More info: ' + 'https://fb.me/react-controlled-components', getCurrentFiberOwnerNameInDevOrNull() || 'A component', props.type);
-      didWarnValueDefaultValue = true;
-    }
-  }
 
-  var node = element;
-  var defaultValue = props.defaultValue == null ? '' : props.defaultValue;
+    var node = element;
+    var defaultValue = props.defaultValue == null ? '' : props.defaultValue;
 
-  node._wrapperState = {
-    initialChecked: props.checked != null ? props.checked : props.defaultChecked,
-    initialValue: getToStringValue(props.value != null ? props.value : defaultValue),
-    controlled: isControlled(props)
-  };
+    node._wrapperState = {
+        initialChecked: props.checked != null ? props.checked : props.defaultChecked,
+        initialValue: getToStringValue(props.value != null ? props.value : defaultValue),
+        controlled: isControlled(props)
+    };
 }
 
 function updateChecked(element, props) {
-  var node = element;
-  var checked = props.checked;
-  if (checked != null) {
-    setValueForProperty(node, 'checked', checked, false);
-  }
+    var node = element;
+    var checked = props.checked;
+    if (checked != null) {
+        setValueForProperty(node, 'checked', checked, false);
+    }
 }
 
 function updateWrapper(element, props) {
-  var node = element;
-  {
-    var _controlled = isControlled(props);
+    var node = element; {
+        var _controlled = isControlled(props);
 
-    if (!node._wrapperState.controlled && _controlled && !didWarnUncontrolledToControlled) {
-      warning$1(false, 'A component is changing an uncontrolled input of type %s to be controlled. ' + 'Input elements should not switch from uncontrolled to controlled (or vice versa). ' + 'Decide between using a controlled or uncontrolled input ' + 'element for the lifetime of the component. More info: https://fb.me/react-controlled-components', props.type);
-      didWarnUncontrolledToControlled = true;
+        if (!node._wrapperState.controlled && _controlled && !didWarnUncontrolledToControlled) {
+            warning$1(false, 'A component is changing an uncontrolled input of type %s to be controlled. ' + 'Input elements should not switch from uncontrolled to controlled (or vice versa). ' + 'Decide between using a controlled or uncontrolled input ' + 'element for the lifetime of the component. More info: https://fb.me/react-controlled-components', props.type);
+            didWarnUncontrolledToControlled = true;
+        }
+        if (node._wrapperState.controlled && !_controlled && !didWarnControlledToUncontrolled) {
+            warning$1(false, 'A component is changing a controlled input of type %s to be uncontrolled. ' + 'Input elements should not switch from controlled to uncontrolled (or vice versa). ' + 'Decide between using a controlled or uncontrolled input ' + 'element for the lifetime of the component. More info: https://fb.me/react-controlled-components', props.type);
+            didWarnControlledToUncontrolled = true;
+        }
     }
-    if (node._wrapperState.controlled && !_controlled && !didWarnControlledToUncontrolled) {
-      warning$1(false, 'A component is changing a controlled input of type %s to be uncontrolled. ' + 'Input elements should not switch from controlled to uncontrolled (or vice versa). ' + 'Decide between using a controlled or uncontrolled input ' + 'element for the lifetime of the component. More info: https://fb.me/react-controlled-components', props.type);
-      didWarnControlledToUncontrolled = true;
-    }
-  }
 
-  updateChecked(element, props);
+    updateChecked(element, props);
 
-  var value = getToStringValue(props.value);
-  var type = props.type;
-
-  if (value != null) {
-    if (type === 'number') {
-      if (value === 0 && node.value === '' ||
-      // We explicitly want to coerce to number here if possible.
-      // eslint-disable-next-line
-      node.value != value) {
-        node.value = toString(value);
-      }
-    } else if (node.value !== toString(value)) {
-      node.value = toString(value);
-    }
-  } else if (type === 'submit' || type === 'reset') {
-    // Submit/reset inputs need the attribute removed completely to avoid
-    // blank-text buttons.
-    node.removeAttribute('value');
-    return;
-  }
-
-  if (disableInputAttributeSyncing) {
-    // When not syncing the value attribute, React only assigns a new value
-    // whenever the defaultValue React prop has changed. When not present,
-    // React does nothing
-    if (props.hasOwnProperty('defaultValue')) {
-      setDefaultValue(node, props.type, getToStringValue(props.defaultValue));
-    }
-  } else {
-    // When syncing the value attribute, the value comes from a cascade of
-    // properties:
-    //  1. The value React property
-    //  2. The defaultValue React property
-    //  3. Otherwise there should be no change
-    if (props.hasOwnProperty('value')) {
-      setDefaultValue(node, props.type, value);
-    } else if (props.hasOwnProperty('defaultValue')) {
-      setDefaultValue(node, props.type, getToStringValue(props.defaultValue));
-    }
-  }
-
-  if (disableInputAttributeSyncing) {
-    // When not syncing the checked attribute, the attribute is directly
-    // controllable from the defaultValue React property. It needs to be
-    // updated as new props come in.
-    if (props.defaultChecked == null) {
-      node.removeAttribute('checked');
-    } else {
-      node.defaultChecked = !!props.defaultChecked;
-    }
-  } else {
-    // When syncing the checked attribute, it only changes when it needs
-    // to be removed, such as transitioning from a checkbox into a text input
-    if (props.checked == null && props.defaultChecked != null) {
-      node.defaultChecked = !!props.defaultChecked;
-    }
-  }
-}
-
-function postMountWrapper(element, props, isHydrating) {
-  var node = element;
-
-  // Do not assign value if it is already set. This prevents user text input
-  // from being lost during SSR hydration.
-  if (props.hasOwnProperty('value') || props.hasOwnProperty('defaultValue')) {
+    var value = getToStringValue(props.value);
     var type = props.type;
-    var isButton = type === 'submit' || type === 'reset';
 
-    // Avoid setting value attribute on submit/reset inputs as it overrides the
-    // default value provided by the browser. See: #12872
-    if (isButton && (props.value === undefined || props.value === null)) {
-      return;
-    }
-
-    var _initialValue = toString(node._wrapperState.initialValue);
-
-    // Do not assign value if it is already set. This prevents user text input
-    // from being lost during SSR hydration.
-    if (!isHydrating) {
-      if (disableInputAttributeSyncing) {
-        var value = getToStringValue(props.value);
-
-        // When not syncing the value attribute, the value property points
-        // directly to the React prop. Only assign it if it exists.
-        if (value != null) {
-          // Always assign on buttons so that it is possible to assign an
-          // empty string to clear button text.
-          //
-          // Otherwise, do not re-assign the value property if is empty. This
-          // potentially avoids a DOM write and prevents Firefox (~60.0.1) from
-          // prematurely marking required inputs as invalid. Equality is compared
-          // to the current value in case the browser provided value is not an
-          // empty string.
-          if (isButton || value !== node.value) {
+    if (value != null) {
+        if (type === 'number') {
+            if (value === 0 && node.value === '' ||
+                // We explicitly want to coerce to number here if possible.
+                // eslint-disable-next-line
+                node.value != value) {
+                node.value = toString(value);
+            }
+        } else if (node.value !== toString(value)) {
             node.value = toString(value);
-          }
         }
-      } else {
-        // When syncing the value attribute, the value property should use
-        // the wrapperState._initialValue property. This uses:
-        //
-        //   1. The value React property when present
-        //   2. The defaultValue React property when present
-        //   3. An empty string
-        if (_initialValue !== node.value) {
-          node.value = _initialValue;
-        }
-      }
+    } else if (type === 'submit' || type === 'reset') {
+        // Submit/reset inputs need the attribute removed completely to avoid
+        // blank-text buttons.
+        node.removeAttribute('value');
+        return;
     }
 
     if (disableInputAttributeSyncing) {
-      // When not syncing the value attribute, assign the value attribute
-      // directly from the defaultValue React property (when present)
-      var defaultValue = getToStringValue(props.defaultValue);
-      if (defaultValue != null) {
-        node.defaultValue = toString(defaultValue);
-      }
+        // When not syncing the value attribute, React only assigns a new value
+        // whenever the defaultValue React prop has changed. When not present,
+        // React does nothing
+        if (props.hasOwnProperty('defaultValue')) {
+            setDefaultValue(node, props.type, getToStringValue(props.defaultValue));
+        }
     } else {
-      // Otherwise, the value attribute is synchronized to the property,
-      // so we assign defaultValue to the same thing as the value property
-      // assignment step above.
-      node.defaultValue = _initialValue;
-    }
-  }
-
-  // Normally, we'd just do `node.checked = node.checked` upon initial mount, less this bug
-  // this is needed to work around a chrome bug where setting defaultChecked
-  // will sometimes influence the value of checked (even after detachment).
-  // Reference: https://bugs.chromium.org/p/chromium/issues/detail?id=608416
-  // We need to temporarily unset name to avoid disrupting radio button groups.
-  var name = node.name;
-  if (name !== '') {
-    node.name = '';
-  }
-
-  if (disableInputAttributeSyncing) {
-    // When not syncing the checked attribute, the checked property
-    // never gets assigned. It must be manually set. We don't want
-    // to do this when hydrating so that existing user input isn't
-    // modified
-    if (!isHydrating) {
-      updateChecked(element, props);
+        // When syncing the value attribute, the value comes from a cascade of
+        // properties:
+        //  1. The value React property
+        //  2. The defaultValue React property
+        //  3. Otherwise there should be no change
+        if (props.hasOwnProperty('value')) {
+            setDefaultValue(node, props.type, value);
+        } else if (props.hasOwnProperty('defaultValue')) {
+            setDefaultValue(node, props.type, getToStringValue(props.defaultValue));
+        }
     }
 
-    // Only assign the checked attribute if it is defined. This saves
-    // a DOM write when controlling the checked attribute isn't needed
-    // (text inputs, submit/reset)
-    if (props.hasOwnProperty('defaultChecked')) {
-      node.defaultChecked = !node.defaultChecked;
-      node.defaultChecked = !!props.defaultChecked;
+    if (disableInputAttributeSyncing) {
+        // When not syncing the checked attribute, the attribute is directly
+        // controllable from the defaultValue React property. It needs to be
+        // updated as new props come in.
+        if (props.defaultChecked == null) {
+            node.removeAttribute('checked');
+        } else {
+            node.defaultChecked = !!props.defaultChecked;
+        }
+    } else {
+        // When syncing the checked attribute, it only changes when it needs
+        // to be removed, such as transitioning from a checkbox into a text input
+        if (props.checked == null && props.defaultChecked != null) {
+            node.defaultChecked = !!props.defaultChecked;
+        }
     }
-  } else {
-    // When syncing the checked attribute, both the checked property and
-    // attribute are assigned at the same time using defaultChecked. This uses:
-    //
-    //   1. The checked React property when present
-    //   2. The defaultChecked React property when present
-    //   3. Otherwise, false
-    node.defaultChecked = !node.defaultChecked;
-    node.defaultChecked = !!node._wrapperState.initialChecked;
-  }
+}
 
-  if (name !== '') {
-    node.name = name;
-  }
+function postMountWrapper(element, props, isHydrating) {
+    var node = element;
+
+    // Do not assign value if it is already set. This prevents user text input
+    // from being lost during SSR hydration.
+    if (props.hasOwnProperty('value') || props.hasOwnProperty('defaultValue')) {
+        var type = props.type;
+        var isButton = type === 'submit' || type === 'reset';
+
+        // Avoid setting value attribute on submit/reset inputs as it overrides the
+        // default value provided by the browser. See: #12872
+        if (isButton && (props.value === undefined || props.value === null)) {
+            return;
+        }
+
+        var _initialValue = toString(node._wrapperState.initialValue);
+
+        // Do not assign value if it is already set. This prevents user text input
+        // from being lost during SSR hydration.
+        if (!isHydrating) {
+            if (disableInputAttributeSyncing) {
+                var value = getToStringValue(props.value);
+
+                // When not syncing the value attribute, the value property points
+                // directly to the React prop. Only assign it if it exists.
+                if (value != null) {
+                    // Always assign on buttons so that it is possible to assign an
+                    // empty string to clear button text.
+                    //
+                    // Otherwise, do not re-assign the value property if is empty. This
+                    // potentially avoids a DOM write and prevents Firefox (~60.0.1) from
+                    // prematurely marking required inputs as invalid. Equality is compared
+                    // to the current value in case the browser provided value is not an
+                    // empty string.
+                    if (isButton || value !== node.value) {
+                        node.value = toString(value);
+                    }
+                }
+            } else {
+                // When syncing the value attribute, the value property should use
+                // the wrapperState._initialValue property. This uses:
+                //
+                //   1. The value React property when present
+                //   2. The defaultValue React property when present
+                //   3. An empty string
+                if (_initialValue !== node.value) {
+                    node.value = _initialValue;
+                }
+            }
+        }
+
+        if (disableInputAttributeSyncing) {
+            // When not syncing the value attribute, assign the value attribute
+            // directly from the defaultValue React property (when present)
+            var defaultValue = getToStringValue(props.defaultValue);
+            if (defaultValue != null) {
+                node.defaultValue = toString(defaultValue);
+            }
+        } else {
+            // Otherwise, the value attribute is synchronized to the property,
+            // so we assign defaultValue to the same thing as the value property
+            // assignment step above.
+            node.defaultValue = _initialValue;
+        }
+    }
+
+    // Normally, we'd just do `node.checked = node.checked` upon initial mount, less this bug
+    // this is needed to work around a chrome bug where setting defaultChecked
+    // will sometimes influence the value of checked (even after detachment).
+    // Reference: https://bugs.chromium.org/p/chromium/issues/detail?id=608416
+    // We need to temporarily unset name to avoid disrupting radio button groups.
+    var name = node.name;
+    if (name !== '') {
+        node.name = '';
+    }
+
+    if (disableInputAttributeSyncing) {
+        // When not syncing the checked attribute, the checked property
+        // never gets assigned. It must be manually set. We don't want
+        // to do this when hydrating so that existing user input isn't
+        // modified
+        if (!isHydrating) {
+            updateChecked(element, props);
+        }
+
+        // Only assign the checked attribute if it is defined. This saves
+        // a DOM write when controlling the checked attribute isn't needed
+        // (text inputs, submit/reset)
+        if (props.hasOwnProperty('defaultChecked')) {
+            node.defaultChecked = !node.defaultChecked;
+            node.defaultChecked = !!props.defaultChecked;
+        }
+    } else {
+        // When syncing the checked attribute, both the checked property and
+        // attribute are assigned at the same time using defaultChecked. This uses:
+        //
+        //   1. The checked React property when present
+        //   2. The defaultChecked React property when present
+        //   3. Otherwise, false
+        node.defaultChecked = !node.defaultChecked;
+        node.defaultChecked = !!node._wrapperState.initialChecked;
+    }
+
+    if (name !== '') {
+        node.name = name;
+    }
 }
 
 function restoreControlledState(element, props) {
-  var node = element;
-  updateWrapper(node, props);
-  updateNamedCousins(node, props);
+    var node = element;
+    updateWrapper(node, props);
+    updateNamedCousins(node, props);
 }
 
 function updateNamedCousins(rootNode, props) {
-  var name = props.name;
-  if (props.type === 'radio' && name != null) {
-    var queryRoot = rootNode;
+    var name = props.name;
+    if (props.type === 'radio' && name != null) {
+        var queryRoot = rootNode;
 
-    while (queryRoot.parentNode) {
-      queryRoot = queryRoot.parentNode;
+        while (queryRoot.parentNode) {
+            queryRoot = queryRoot.parentNode;
+        }
+
+        // If `rootNode.form` was non-null, then we could try `form.elements`,
+        // but that sometimes behaves strangely in IE8. We could also try using
+        // `form.getElementsByName`, but that will only return direct children
+        // and won't include inputs that use the HTML5 `form=` attribute. Since
+        // the input might not even be in a form. It might not even be in the
+        // document. Let's just use the local `querySelectorAll` to ensure we don't
+        // miss anything.
+        var group = queryRoot.querySelectorAll('input[name=' + JSON.stringify('' + name) + '][type="radio"]');
+
+        for (var i = 0; i < group.length; i++) {
+            var otherNode = group[i];
+            if (otherNode === rootNode || otherNode.form !== rootNode.form) {
+                continue;
+            }
+            // This will throw if radio buttons rendered by different copies of React
+            // and the same name are rendered into the same form (same as #1939).
+            // That's probably okay; we don't support it just as we don't support
+            // mixing React radio buttons with non-React ones.
+            var otherProps = getFiberCurrentPropsFromNode$1(otherNode);
+            !otherProps ? invariant(false, 'ReactDOMInput: Mixing React and non-React radio inputs with the same `name` is not supported.') : undefined;
+
+            // We need update the tracked value on the named cousin since the value
+            // was changed but the input saw no event or value set
+            updateValueIfChanged(otherNode);
+
+            // If this is a controlled radio button group, forcing the input that
+            // was previously checked to update will cause it to be come re-checked
+            // as appropriate.
+            updateWrapper(otherNode, otherProps);
+        }
     }
-
-    // If `rootNode.form` was non-null, then we could try `form.elements`,
-    // but that sometimes behaves strangely in IE8. We could also try using
-    // `form.getElementsByName`, but that will only return direct children
-    // and won't include inputs that use the HTML5 `form=` attribute. Since
-    // the input might not even be in a form. It might not even be in the
-    // document. Let's just use the local `querySelectorAll` to ensure we don't
-    // miss anything.
-    var group = queryRoot.querySelectorAll('input[name=' + JSON.stringify('' + name) + '][type="radio"]');
-
-    for (var i = 0; i < group.length; i++) {
-      var otherNode = group[i];
-      if (otherNode === rootNode || otherNode.form !== rootNode.form) {
-        continue;
-      }
-      // This will throw if radio buttons rendered by different copies of React
-      // and the same name are rendered into the same form (same as #1939).
-      // That's probably okay; we don't support it just as we don't support
-      // mixing React radio buttons with non-React ones.
-      var otherProps = getFiberCurrentPropsFromNode$1(otherNode);
-      !otherProps ? invariant(false, 'ReactDOMInput: Mixing React and non-React radio inputs with the same `name` is not supported.') : void 0;
-
-      // We need update the tracked value on the named cousin since the value
-      // was changed but the input saw no event or value set
-      updateValueIfChanged(otherNode);
-
-      // If this is a controlled radio button group, forcing the input that
-      // was previously checked to update will cause it to be come re-checked
-      // as appropriate.
-      updateWrapper(otherNode, otherProps);
-    }
-  }
 }
 
 // In Chrome, assigning defaultValue to certain input types triggers input validation.
@@ -3587,34 +3465,34 @@ function updateNamedCousins(rootNode, props) {
 //
 // https://github.com/facebook/react/issues/7253
 function setDefaultValue(node, type, value) {
-  if (
-  // Focused number inputs synchronize on blur. See ChangeEventPlugin.js
-  type !== 'number' || node.ownerDocument.activeElement !== node) {
-    if (value == null) {
-      node.defaultValue = toString(node._wrapperState.initialValue);
-    } else if (node.defaultValue !== toString(value)) {
-      node.defaultValue = toString(value);
+    if (
+        // Focused number inputs synchronize on blur. See ChangeEventPlugin.js
+        type !== 'number' || node.ownerDocument.activeElement !== node) {
+        if (value == null) {
+            node.defaultValue = toString(node._wrapperState.initialValue);
+        } else if (node.defaultValue !== toString(value)) {
+            node.defaultValue = toString(value);
+        }
     }
-  }
 }
 
 var eventTypes$1 = {
-  change: {
-    phasedRegistrationNames: {
-      bubbled: 'onChange',
-      captured: 'onChangeCapture'
-    },
-    dependencies: [TOP_BLUR, TOP_CHANGE, TOP_CLICK, TOP_FOCUS, TOP_INPUT, TOP_KEY_DOWN, TOP_KEY_UP, TOP_SELECTION_CHANGE]
-  }
+    change: {
+        phasedRegistrationNames: {
+            bubbled: 'onChange',
+            captured: 'onChangeCapture'
+        },
+        dependencies: [TOP_BLUR, TOP_CHANGE, TOP_CLICK, TOP_FOCUS, TOP_INPUT, TOP_KEY_DOWN, TOP_KEY_UP, TOP_SELECTION_CHANGE]
+    }
 };
 
 function createAndAccumulateChangeEvent(inst, nativeEvent, target) {
-  var event = SyntheticEvent.getPooled(eventTypes$1.change, inst, nativeEvent, target);
-  event.type = 'change';
-  // Flag this event loop as needing state restore.
-  enqueueStateRestore(target);
-  accumulateTwoPhaseDispatches(event);
-  return event;
+    var event = SyntheticEvent.getPooled(eventTypes$1.change, inst, nativeEvent, target);
+    event.type = 'change';
+    // Flag this event loop as needing state restore.
+    enqueueStateRestore(target);
+    accumulateTwoPhaseDispatches(event);
+    return event;
 }
 /**
  * For IE shims
@@ -3626,42 +3504,42 @@ var activeElementInst = null;
  * SECTION: handle `change` event
  */
 function shouldUseChangeEvent(elem) {
-  var nodeName = elem.nodeName && elem.nodeName.toLowerCase();
-  return nodeName === 'select' || nodeName === 'input' && elem.type === 'file';
+    var nodeName = elem.nodeName && elem.nodeName.toLowerCase();
+    return nodeName === 'select' || nodeName === 'input' && elem.type === 'file';
 }
 
 function manualDispatchChangeEvent(nativeEvent) {
-  var event = createAndAccumulateChangeEvent(activeElementInst, nativeEvent, getEventTarget(nativeEvent));
+    var event = createAndAccumulateChangeEvent(activeElementInst, nativeEvent, getEventTarget(nativeEvent));
 
-  // If change and propertychange bubbled, we'd just bind to it like all the
-  // other events and have it go through ReactBrowserEventEmitter. Since it
-  // doesn't, we manually listen for the events and so we have to enqueue and
-  // process the abstract event manually.
-  //
-  // Batching is necessary here in order to ensure that all event handlers run
-  // before the next rerender (including event handlers attached to ancestor
-  // elements instead of directly on the input). Without this, controlled
-  // components don't work properly in conjunction with event bubbling because
-  // the component is rerendered and the value reverted before all the event
-  // handlers can run. See https://github.com/facebook/react/issues/708.
-  batchedUpdates(runEventInBatch, event);
+    // If change and propertychange bubbled, we'd just bind to it like all the
+    // other events and have it go through ReactBrowserEventEmitter. Since it
+    // doesn't, we manually listen for the events and so we have to enqueue and
+    // process the abstract event manually.
+    //
+    // Batching is necessary here in order to ensure that all event handlers run
+    // before the next rerender (including event handlers attached to ancestor
+    // elements instead of directly on the input). Without this, controlled
+    // components don't work properly in conjunction with event bubbling because
+    // the component is rerendered and the value reverted before all the event
+    // handlers can run. See https://github.com/facebook/react/issues/708.
+    batchedUpdates(runEventInBatch, event);
 }
 
 function runEventInBatch(event) {
-  runEventsInBatch(event);
+    runEventsInBatch(event);
 }
 
 function getInstIfValueChanged(targetInst) {
-  var targetNode = getNodeFromInstance$1(targetInst);
-  if (updateValueIfChanged(targetNode)) {
-    return targetInst;
-  }
+    var targetNode = getNodeFromInstance$1(targetInst);
+    if (updateValueIfChanged(targetNode)) {
+        return targetInst;
+    }
 }
 
 function getTargetInstForChangeEvent(topLevelType, targetInst) {
-  if (topLevelType === TOP_CHANGE) {
-    return targetInst;
-  }
+    if (topLevelType === TOP_CHANGE) {
+        return targetInst;
+    }
 }
 
 /**
@@ -3669,9 +3547,9 @@ function getTargetInstForChangeEvent(topLevelType, targetInst) {
  */
 var isInputEventSupported = false;
 if (canUseDOM) {
-  // IE9 claims to support the input event but fails to trigger it when
-  // deleting text, so we ignore its input events.
-  isInputEventSupported = isEventSupported('input') && (!document.documentMode || document.documentMode > 9);
+    // IE9 claims to support the input event but fails to trigger it when
+    // deleting text, so we ignore its input events.
+    isInputEventSupported = isEventSupported('input') && (!document.documentMode || document.documentMode > 9);
 }
 
 /**
@@ -3680,9 +3558,9 @@ if (canUseDOM) {
  * value changes in JS.
  */
 function startWatchingForValueChange(target, targetInst) {
-  activeElement = target;
-  activeElementInst = targetInst;
-  activeElement.attachEvent('onpropertychange', handlePropertyChange);
+    activeElement = target;
+    activeElementInst = targetInst;
+    activeElement.attachEvent('onpropertychange', handlePropertyChange);
 }
 
 /**
@@ -3690,12 +3568,12 @@ function startWatchingForValueChange(target, targetInst) {
  * if any exists.
  */
 function stopWatchingForValueChange() {
-  if (!activeElement) {
-    return;
-  }
-  activeElement.detachEvent('onpropertychange', handlePropertyChange);
-  activeElement = null;
-  activeElementInst = null;
+    if (!activeElement) {
+        return;
+    }
+    activeElement.detachEvent('onpropertychange', handlePropertyChange);
+    activeElement = null;
+    activeElementInst = null;
 }
 
 /**
@@ -3703,84 +3581,84 @@ function stopWatchingForValueChange() {
  * the value of the active element has changed.
  */
 function handlePropertyChange(nativeEvent) {
-  if (nativeEvent.propertyName !== 'value') {
-    return;
-  }
-  if (getInstIfValueChanged(activeElementInst)) {
-    manualDispatchChangeEvent(nativeEvent);
-  }
+    if (nativeEvent.propertyName !== 'value') {
+        return;
+    }
+    if (getInstIfValueChanged(activeElementInst)) {
+        manualDispatchChangeEvent(nativeEvent);
+    }
 }
 
 function handleEventsForInputEventPolyfill(topLevelType, target, targetInst) {
-  if (topLevelType === TOP_FOCUS) {
-    // In IE9, propertychange fires for most input events but is buggy and
-    // doesn't fire when text is deleted, but conveniently, selectionchange
-    // appears to fire in all of the remaining cases so we catch those and
-    // forward the event if the value has changed
-    // In either case, we don't want to call the event handler if the value
-    // is changed from JS so we redefine a setter for `.value` that updates
-    // our activeElementValue variable, allowing us to ignore those changes
-    //
-    // stopWatching() should be a noop here but we call it just in case we
-    // missed a blur event somehow.
-    stopWatchingForValueChange();
-    startWatchingForValueChange(target, targetInst);
-  } else if (topLevelType === TOP_BLUR) {
-    stopWatchingForValueChange();
-  }
+    if (topLevelType === TOP_FOCUS) {
+        // In IE9, propertychange fires for most input events but is buggy and
+        // doesn't fire when text is deleted, but conveniently, selectionchange
+        // appears to fire in all of the remaining cases so we catch those and
+        // forward the event if the value has changed
+        // In either case, we don't want to call the event handler if the value
+        // is changed from JS so we redefine a setter for `.value` that updates
+        // our activeElementValue variable, allowing us to ignore those changes
+        //
+        // stopWatching() should be a noop here but we call it just in case we
+        // missed a blur event somehow.
+        stopWatchingForValueChange();
+        startWatchingForValueChange(target, targetInst);
+    } else if (topLevelType === TOP_BLUR) {
+        stopWatchingForValueChange();
+    }
 }
 
 // For IE8 and IE9.
 function getTargetInstForInputEventPolyfill(topLevelType, targetInst) {
-  if (topLevelType === TOP_SELECTION_CHANGE || topLevelType === TOP_KEY_UP || topLevelType === TOP_KEY_DOWN) {
-    // On the selectionchange event, the target is just document which isn't
-    // helpful for us so just check activeElement instead.
-    //
-    // 99% of the time, keydown and keyup aren't necessary. IE8 fails to fire
-    // propertychange on the first input event after setting `value` from a
-    // script and fires only keydown, keypress, keyup. Catching keyup usually
-    // gets it and catching keydown lets us fire an event for the first
-    // keystroke if user does a key repeat (it'll be a little delayed: right
-    // before the second keystroke). Other input methods (e.g., paste) seem to
-    // fire selectionchange normally.
-    return getInstIfValueChanged(activeElementInst);
-  }
+    if (topLevelType === TOP_SELECTION_CHANGE || topLevelType === TOP_KEY_UP || topLevelType === TOP_KEY_DOWN) {
+        // On the selectionchange event, the target is just document which isn't
+        // helpful for us so just check activeElement instead.
+        //
+        // 99% of the time, keydown and keyup aren't necessary. IE8 fails to fire
+        // propertychange on the first input event after setting `value` from a
+        // script and fires only keydown, keypress, keyup. Catching keyup usually
+        // gets it and catching keydown lets us fire an event for the first
+        // keystroke if user does a key repeat (it'll be a little delayed: right
+        // before the second keystroke). Other input methods (e.g., paste) seem to
+        // fire selectionchange normally.
+        return getInstIfValueChanged(activeElementInst);
+    }
 }
 
 /**
  * SECTION: handle `click` event
  */
 function shouldUseClickEvent(elem) {
-  // Use the `click` event to detect changes to checkbox and radio inputs.
-  // This approach works across all browsers, whereas `change` does not fire
-  // until `blur` in IE8.
-  var nodeName = elem.nodeName;
-  return nodeName && nodeName.toLowerCase() === 'input' && (elem.type === 'checkbox' || elem.type === 'radio');
+    // Use the `click` event to detect changes to checkbox and radio inputs.
+    // This approach works across all browsers, whereas `change` does not fire
+    // until `blur` in IE8.
+    var nodeName = elem.nodeName;
+    return nodeName && nodeName.toLowerCase() === 'input' && (elem.type === 'checkbox' || elem.type === 'radio');
 }
 
 function getTargetInstForClickEvent(topLevelType, targetInst) {
-  if (topLevelType === TOP_CLICK) {
-    return getInstIfValueChanged(targetInst);
-  }
+    if (topLevelType === TOP_CLICK) {
+        return getInstIfValueChanged(targetInst);
+    }
 }
 
 function getTargetInstForInputOrChangeEvent(topLevelType, targetInst) {
-  if (topLevelType === TOP_INPUT || topLevelType === TOP_CHANGE) {
-    return getInstIfValueChanged(targetInst);
-  }
+    if (topLevelType === TOP_INPUT || topLevelType === TOP_CHANGE) {
+        return getInstIfValueChanged(targetInst);
+    }
 }
 
 function handleControlledInputBlur(node) {
-  var state = node._wrapperState;
+    var state = node._wrapperState;
 
-  if (!state || !state.controlled || node.type !== 'number') {
-    return;
-  }
+    if (!state || !state.controlled || node.type !== 'number') {
+        return;
+    }
 
-  if (!disableInputAttributeSyncing) {
-    // If controlled, assign the value attribute to the current value on blur
-    setDefaultValue(node, 'number', node.value);
-  }
+    if (!disableInputAttributeSyncing) {
+        // If controlled, assign the value attribute to the current value on blur
+        setDefaultValue(node, 'number', node.value);
+    }
 }
 
 /**
@@ -3794,45 +3672,45 @@ function handleControlledInputBlur(node) {
  * - select
  */
 var ChangeEventPlugin = {
-  eventTypes: eventTypes$1,
+    eventTypes: eventTypes$1,
 
-  _isInputEventSupported: isInputEventSupported,
+    _isInputEventSupported: isInputEventSupported,
 
-  extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
-    var targetNode = targetInst ? getNodeFromInstance$1(targetInst) : window;
+    extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
+        var targetNode = targetInst ? getNodeFromInstance$1(targetInst) : window;
 
-    var getTargetInstFunc = void 0,
-        handleEventFunc = void 0;
-    if (shouldUseChangeEvent(targetNode)) {
-      getTargetInstFunc = getTargetInstForChangeEvent;
-    } else if (isTextInputElement(targetNode)) {
-      if (isInputEventSupported) {
-        getTargetInstFunc = getTargetInstForInputOrChangeEvent;
-      } else {
-        getTargetInstFunc = getTargetInstForInputEventPolyfill;
-        handleEventFunc = handleEventsForInputEventPolyfill;
-      }
-    } else if (shouldUseClickEvent(targetNode)) {
-      getTargetInstFunc = getTargetInstForClickEvent;
+        var getTargetInstFunc = undefined,
+            handleEventFunc = undefined;
+        if (shouldUseChangeEvent(targetNode)) {
+            getTargetInstFunc = getTargetInstForChangeEvent;
+        } else if (isTextInputElement(targetNode)) {
+            if (isInputEventSupported) {
+                getTargetInstFunc = getTargetInstForInputOrChangeEvent;
+            } else {
+                getTargetInstFunc = getTargetInstForInputEventPolyfill;
+                handleEventFunc = handleEventsForInputEventPolyfill;
+            }
+        } else if (shouldUseClickEvent(targetNode)) {
+            getTargetInstFunc = getTargetInstForClickEvent;
+        }
+
+        if (getTargetInstFunc) {
+            var inst = getTargetInstFunc(topLevelType, targetInst);
+            if (inst) {
+                var event = createAndAccumulateChangeEvent(inst, nativeEvent, nativeEventTarget);
+                return event;
+            }
+        }
+
+        if (handleEventFunc) {
+            handleEventFunc(topLevelType, targetNode, targetInst);
+        }
+
+        // When blurring, set the value attribute for number inputs
+        if (topLevelType === TOP_BLUR) {
+            handleControlledInputBlur(targetNode);
+        }
     }
-
-    if (getTargetInstFunc) {
-      var inst = getTargetInstFunc(topLevelType, targetInst);
-      if (inst) {
-        var event = createAndAccumulateChangeEvent(inst, nativeEvent, nativeEventTarget);
-        return event;
-      }
-    }
-
-    if (handleEventFunc) {
-      handleEventFunc(topLevelType, targetNode, targetInst);
-    }
-
-    // When blurring, set the value attribute for number inputs
-    if (topLevelType === TOP_BLUR) {
-      handleControlledInputBlur(targetNode);
-    }
-  }
 };
 
 /**
@@ -3847,15 +3725,15 @@ var ChangeEventPlugin = {
 var DOMEventPluginOrder = ['ResponderEventPlugin', 'SimpleEventPlugin', 'EnterLeaveEventPlugin', 'ChangeEventPlugin', 'SelectEventPlugin', 'BeforeInputEventPlugin'];
 
 var SyntheticUIEvent = SyntheticEvent.extend({
-  view: null,
-  detail: null
+    view: null,
+    detail: null
 });
 
 var modifierKeyToProp = {
-  Alt: 'altKey',
-  Control: 'ctrlKey',
-  Meta: 'metaKey',
-  Shift: 'shiftKey'
+    Alt: 'altKey',
+    Control: 'ctrlKey',
+    Meta: 'metaKey',
+    Shift: 'shiftKey'
 };
 
 // Older browsers (Safari <= 10, iOS Safari <= 10.2) do not support
@@ -3867,17 +3745,17 @@ var modifierKeyToProp = {
  */
 
 function modifierStateGetter(keyArg) {
-  var syntheticEvent = this;
-  var nativeEvent = syntheticEvent.nativeEvent;
-  if (nativeEvent.getModifierState) {
-    return nativeEvent.getModifierState(keyArg);
-  }
-  var keyProp = modifierKeyToProp[keyArg];
-  return keyProp ? !!nativeEvent[keyProp] : false;
+    var syntheticEvent = this;
+    var nativeEvent = syntheticEvent.nativeEvent;
+    if (nativeEvent.getModifierState) {
+        return nativeEvent.getModifierState(keyArg);
+    }
+    var keyProp = modifierKeyToProp[keyArg];
+    return keyProp ? !!nativeEvent[keyProp] : false;
 }
 
 function getEventModifierState(nativeEvent) {
-  return modifierStateGetter;
+    return modifierStateGetter;
 }
 
 var previousScreenX = 0;
@@ -3891,52 +3769,52 @@ var isMovementYSet = false;
  * @see http://www.w3.org/TR/DOM-Level-3-Events/
  */
 var SyntheticMouseEvent = SyntheticUIEvent.extend({
-  screenX: null,
-  screenY: null,
-  clientX: null,
-  clientY: null,
-  pageX: null,
-  pageY: null,
-  ctrlKey: null,
-  shiftKey: null,
-  altKey: null,
-  metaKey: null,
-  getModifierState: getEventModifierState,
-  button: null,
-  buttons: null,
-  relatedTarget: function (event) {
-    return event.relatedTarget || (event.fromElement === event.srcElement ? event.toElement : event.fromElement);
-  },
-  movementX: function (event) {
-    if ('movementX' in event) {
-      return event.movementX;
+    screenX: null,
+    screenY: null,
+    clientX: null,
+    clientY: null,
+    pageX: null,
+    pageY: null,
+    ctrlKey: null,
+    shiftKey: null,
+    altKey: null,
+    metaKey: null,
+    getModifierState: getEventModifierState,
+    button: null,
+    buttons: null,
+    relatedTarget: function (event) {
+        return event.relatedTarget || (event.fromElement === event.srcElement ? event.toElement : event.fromElement);
+    },
+    movementX: function (event) {
+        if ('movementX' in event) {
+            return event.movementX;
+        }
+
+        var screenX = previousScreenX;
+        previousScreenX = event.screenX;
+
+        if (!isMovementXSet) {
+            isMovementXSet = true;
+            return 0;
+        }
+
+        return event.type === 'mousemove' ? event.screenX - screenX : 0;
+    },
+    movementY: function (event) {
+        if ('movementY' in event) {
+            return event.movementY;
+        }
+
+        var screenY = previousScreenY;
+        previousScreenY = event.screenY;
+
+        if (!isMovementYSet) {
+            isMovementYSet = true;
+            return 0;
+        }
+
+        return event.type === 'mousemove' ? event.screenY - screenY : 0;
     }
-
-    var screenX = previousScreenX;
-    previousScreenX = event.screenX;
-
-    if (!isMovementXSet) {
-      isMovementXSet = true;
-      return 0;
-    }
-
-    return event.type === 'mousemove' ? event.screenX - screenX : 0;
-  },
-  movementY: function (event) {
-    if ('movementY' in event) {
-      return event.movementY;
-    }
-
-    var screenY = previousScreenY;
-    previousScreenY = event.screenY;
-
-    if (!isMovementYSet) {
-      isMovementYSet = true;
-      return 0;
-    }
-
-    return event.type === 'mousemove' ? event.screenY - screenY : 0;
-  }
 });
 
 /**
@@ -3944,125 +3822,125 @@ var SyntheticMouseEvent = SyntheticUIEvent.extend({
  * @see http://www.w3.org/TR/pointerevents/
  */
 var SyntheticPointerEvent = SyntheticMouseEvent.extend({
-  pointerId: null,
-  width: null,
-  height: null,
-  pressure: null,
-  tangentialPressure: null,
-  tiltX: null,
-  tiltY: null,
-  twist: null,
-  pointerType: null,
-  isPrimary: null
+    pointerId: null,
+    width: null,
+    height: null,
+    pressure: null,
+    tangentialPressure: null,
+    tiltX: null,
+    tiltY: null,
+    twist: null,
+    pointerType: null,
+    isPrimary: null
 });
 
 var eventTypes$2 = {
-  mouseEnter: {
-    registrationName: 'onMouseEnter',
-    dependencies: [TOP_MOUSE_OUT, TOP_MOUSE_OVER]
-  },
-  mouseLeave: {
-    registrationName: 'onMouseLeave',
-    dependencies: [TOP_MOUSE_OUT, TOP_MOUSE_OVER]
-  },
-  pointerEnter: {
-    registrationName: 'onPointerEnter',
-    dependencies: [TOP_POINTER_OUT, TOP_POINTER_OVER]
-  },
-  pointerLeave: {
-    registrationName: 'onPointerLeave',
-    dependencies: [TOP_POINTER_OUT, TOP_POINTER_OVER]
-  }
+    mouseEnter: {
+        registrationName: 'onMouseEnter',
+        dependencies: [TOP_MOUSE_OUT, TOP_MOUSE_OVER]
+    },
+    mouseLeave: {
+        registrationName: 'onMouseLeave',
+        dependencies: [TOP_MOUSE_OUT, TOP_MOUSE_OVER]
+    },
+    pointerEnter: {
+        registrationName: 'onPointerEnter',
+        dependencies: [TOP_POINTER_OUT, TOP_POINTER_OVER]
+    },
+    pointerLeave: {
+        registrationName: 'onPointerLeave',
+        dependencies: [TOP_POINTER_OUT, TOP_POINTER_OVER]
+    }
 };
 
 var EnterLeaveEventPlugin = {
-  eventTypes: eventTypes$2,
+    eventTypes: eventTypes$2,
 
-  /**
-   * For almost every interaction we care about, there will be both a top-level
-   * `mouseover` and `mouseout` event that occurs. Only use `mouseout` so that
-   * we do not extract duplicate events. However, moving the mouse into the
-   * browser from outside will not fire a `mouseout` event. In this case, we use
-   * the `mouseover` top-level event.
-   */
-  extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
-    var isOverEvent = topLevelType === TOP_MOUSE_OVER || topLevelType === TOP_POINTER_OVER;
-    var isOutEvent = topLevelType === TOP_MOUSE_OUT || topLevelType === TOP_POINTER_OUT;
+    /**
+     * For almost every interaction we care about, there will be both a top-level
+     * `mouseover` and `mouseout` event that occurs. Only use `mouseout` so that
+     * we do not extract duplicate events. However, moving the mouse into the
+     * browser from outside will not fire a `mouseout` event. In this case, we use
+     * the `mouseover` top-level event.
+     */
+    extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
+        var isOverEvent = topLevelType === TOP_MOUSE_OVER || topLevelType === TOP_POINTER_OVER;
+        var isOutEvent = topLevelType === TOP_MOUSE_OUT || topLevelType === TOP_POINTER_OUT;
 
-    if (isOverEvent && (nativeEvent.relatedTarget || nativeEvent.fromElement)) {
-      return null;
+        if (isOverEvent && (nativeEvent.relatedTarget || nativeEvent.fromElement)) {
+            return null;
+        }
+
+        if (!isOutEvent && !isOverEvent) {
+            // Must not be a mouse or pointer in or out - ignoring.
+            return null;
+        }
+
+        var win = undefined;
+        if (nativeEventTarget.window === nativeEventTarget) {
+            // `nativeEventTarget` is probably a window object.
+            win = nativeEventTarget;
+        } else {
+            // TODO: Figure out why `ownerDocument` is sometimes undefined in IE8.
+            var doc = nativeEventTarget.ownerDocument;
+            if (doc) {
+                win = doc.defaultView || doc.parentWindow;
+            } else {
+                win = window;
+            }
+        }
+
+        var from = undefined;
+        var to = undefined;
+        if (isOutEvent) {
+            from = targetInst;
+            var related = nativeEvent.relatedTarget || nativeEvent.toElement;
+            to = related ? getClosestInstanceFromNode(related) : null;
+        } else {
+            // Moving to a node from outside the window.
+            from = null;
+            to = targetInst;
+        }
+
+        if (from === to) {
+            // Nothing pertains to our managed components.
+            return null;
+        }
+
+        var eventInterface = undefined,
+            leaveEventType = undefined,
+            enterEventType = undefined,
+            eventTypePrefix = undefined;
+
+        if (topLevelType === TOP_MOUSE_OUT || topLevelType === TOP_MOUSE_OVER) {
+            eventInterface = SyntheticMouseEvent;
+            leaveEventType = eventTypes$2.mouseLeave;
+            enterEventType = eventTypes$2.mouseEnter;
+            eventTypePrefix = 'mouse';
+        } else if (topLevelType === TOP_POINTER_OUT || topLevelType === TOP_POINTER_OVER) {
+            eventInterface = SyntheticPointerEvent;
+            leaveEventType = eventTypes$2.pointerLeave;
+            enterEventType = eventTypes$2.pointerEnter;
+            eventTypePrefix = 'pointer';
+        }
+
+        var fromNode = from == null ? win : getNodeFromInstance$1(from);
+        var toNode = to == null ? win : getNodeFromInstance$1(to);
+
+        var leave = eventInterface.getPooled(leaveEventType, from, nativeEvent, nativeEventTarget);
+        leave.type = eventTypePrefix + 'leave';
+        leave.target = fromNode;
+        leave.relatedTarget = toNode;
+
+        var enter = eventInterface.getPooled(enterEventType, to, nativeEvent, nativeEventTarget);
+        enter.type = eventTypePrefix + 'enter';
+        enter.target = toNode;
+        enter.relatedTarget = fromNode;
+
+        accumulateEnterLeaveDispatches(leave, enter, from, to);
+
+        return [leave, enter];
     }
-
-    if (!isOutEvent && !isOverEvent) {
-      // Must not be a mouse or pointer in or out - ignoring.
-      return null;
-    }
-
-    var win = void 0;
-    if (nativeEventTarget.window === nativeEventTarget) {
-      // `nativeEventTarget` is probably a window object.
-      win = nativeEventTarget;
-    } else {
-      // TODO: Figure out why `ownerDocument` is sometimes undefined in IE8.
-      var doc = nativeEventTarget.ownerDocument;
-      if (doc) {
-        win = doc.defaultView || doc.parentWindow;
-      } else {
-        win = window;
-      }
-    }
-
-    var from = void 0;
-    var to = void 0;
-    if (isOutEvent) {
-      from = targetInst;
-      var related = nativeEvent.relatedTarget || nativeEvent.toElement;
-      to = related ? getClosestInstanceFromNode(related) : null;
-    } else {
-      // Moving to a node from outside the window.
-      from = null;
-      to = targetInst;
-    }
-
-    if (from === to) {
-      // Nothing pertains to our managed components.
-      return null;
-    }
-
-    var eventInterface = void 0,
-        leaveEventType = void 0,
-        enterEventType = void 0,
-        eventTypePrefix = void 0;
-
-    if (topLevelType === TOP_MOUSE_OUT || topLevelType === TOP_MOUSE_OVER) {
-      eventInterface = SyntheticMouseEvent;
-      leaveEventType = eventTypes$2.mouseLeave;
-      enterEventType = eventTypes$2.mouseEnter;
-      eventTypePrefix = 'mouse';
-    } else if (topLevelType === TOP_POINTER_OUT || topLevelType === TOP_POINTER_OVER) {
-      eventInterface = SyntheticPointerEvent;
-      leaveEventType = eventTypes$2.pointerLeave;
-      enterEventType = eventTypes$2.pointerEnter;
-      eventTypePrefix = 'pointer';
-    }
-
-    var fromNode = from == null ? win : getNodeFromInstance$1(from);
-    var toNode = to == null ? win : getNodeFromInstance$1(to);
-
-    var leave = eventInterface.getPooled(leaveEventType, from, nativeEvent, nativeEventTarget);
-    leave.type = eventTypePrefix + 'leave';
-    leave.target = fromNode;
-    leave.relatedTarget = toNode;
-
-    var enter = eventInterface.getPooled(enterEventType, to, nativeEvent, nativeEventTarget);
-    enter.type = eventTypePrefix + 'enter';
-    enter.target = toNode;
-    enter.relatedTarget = fromNode;
-
-    accumulateEnterLeaveDispatches(leave, enter, from, to);
-
-    return [leave, enter];
-  }
 };
 
 /**
@@ -4070,8 +3948,8 @@ var EnterLeaveEventPlugin = {
  * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is
  */
 function is(x, y) {
-  return x === y && (x !== 0 || 1 / x === 1 / y) || x !== x && y !== y // eslint-disable-line no-self-compare
-  ;
+    return x === y && (x !== 0 || 1 / x === 1 / y) || x !== x && y !== y // eslint-disable-line no-self-compare
+    ;
 }
 
 var hasOwnProperty$1 = Object.prototype.hasOwnProperty;
@@ -4082,29 +3960,29 @@ var hasOwnProperty$1 = Object.prototype.hasOwnProperty;
  * Returns true when the values of all keys are strictly equal.
  */
 function shallowEqual(objA, objB) {
-  if (is(objA, objB)) {
-    return true;
-  }
-
-  if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) {
-    return false;
-  }
-
-  var keysA = Object.keys(objA);
-  var keysB = Object.keys(objB);
-
-  if (keysA.length !== keysB.length) {
-    return false;
-  }
-
-  // Test for A's keys different from B.
-  for (var i = 0; i < keysA.length; i++) {
-    if (!hasOwnProperty$1.call(objB, keysA[i]) || !is(objA[keysA[i]], objB[keysA[i]])) {
-      return false;
+    if (is(objA, objB)) {
+        return true;
     }
-  }
 
-  return true;
+    if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) {
+        return false;
+    }
+
+    var keysA = Object.keys(objA);
+    var keysB = Object.keys(objB);
+
+    if (keysA.length !== keysB.length) {
+        return false;
+    }
+
+    // Test for A's keys different from B.
+    for (var i = 0; i < keysA.length; i++) {
+        if (!hasOwnProperty$1.call(objB, keysA[i]) || !is(objA[keysA[i]], objB[keysA[i]])) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 /**
@@ -4125,41 +4003,41 @@ function shallowEqual(objA, objB) {
 
 
 function get(key) {
-  return key._reactInternalFiber;
+    return key._reactInternalFiber;
 }
 
 function has(key) {
-  return key._reactInternalFiber !== undefined;
+    return key._reactInternalFiber !== undefined;
 }
 
 function set(key, value) {
-  key._reactInternalFiber = value;
+    key._reactInternalFiber = value;
 }
 
 // Don't change these two values. They're used by React Dev Tools.
-var NoEffect = /*              */0;
-var PerformedWork = /*         */1;
+var NoEffect = /*              */ 0;
+var PerformedWork = /*         */ 1;
 
 // You can change the rest (and add more).
-var Placement = /*             */2;
-var Update = /*                */4;
-var PlacementAndUpdate = /*    */6;
-var Deletion = /*              */8;
-var ContentReset = /*          */16;
-var Callback = /*              */32;
-var DidCapture = /*            */64;
-var Ref = /*                   */128;
-var Snapshot = /*              */256;
-var Passive = /*               */512;
+var Placement = /*             */ 2;
+var Update = /*                */ 4;
+var PlacementAndUpdate = /*    */ 6;
+var Deletion = /*              */ 8;
+var ContentReset = /*          */ 16;
+var Callback = /*              */ 32;
+var DidCapture = /*            */ 64;
+var Ref = /*                   */ 128;
+var Snapshot = /*              */ 256;
+var Passive = /*               */ 512;
 
 // Passive & Update & Callback & Ref & Snapshot
-var LifecycleEffectMask = /*   */932;
+var LifecycleEffectMask = /*   */ 932;
 
 // Union of all host effects
-var HostEffectMask = /*        */1023;
+var HostEffectMask = /*        */ 1023;
 
-var Incomplete = /*            */1024;
-var ShouldCapture = /*         */2048;
+var Incomplete = /*            */ 1024;
+var ShouldCapture = /*         */ 2048;
 
 var ReactCurrentOwner$1 = ReactSharedInternals.ReactCurrentOwner;
 
@@ -4168,244 +4046,243 @@ var MOUNTED = 2;
 var UNMOUNTED = 3;
 
 function isFiberMountedImpl(fiber) {
-  var node = fiber;
-  if (!fiber.alternate) {
-    // If there is no alternate, this might be a new tree that isn't inserted
-    // yet. If it is, then it will have a pending insertion effect on it.
-    if ((node.effectTag & Placement) !== NoEffect) {
-      return MOUNTING;
+    var node = fiber;
+    if (!fiber.alternate) {
+        // If there is no alternate, this might be a new tree that isn't inserted
+        // yet. If it is, then it will have a pending insertion effect on it.
+        if ((node.effectTag & Placement) !== NoEffect) {
+            return MOUNTING;
+        }
+        while (node.return) {
+            node = node.return;
+            if ((node.effectTag & Placement) !== NoEffect) {
+                return MOUNTING;
+            }
+        }
+    } else {
+        while (node.return) {
+            node = node.return;
+        }
     }
-    while (node.return) {
-      node = node.return;
-      if ((node.effectTag & Placement) !== NoEffect) {
-        return MOUNTING;
-      }
+    if (node.tag === HostRoot) {
+        // TODO: Check if this was a nested HostRoot when used with
+        // renderContainerIntoSubtree.
+        return MOUNTED;
     }
-  } else {
-    while (node.return) {
-      node = node.return;
-    }
-  }
-  if (node.tag === HostRoot) {
-    // TODO: Check if this was a nested HostRoot when used with
-    // renderContainerIntoSubtree.
-    return MOUNTED;
-  }
-  // If we didn't hit the root, that means that we're in an disconnected tree
-  // that has been unmounted.
-  return UNMOUNTED;
+    // If we didn't hit the root, that means that we're in an disconnected tree
+    // that has been unmounted.
+    return UNMOUNTED;
 }
 
 function isFiberMounted(fiber) {
-  return isFiberMountedImpl(fiber) === MOUNTED;
+    return isFiberMountedImpl(fiber) === MOUNTED;
 }
 
 function isMounted(component) {
-  {
-    var owner = ReactCurrentOwner$1.current;
-    if (owner !== null && owner.tag === ClassComponent) {
-      var ownerFiber = owner;
-      var instance = ownerFiber.stateNode;
-      !instance._warnedAboutRefsInRender ? warningWithoutStack$1(false, '%s is accessing isMounted inside its render() function. ' + 'render() should be a pure function of props and state. It should ' + 'never access something that requires stale data from the previous ' + 'render, such as refs. Move this logic to componentDidMount and ' + 'componentDidUpdate instead.', getComponentName(ownerFiber.type) || 'A component') : void 0;
-      instance._warnedAboutRefsInRender = true;
+    {
+        var owner = ReactCurrentOwner$1.current;
+        if (owner !== null && owner.tag === ClassComponent) {
+            var ownerFiber = owner;
+            var instance = ownerFiber.stateNode;
+            !instance._warnedAboutRefsInRender ? warningWithoutStack$1(false, '%s is accessing isMounted inside its render() function. ' + 'render() should be a pure function of props and state. It should ' + 'never access something that requires stale data from the previous ' + 'render, such as refs. Move this logic to componentDidMount and ' + 'componentDidUpdate instead.', getComponentName(ownerFiber.type) || 'A component') : undefined;
+            instance._warnedAboutRefsInRender = true;
+        }
     }
-  }
 
-  var fiber = get(component);
-  if (!fiber) {
-    return false;
-  }
-  return isFiberMountedImpl(fiber) === MOUNTED;
+    var fiber = get(component);
+    if (!fiber) {
+        return false;
+    }
+    return isFiberMountedImpl(fiber) === MOUNTED;
 }
 
 function assertIsMounted(fiber) {
-  !(isFiberMountedImpl(fiber) === MOUNTED) ? invariant(false, 'Unable to find node on an unmounted component.') : void 0;
+    !(isFiberMountedImpl(fiber) === MOUNTED) ? invariant(false, 'Unable to find node on an unmounted component.'): undefined;
 }
 
 function findCurrentFiberUsingSlowPath(fiber) {
-  var alternate = fiber.alternate;
-  if (!alternate) {
-    // If there is no alternate, then we only need to check if it is mounted.
-    var state = isFiberMountedImpl(fiber);
-    !(state !== UNMOUNTED) ? invariant(false, 'Unable to find node on an unmounted component.') : void 0;
-    if (state === MOUNTING) {
-      return null;
+    var alternate = fiber.alternate;
+    if (!alternate) {
+        // If there is no alternate, then we only need to check if it is mounted.
+        var state = isFiberMountedImpl(fiber);
+        !(state !== UNMOUNTED) ? invariant(false, 'Unable to find node on an unmounted component.'): undefined;
+        if (state === MOUNTING) {
+            return null;
+        }
+        return fiber;
     }
-    return fiber;
-  }
-  // If we have two possible branches, we'll walk backwards up to the root
-  // to see what path the root points to. On the way we may hit one of the
-  // special cases and we'll deal with them.
-  var a = fiber;
-  var b = alternate;
-  while (true) {
-    var parentA = a.return;
-    var parentB = parentA ? parentA.alternate : null;
-    if (!parentA || !parentB) {
-      // We're at the root.
-      break;
-    }
-
-    // If both copies of the parent fiber point to the same child, we can
-    // assume that the child is current. This happens when we bailout on low
-    // priority: the bailed out fiber's child reuses the current child.
-    if (parentA.child === parentB.child) {
-      var child = parentA.child;
-      while (child) {
-        if (child === a) {
-          // We've determined that A is the current branch.
-          assertIsMounted(parentA);
-          return fiber;
-        }
-        if (child === b) {
-          // We've determined that B is the current branch.
-          assertIsMounted(parentA);
-          return alternate;
-        }
-        child = child.sibling;
-      }
-      // We should never have an alternate for any mounting node. So the only
-      // way this could possibly happen is if this was unmounted, if at all.
-      invariant(false, 'Unable to find node on an unmounted component.');
-    }
-
-    if (a.return !== b.return) {
-      // The return pointer of A and the return pointer of B point to different
-      // fibers. We assume that return pointers never criss-cross, so A must
-      // belong to the child set of A.return, and B must belong to the child
-      // set of B.return.
-      a = parentA;
-      b = parentB;
-    } else {
-      // The return pointers point to the same fiber. We'll have to use the
-      // default, slow path: scan the child sets of each parent alternate to see
-      // which child belongs to which set.
-      //
-      // Search parent A's child set
-      var didFindChild = false;
-      var _child = parentA.child;
-      while (_child) {
-        if (_child === a) {
-          didFindChild = true;
-          a = parentA;
-          b = parentB;
-          break;
-        }
-        if (_child === b) {
-          didFindChild = true;
-          b = parentA;
-          a = parentB;
-          break;
-        }
-        _child = _child.sibling;
-      }
-      if (!didFindChild) {
-        // Search parent B's child set
-        _child = parentB.child;
-        while (_child) {
-          if (_child === a) {
-            didFindChild = true;
-            a = parentB;
-            b = parentA;
+    // If we have two possible branches, we'll walk backwards up to the root
+    // to see what path the root points to. On the way we may hit one of the
+    // special cases and we'll deal with them.
+    var a = fiber;
+    var b = alternate;
+    while (true) {
+        var parentA = a.return;
+        var parentB = parentA ? parentA.alternate : null;
+        if (!parentA || !parentB) {
+            // We're at the root.
             break;
-          }
-          if (_child === b) {
-            didFindChild = true;
-            b = parentB;
+        }
+
+        // If both copies of the parent fiber point to the same child, we can
+        // assume that the child is current. This happens when we bailout on low
+        // priority: the bailed out fiber's child reuses the current child.
+        if (parentA.child === parentB.child) {
+            var child = parentA.child;
+            while (child) {
+                if (child === a) {
+                    // We've determined that A is the current branch.
+                    assertIsMounted(parentA);
+                    return fiber;
+                }
+                if (child === b) {
+                    // We've determined that B is the current branch.
+                    assertIsMounted(parentA);
+                    return alternate;
+                }
+                child = child.sibling;
+            }
+            // We should never have an alternate for any mounting node. So the only
+            // way this could possibly happen is if this was unmounted, if at all.
+            invariant(false, 'Unable to find node on an unmounted component.');
+        }
+
+        if (a.return !== b.return) {
+            // The return pointer of A and the return pointer of B point to different
+            // fibers. We assume that return pointers never criss-cross, so A must
+            // belong to the child set of A.return, and B must belong to the child
+            // set of B.return.
             a = parentA;
-            break;
-          }
-          _child = _child.sibling;
+            b = parentB;
+        } else {
+            // The return pointers point to the same fiber. We'll have to use the
+            // default, slow path: scan the child sets of each parent alternate to see
+            // which child belongs to which set.
+            //
+            // Search parent A's child set
+            var didFindChild = false;
+            var _child = parentA.child;
+            while (_child) {
+                if (_child === a) {
+                    didFindChild = true;
+                    a = parentA;
+                    b = parentB;
+                    break;
+                }
+                if (_child === b) {
+                    didFindChild = true;
+                    b = parentA;
+                    a = parentB;
+                    break;
+                }
+                _child = _child.sibling;
+            }
+            if (!didFindChild) {
+                // Search parent B's child set
+                _child = parentB.child;
+                while (_child) {
+                    if (_child === a) {
+                        didFindChild = true;
+                        a = parentB;
+                        b = parentA;
+                        break;
+                    }
+                    if (_child === b) {
+                        didFindChild = true;
+                        b = parentB;
+                        a = parentA;
+                        break;
+                    }
+                    _child = _child.sibling;
+                }!didFindChild ? invariant(false, 'Child was not found in either parent set. This indicates a bug in React related to the return pointer. Please file an issue.') : undefined;
+            }
         }
-        !didFindChild ? invariant(false, 'Child was not found in either parent set. This indicates a bug in React related to the return pointer. Please file an issue.') : void 0;
-      }
-    }
 
-    !(a.alternate === b) ? invariant(false, 'Return fibers should always be each others\' alternates. This error is likely caused by a bug in React. Please file an issue.') : void 0;
-  }
-  // If the root is not a host container, we're in a disconnected tree. I.e.
-  // unmounted.
-  !(a.tag === HostRoot) ? invariant(false, 'Unable to find node on an unmounted component.') : void 0;
-  if (a.stateNode.current === a) {
-    // We've determined that A is the current branch.
-    return fiber;
-  }
-  // Otherwise B has to be current branch.
-  return alternate;
+        !(a.alternate === b) ? invariant(false, 'Return fibers should always be each others\' alternates. This error is likely caused by a bug in React. Please file an issue.'): undefined;
+    }
+    // If the root is not a host container, we're in a disconnected tree. I.e.
+    // unmounted.
+    !(a.tag === HostRoot) ? invariant(false, 'Unable to find node on an unmounted component.'): undefined;
+    if (a.stateNode.current === a) {
+        // We've determined that A is the current branch.
+        return fiber;
+    }
+    // Otherwise B has to be current branch.
+    return alternate;
 }
 
 function findCurrentHostFiber(parent) {
-  var currentParent = findCurrentFiberUsingSlowPath(parent);
-  if (!currentParent) {
-    return null;
-  }
-
-  // Next we'll drill down this component to find the first HostComponent/Text.
-  var node = currentParent;
-  while (true) {
-    if (node.tag === HostComponent || node.tag === HostText) {
-      return node;
-    } else if (node.child) {
-      node.child.return = node;
-      node = node.child;
-      continue;
-    }
-    if (node === currentParent) {
-      return null;
-    }
-    while (!node.sibling) {
-      if (!node.return || node.return === currentParent) {
+    var currentParent = findCurrentFiberUsingSlowPath(parent);
+    if (!currentParent) {
         return null;
-      }
-      node = node.return;
     }
-    node.sibling.return = node.return;
-    node = node.sibling;
-  }
-  // Flow needs the return null here, but ESLint complains about it.
-  // eslint-disable-next-line no-unreachable
-  return null;
+
+    // Next we'll drill down this component to find the first HostComponent/Text.
+    var node = currentParent;
+    while (true) {
+        if (node.tag === HostComponent || node.tag === HostText) {
+            return node;
+        } else if (node.child) {
+            node.child.return = node;
+            node = node.child;
+            continue;
+        }
+        if (node === currentParent) {
+            return null;
+        }
+        while (!node.sibling) {
+            if (!node.return || node.return === currentParent) {
+                return null;
+            }
+            node = node.return;
+        }
+        node.sibling.return = node.return;
+        node = node.sibling;
+    }
+    // Flow needs the return null here, but ESLint complains about it.
+    // eslint-disable-next-line no-unreachable
+    return null;
 }
 
 function findCurrentHostFiberWithNoPortals(parent) {
-  var currentParent = findCurrentFiberUsingSlowPath(parent);
-  if (!currentParent) {
-    return null;
-  }
-
-  // Next we'll drill down this component to find the first HostComponent/Text.
-  var node = currentParent;
-  while (true) {
-    if (node.tag === HostComponent || node.tag === HostText) {
-      return node;
-    } else if (node.child && node.tag !== HostPortal) {
-      node.child.return = node;
-      node = node.child;
-      continue;
-    }
-    if (node === currentParent) {
-      return null;
-    }
-    while (!node.sibling) {
-      if (!node.return || node.return === currentParent) {
+    var currentParent = findCurrentFiberUsingSlowPath(parent);
+    if (!currentParent) {
         return null;
-      }
-      node = node.return;
     }
-    node.sibling.return = node.return;
-    node = node.sibling;
-  }
-  // Flow needs the return null here, but ESLint complains about it.
-  // eslint-disable-next-line no-unreachable
-  return null;
+
+    // Next we'll drill down this component to find the first HostComponent/Text.
+    var node = currentParent;
+    while (true) {
+        if (node.tag === HostComponent || node.tag === HostText) {
+            return node;
+        } else if (node.child && node.tag !== HostPortal) {
+            node.child.return = node;
+            node = node.child;
+            continue;
+        }
+        if (node === currentParent) {
+            return null;
+        }
+        while (!node.sibling) {
+            if (!node.return || node.return === currentParent) {
+                return null;
+            }
+            node = node.return;
+        }
+        node.sibling.return = node.return;
+        node = node.sibling;
+    }
+    // Flow needs the return null here, but ESLint complains about it.
+    // eslint-disable-next-line no-unreachable
+    return null;
 }
 
 function addEventBubbleListener(element, eventType, listener) {
-  element.addEventListener(eventType, listener, false);
+    element.addEventListener(eventType, listener, false);
 }
 
 function addEventCaptureListener(element, eventType, listener) {
-  element.addEventListener(eventType, listener, true);
+    element.addEventListener(eventType, listener, true);
 }
 
 /**
@@ -4414,9 +4291,9 @@ function addEventCaptureListener(element, eventType, listener) {
  * @see https://developer.mozilla.org/en-US/docs/Web/API/AnimationEvent
  */
 var SyntheticAnimationEvent = SyntheticEvent.extend({
-  animationName: null,
-  elapsedTime: null,
-  pseudoElement: null
+    animationName: null,
+    elapsedTime: null,
+    pseudoElement: null
 });
 
 /**
@@ -4424,9 +4301,9 @@ var SyntheticAnimationEvent = SyntheticEvent.extend({
  * @see http://www.w3.org/TR/clipboard-apis/
  */
 var SyntheticClipboardEvent = SyntheticEvent.extend({
-  clipboardData: function (event) {
-    return 'clipboardData' in event ? event.clipboardData : window.clipboardData;
-  }
+    clipboardData: function (event) {
+        return 'clipboardData' in event ? event.clipboardData : window.clipboardData;
+    }
 });
 
 /**
@@ -4434,7 +4311,7 @@ var SyntheticClipboardEvent = SyntheticEvent.extend({
  * @see http://www.w3.org/TR/DOM-Level-3-Events/
  */
 var SyntheticFocusEvent = SyntheticUIEvent.extend({
-  relatedTarget: null
+    relatedTarget: null
 });
 
 /**
@@ -4448,34 +4325,34 @@ var SyntheticFocusEvent = SyntheticUIEvent.extend({
  * @return {number} Normalized `charCode` property.
  */
 function getEventCharCode(nativeEvent) {
-  var charCode = void 0;
-  var keyCode = nativeEvent.keyCode;
+    var charCode = undefined;
+    var keyCode = nativeEvent.keyCode;
 
-  if ('charCode' in nativeEvent) {
-    charCode = nativeEvent.charCode;
+    if ('charCode' in nativeEvent) {
+        charCode = nativeEvent.charCode;
 
-    // FF does not set `charCode` for the Enter-key, check against `keyCode`.
-    if (charCode === 0 && keyCode === 13) {
-      charCode = 13;
+        // FF does not set `charCode` for the Enter-key, check against `keyCode`.
+        if (charCode === 0 && keyCode === 13) {
+            charCode = 13;
+        }
+    } else {
+        // IE8 does not implement `charCode`, but `keyCode` has the correct value.
+        charCode = keyCode;
     }
-  } else {
-    // IE8 does not implement `charCode`, but `keyCode` has the correct value.
-    charCode = keyCode;
-  }
 
-  // IE and Edge (on Windows) and Chrome / Safari (on Windows and Linux)
-  // report Enter as charCode 10 when ctrl is pressed.
-  if (charCode === 10) {
-    charCode = 13;
-  }
+    // IE and Edge (on Windows) and Chrome / Safari (on Windows and Linux)
+    // report Enter as charCode 10 when ctrl is pressed.
+    if (charCode === 10) {
+        charCode = 13;
+    }
 
-  // Some non-printable keys are reported in `charCode`/`keyCode`, discard them.
-  // Must not discard the (non-)printable Enter-key.
-  if (charCode >= 32 || charCode === 13) {
-    return charCode;
-  }
+    // Some non-printable keys are reported in `charCode`/`keyCode`, discard them.
+    // Must not discard the (non-)printable Enter-key.
+    if (charCode >= 32 || charCode === 13) {
+        return charCode;
+    }
 
-  return 0;
+    return 0;
 }
 
 /**
@@ -4483,18 +4360,18 @@ function getEventCharCode(nativeEvent) {
  * @see https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent#Key_names
  */
 var normalizeKey = {
-  Esc: 'Escape',
-  Spacebar: ' ',
-  Left: 'ArrowLeft',
-  Up: 'ArrowUp',
-  Right: 'ArrowRight',
-  Down: 'ArrowDown',
-  Del: 'Delete',
-  Win: 'OS',
-  Menu: 'ContextMenu',
-  Apps: 'ContextMenu',
-  Scroll: 'ScrollLock',
-  MozPrintableKey: 'Unidentified'
+    Esc: 'Escape',
+    Spacebar: ' ',
+    Left: 'ArrowLeft',
+    Up: 'ArrowUp',
+    Right: 'ArrowRight',
+    Down: 'ArrowDown',
+    Del: 'Delete',
+    Win: 'OS',
+    Menu: 'ContextMenu',
+    Apps: 'ContextMenu',
+    Scroll: 'ScrollLock',
+    MozPrintableKey: 'Unidentified'
 };
 
 /**
@@ -4503,42 +4380,42 @@ var normalizeKey = {
  * @see https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent#Key_names
  */
 var translateToKey = {
-  '8': 'Backspace',
-  '9': 'Tab',
-  '12': 'Clear',
-  '13': 'Enter',
-  '16': 'Shift',
-  '17': 'Control',
-  '18': 'Alt',
-  '19': 'Pause',
-  '20': 'CapsLock',
-  '27': 'Escape',
-  '32': ' ',
-  '33': 'PageUp',
-  '34': 'PageDown',
-  '35': 'End',
-  '36': 'Home',
-  '37': 'ArrowLeft',
-  '38': 'ArrowUp',
-  '39': 'ArrowRight',
-  '40': 'ArrowDown',
-  '45': 'Insert',
-  '46': 'Delete',
-  '112': 'F1',
-  '113': 'F2',
-  '114': 'F3',
-  '115': 'F4',
-  '116': 'F5',
-  '117': 'F6',
-  '118': 'F7',
-  '119': 'F8',
-  '120': 'F9',
-  '121': 'F10',
-  '122': 'F11',
-  '123': 'F12',
-  '144': 'NumLock',
-  '145': 'ScrollLock',
-  '224': 'Meta'
+    '8': 'Backspace',
+    '9': 'Tab',
+    '12': 'Clear',
+    '13': 'Enter',
+    '16': 'Shift',
+    '17': 'Control',
+    '18': 'Alt',
+    '19': 'Pause',
+    '20': 'CapsLock',
+    '27': 'Escape',
+    '32': ' ',
+    '33': 'PageUp',
+    '34': 'PageDown',
+    '35': 'End',
+    '36': 'Home',
+    '37': 'ArrowLeft',
+    '38': 'ArrowUp',
+    '39': 'ArrowRight',
+    '40': 'ArrowDown',
+    '45': 'Insert',
+    '46': 'Delete',
+    '112': 'F1',
+    '113': 'F2',
+    '114': 'F3',
+    '115': 'F4',
+    '116': 'F5',
+    '117': 'F6',
+    '118': 'F7',
+    '119': 'F8',
+    '120': 'F9',
+    '121': 'F10',
+    '122': 'F11',
+    '123': 'F12',
+    '144': 'NumLock',
+    '145': 'ScrollLock',
+    '224': 'Meta'
 };
 
 /**
@@ -4546,32 +4423,32 @@ var translateToKey = {
  * @return {string} Normalized `key` property.
  */
 function getEventKey(nativeEvent) {
-  if (nativeEvent.key) {
-    // Normalize inconsistent values reported by browsers due to
-    // implementations of a working draft specification.
+    if (nativeEvent.key) {
+        // Normalize inconsistent values reported by browsers due to
+        // implementations of a working draft specification.
 
-    // FireFox implements `key` but returns `MozPrintableKey` for all
-    // printable characters (normalized to `Unidentified`), ignore it.
-    var key = normalizeKey[nativeEvent.key] || nativeEvent.key;
-    if (key !== 'Unidentified') {
-      return key;
+        // FireFox implements `key` but returns `MozPrintableKey` for all
+        // printable characters (normalized to `Unidentified`), ignore it.
+        var key = normalizeKey[nativeEvent.key] || nativeEvent.key;
+        if (key !== 'Unidentified') {
+            return key;
+        }
     }
-  }
 
-  // Browser does not implement `key`, polyfill as much of it as we can.
-  if (nativeEvent.type === 'keypress') {
-    var charCode = getEventCharCode(nativeEvent);
+    // Browser does not implement `key`, polyfill as much of it as we can.
+    if (nativeEvent.type === 'keypress') {
+        var charCode = getEventCharCode(nativeEvent);
 
-    // The enter-key is technically both printable and non-printable and can
-    // thus be captured by `keypress`, no other non-printable key should.
-    return charCode === 13 ? 'Enter' : String.fromCharCode(charCode);
-  }
-  if (nativeEvent.type === 'keydown' || nativeEvent.type === 'keyup') {
-    // While user keyboard layout determines the actual meaning of each
-    // `keyCode` value, almost all function keys have a universal value.
-    return translateToKey[nativeEvent.keyCode] || 'Unidentified';
-  }
-  return '';
+        // The enter-key is technically both printable and non-printable and can
+        // thus be captured by `keypress`, no other non-printable key should.
+        return charCode === 13 ? 'Enter' : String.fromCharCode(charCode);
+    }
+    if (nativeEvent.type === 'keydown' || nativeEvent.type === 'keyup') {
+        // While user keyboard layout determines the actual meaning of each
+        // `keyCode` value, almost all function keys have a universal value.
+        return translateToKey[nativeEvent.keyCode] || 'Unidentified';
+    }
+    return '';
 }
 
 /**
@@ -4579,51 +4456,51 @@ function getEventKey(nativeEvent) {
  * @see http://www.w3.org/TR/DOM-Level-3-Events/
  */
 var SyntheticKeyboardEvent = SyntheticUIEvent.extend({
-  key: getEventKey,
-  location: null,
-  ctrlKey: null,
-  shiftKey: null,
-  altKey: null,
-  metaKey: null,
-  repeat: null,
-  locale: null,
-  getModifierState: getEventModifierState,
-  // Legacy Interface
-  charCode: function (event) {
-    // `charCode` is the result of a KeyPress event and represents the value of
-    // the actual printable character.
+    key: getEventKey,
+    location: null,
+    ctrlKey: null,
+    shiftKey: null,
+    altKey: null,
+    metaKey: null,
+    repeat: null,
+    locale: null,
+    getModifierState: getEventModifierState,
+    // Legacy Interface
+    charCode: function (event) {
+        // `charCode` is the result of a KeyPress event and represents the value of
+        // the actual printable character.
 
-    // KeyPress is deprecated, but its replacement is not yet final and not
-    // implemented in any major browser. Only KeyPress has charCode.
-    if (event.type === 'keypress') {
-      return getEventCharCode(event);
-    }
-    return 0;
-  },
-  keyCode: function (event) {
-    // `keyCode` is the result of a KeyDown/Up event and represents the value of
-    // physical keyboard key.
+        // KeyPress is deprecated, but its replacement is not yet final and not
+        // implemented in any major browser. Only KeyPress has charCode.
+        if (event.type === 'keypress') {
+            return getEventCharCode(event);
+        }
+        return 0;
+    },
+    keyCode: function (event) {
+        // `keyCode` is the result of a KeyDown/Up event and represents the value of
+        // physical keyboard key.
 
-    // The actual meaning of the value depends on the users' keyboard layout
-    // which cannot be detected. Assuming that it is a US keyboard layout
-    // provides a surprisingly accurate mapping for US and European users.
-    // Due to this, it is left to the user to implement at this time.
-    if (event.type === 'keydown' || event.type === 'keyup') {
-      return event.keyCode;
+        // The actual meaning of the value depends on the users' keyboard layout
+        // which cannot be detected. Assuming that it is a US keyboard layout
+        // provides a surprisingly accurate mapping for US and European users.
+        // Due to this, it is left to the user to implement at this time.
+        if (event.type === 'keydown' || event.type === 'keyup') {
+            return event.keyCode;
+        }
+        return 0;
+    },
+    which: function (event) {
+        // `which` is an alias for either `keyCode` or `charCode` depending on the
+        // type of the event.
+        if (event.type === 'keypress') {
+            return getEventCharCode(event);
+        }
+        if (event.type === 'keydown' || event.type === 'keyup') {
+            return event.keyCode;
+        }
+        return 0;
     }
-    return 0;
-  },
-  which: function (event) {
-    // `which` is an alias for either `keyCode` or `charCode` depending on the
-    // type of the event.
-    if (event.type === 'keypress') {
-      return getEventCharCode(event);
-    }
-    if (event.type === 'keydown' || event.type === 'keyup') {
-      return event.keyCode;
-    }
-    return 0;
-  }
 });
 
 /**
@@ -4631,7 +4508,7 @@ var SyntheticKeyboardEvent = SyntheticUIEvent.extend({
  * @see http://www.w3.org/TR/DOM-Level-3-Events/
  */
 var SyntheticDragEvent = SyntheticMouseEvent.extend({
-  dataTransfer: null
+    dataTransfer: null
 });
 
 /**
@@ -4639,14 +4516,14 @@ var SyntheticDragEvent = SyntheticMouseEvent.extend({
  * @see http://www.w3.org/TR/touch-events/
  */
 var SyntheticTouchEvent = SyntheticUIEvent.extend({
-  touches: null,
-  targetTouches: null,
-  changedTouches: null,
-  altKey: null,
-  metaKey: null,
-  ctrlKey: null,
-  shiftKey: null,
-  getModifierState: getEventModifierState
+    touches: null,
+    targetTouches: null,
+    changedTouches: null,
+    altKey: null,
+    metaKey: null,
+    ctrlKey: null,
+    shiftKey: null,
+    getModifierState: getEventModifierState
 });
 
 /**
@@ -4655,9 +4532,9 @@ var SyntheticTouchEvent = SyntheticUIEvent.extend({
  * @see https://developer.mozilla.org/en-US/docs/Web/API/TransitionEvent
  */
 var SyntheticTransitionEvent = SyntheticEvent.extend({
-  propertyName: null,
-  elapsedTime: null,
-  pseudoElement: null
+    propertyName: null,
+    elapsedTime: null,
+    pseudoElement: null
 });
 
 /**
@@ -4665,23 +4542,23 @@ var SyntheticTransitionEvent = SyntheticEvent.extend({
  * @see http://www.w3.org/TR/DOM-Level-3-Events/
  */
 var SyntheticWheelEvent = SyntheticMouseEvent.extend({
-  deltaX: function (event) {
-    return 'deltaX' in event ? event.deltaX : // Fallback to `wheelDeltaX` for Webkit and normalize (right is positive).
-    'wheelDeltaX' in event ? -event.wheelDeltaX : 0;
-  },
-  deltaY: function (event) {
-    return 'deltaY' in event ? event.deltaY : // Fallback to `wheelDeltaY` for Webkit and normalize (down is positive).
-    'wheelDeltaY' in event ? -event.wheelDeltaY : // Fallback to `wheelDelta` for IE<9 and normalize (down is positive).
-    'wheelDelta' in event ? -event.wheelDelta : 0;
-  },
+    deltaX: function (event) {
+        return 'deltaX' in event ? event.deltaX : // Fallback to `wheelDeltaX` for Webkit and normalize (right is positive).
+            'wheelDeltaX' in event ? -event.wheelDeltaX : 0;
+    },
+    deltaY: function (event) {
+        return 'deltaY' in event ? event.deltaY : // Fallback to `wheelDeltaY` for Webkit and normalize (down is positive).
+            'wheelDeltaY' in event ? -event.wheelDeltaY : // Fallback to `wheelDelta` for IE<9 and normalize (down is positive).
+            'wheelDelta' in event ? -event.wheelDelta : 0;
+    },
 
-  deltaZ: null,
+    deltaZ: null,
 
-  // Browsers without "deltaMode" is reporting in raw wheel delta where one
-  // notch on the scroll is always +/- 120, roughly equivalent to pixels.
-  // A good approximation of DOM_DELTA_LINE (1) is 5% of viewport size or
-  // ~40 pixels, for DOM_DELTA_SCREEN (2) it is 87.5% of viewport size.
-  deltaMode: null
+    // Browsers without "deltaMode" is reporting in raw wheel delta where one
+    // notch on the scroll is always +/- 120, roughly equivalent to pixels.
+    // A good approximation of DOM_DELTA_LINE (1) is 5% of viewport size or
+    // ~40 pixels, for DOM_DELTA_SCREEN (2) it is 87.5% of viewport size.
+    deltaMode: null
 });
 
 /**
@@ -4703,152 +4580,228 @@ var SyntheticWheelEvent = SyntheticMouseEvent.extend({
  * ]);
  */
 
-var interactiveEventTypeNames = [[TOP_BLUR, 'blur'], [TOP_CANCEL, 'cancel'], [TOP_CLICK, 'click'], [TOP_CLOSE, 'close'], [TOP_CONTEXT_MENU, 'contextMenu'], [TOP_COPY, 'copy'], [TOP_CUT, 'cut'], [TOP_AUX_CLICK, 'auxClick'], [TOP_DOUBLE_CLICK, 'doubleClick'], [TOP_DRAG_END, 'dragEnd'], [TOP_DRAG_START, 'dragStart'], [TOP_DROP, 'drop'], [TOP_FOCUS, 'focus'], [TOP_INPUT, 'input'], [TOP_INVALID, 'invalid'], [TOP_KEY_DOWN, 'keyDown'], [TOP_KEY_PRESS, 'keyPress'], [TOP_KEY_UP, 'keyUp'], [TOP_MOUSE_DOWN, 'mouseDown'], [TOP_MOUSE_UP, 'mouseUp'], [TOP_PASTE, 'paste'], [TOP_PAUSE, 'pause'], [TOP_PLAY, 'play'], [TOP_POINTER_CANCEL, 'pointerCancel'], [TOP_POINTER_DOWN, 'pointerDown'], [TOP_POINTER_UP, 'pointerUp'], [TOP_RATE_CHANGE, 'rateChange'], [TOP_RESET, 'reset'], [TOP_SEEKED, 'seeked'], [TOP_SUBMIT, 'submit'], [TOP_TOUCH_CANCEL, 'touchCancel'], [TOP_TOUCH_END, 'touchEnd'], [TOP_TOUCH_START, 'touchStart'], [TOP_VOLUME_CHANGE, 'volumeChange']];
-var nonInteractiveEventTypeNames = [[TOP_ABORT, 'abort'], [TOP_ANIMATION_END, 'animationEnd'], [TOP_ANIMATION_ITERATION, 'animationIteration'], [TOP_ANIMATION_START, 'animationStart'], [TOP_CAN_PLAY, 'canPlay'], [TOP_CAN_PLAY_THROUGH, 'canPlayThrough'], [TOP_DRAG, 'drag'], [TOP_DRAG_ENTER, 'dragEnter'], [TOP_DRAG_EXIT, 'dragExit'], [TOP_DRAG_LEAVE, 'dragLeave'], [TOP_DRAG_OVER, 'dragOver'], [TOP_DURATION_CHANGE, 'durationChange'], [TOP_EMPTIED, 'emptied'], [TOP_ENCRYPTED, 'encrypted'], [TOP_ENDED, 'ended'], [TOP_ERROR, 'error'], [TOP_GOT_POINTER_CAPTURE, 'gotPointerCapture'], [TOP_LOAD, 'load'], [TOP_LOADED_DATA, 'loadedData'], [TOP_LOADED_METADATA, 'loadedMetadata'], [TOP_LOAD_START, 'loadStart'], [TOP_LOST_POINTER_CAPTURE, 'lostPointerCapture'], [TOP_MOUSE_MOVE, 'mouseMove'], [TOP_MOUSE_OUT, 'mouseOut'], [TOP_MOUSE_OVER, 'mouseOver'], [TOP_PLAYING, 'playing'], [TOP_POINTER_MOVE, 'pointerMove'], [TOP_POINTER_OUT, 'pointerOut'], [TOP_POINTER_OVER, 'pointerOver'], [TOP_PROGRESS, 'progress'], [TOP_SCROLL, 'scroll'], [TOP_SEEKING, 'seeking'], [TOP_STALLED, 'stalled'], [TOP_SUSPEND, 'suspend'], [TOP_TIME_UPDATE, 'timeUpdate'], [TOP_TOGGLE, 'toggle'], [TOP_TOUCH_MOVE, 'touchMove'], [TOP_TRANSITION_END, 'transitionEnd'], [TOP_WAITING, 'waiting'], [TOP_WHEEL, 'wheel']];
+var interactiveEventTypeNames = [
+    [TOP_BLUR, 'blur'],
+    [TOP_CANCEL, 'cancel'],
+    [TOP_CLICK, 'click'],
+    [TOP_CLOSE, 'close'],
+    [TOP_CONTEXT_MENU, 'contextMenu'],
+    [TOP_COPY, 'copy'],
+    [TOP_CUT, 'cut'],
+    [TOP_AUX_CLICK, 'auxClick'],
+    [TOP_DOUBLE_CLICK, 'doubleClick'],
+    [TOP_DRAG_END, 'dragEnd'],
+    [TOP_DRAG_START, 'dragStart'],
+    [TOP_DROP, 'drop'],
+    [TOP_FOCUS, 'focus'],
+    [TOP_INPUT, 'input'],
+    [TOP_INVALID, 'invalid'],
+    [TOP_KEY_DOWN, 'keyDown'],
+    [TOP_KEY_PRESS, 'keyPress'],
+    [TOP_KEY_UP, 'keyUp'],
+    [TOP_MOUSE_DOWN, 'mouseDown'],
+    [TOP_MOUSE_UP, 'mouseUp'],
+    [TOP_PASTE, 'paste'],
+    [TOP_PAUSE, 'pause'],
+    [TOP_PLAY, 'play'],
+    [TOP_POINTER_CANCEL, 'pointerCancel'],
+    [TOP_POINTER_DOWN, 'pointerDown'],
+    [TOP_POINTER_UP, 'pointerUp'],
+    [TOP_RATE_CHANGE, 'rateChange'],
+    [TOP_RESET, 'reset'],
+    [TOP_SEEKED, 'seeked'],
+    [TOP_SUBMIT, 'submit'],
+    [TOP_TOUCH_CANCEL, 'touchCancel'],
+    [TOP_TOUCH_END, 'touchEnd'],
+    [TOP_TOUCH_START, 'touchStart'],
+    [TOP_VOLUME_CHANGE, 'volumeChange']
+];
+var nonInteractiveEventTypeNames = [
+    [TOP_ABORT, 'abort'],
+    [TOP_ANIMATION_END, 'animationEnd'],
+    [TOP_ANIMATION_ITERATION, 'animationIteration'],
+    [TOP_ANIMATION_START, 'animationStart'],
+    [TOP_CAN_PLAY, 'canPlay'],
+    [TOP_CAN_PLAY_THROUGH, 'canPlayThrough'],
+    [TOP_DRAG, 'drag'],
+    [TOP_DRAG_ENTER, 'dragEnter'],
+    [TOP_DRAG_EXIT, 'dragExit'],
+    [TOP_DRAG_LEAVE, 'dragLeave'],
+    [TOP_DRAG_OVER, 'dragOver'],
+    [TOP_DURATION_CHANGE, 'durationChange'],
+    [TOP_EMPTIED, 'emptied'],
+    [TOP_ENCRYPTED, 'encrypted'],
+    [TOP_ENDED, 'ended'],
+    [TOP_ERROR, 'error'],
+    [TOP_GOT_POINTER_CAPTURE, 'gotPointerCapture'],
+    [TOP_LOAD, 'load'],
+    [TOP_LOADED_DATA, 'loadedData'],
+    [TOP_LOADED_METADATA, 'loadedMetadata'],
+    [TOP_LOAD_START, 'loadStart'],
+    [TOP_LOST_POINTER_CAPTURE, 'lostPointerCapture'],
+    [TOP_MOUSE_MOVE, 'mouseMove'],
+    [TOP_MOUSE_OUT, 'mouseOut'],
+    [TOP_MOUSE_OVER, 'mouseOver'],
+    [TOP_PLAYING, 'playing'],
+    [TOP_POINTER_MOVE, 'pointerMove'],
+    [TOP_POINTER_OUT, 'pointerOut'],
+    [TOP_POINTER_OVER, 'pointerOver'],
+    [TOP_PROGRESS, 'progress'],
+    [TOP_SCROLL, 'scroll'],
+    [TOP_SEEKING, 'seeking'],
+    [TOP_STALLED, 'stalled'],
+    [TOP_SUSPEND, 'suspend'],
+    [TOP_TIME_UPDATE, 'timeUpdate'],
+    [TOP_TOGGLE, 'toggle'],
+    [TOP_TOUCH_MOVE, 'touchMove'],
+    [TOP_TRANSITION_END, 'transitionEnd'],
+    [TOP_WAITING, 'waiting'],
+    [TOP_WHEEL, 'wheel']
+];
 
 var eventTypes$4 = {};
 var topLevelEventsToDispatchConfig = {};
 
 function addEventTypeNameToConfig(_ref, isInteractive) {
-  var topEvent = _ref[0],
-      event = _ref[1];
+    var topEvent = _ref[0],
+        event = _ref[1];
 
-  var capitalizedEvent = event[0].toUpperCase() + event.slice(1);
-  var onEvent = 'on' + capitalizedEvent;
+    var capitalizedEvent = event[0].toUpperCase() + event.slice(1);
+    var onEvent = 'on' + capitalizedEvent;
 
-  var type = {
-    phasedRegistrationNames: {
-      bubbled: onEvent,
-      captured: onEvent + 'Capture'
-    },
-    dependencies: [topEvent],
-    isInteractive: isInteractive
-  };
-  eventTypes$4[event] = type;
-  topLevelEventsToDispatchConfig[topEvent] = type;
+    var type = {
+        phasedRegistrationNames: {
+            bubbled: onEvent,
+            captured: onEvent + 'Capture'
+        },
+        dependencies: [topEvent],
+        isInteractive: isInteractive
+    };
+    eventTypes$4[event] = type;
+    topLevelEventsToDispatchConfig[topEvent] = type;
 }
 
 interactiveEventTypeNames.forEach(function (eventTuple) {
-  addEventTypeNameToConfig(eventTuple, true);
+    addEventTypeNameToConfig(eventTuple, true);
 });
 nonInteractiveEventTypeNames.forEach(function (eventTuple) {
-  addEventTypeNameToConfig(eventTuple, false);
+    addEventTypeNameToConfig(eventTuple, false);
 });
 
 // Only used in DEV for exhaustiveness validation.
 var knownHTMLTopLevelTypes = [TOP_ABORT, TOP_CANCEL, TOP_CAN_PLAY, TOP_CAN_PLAY_THROUGH, TOP_CLOSE, TOP_DURATION_CHANGE, TOP_EMPTIED, TOP_ENCRYPTED, TOP_ENDED, TOP_ERROR, TOP_INPUT, TOP_INVALID, TOP_LOAD, TOP_LOADED_DATA, TOP_LOADED_METADATA, TOP_LOAD_START, TOP_PAUSE, TOP_PLAY, TOP_PLAYING, TOP_PROGRESS, TOP_RATE_CHANGE, TOP_RESET, TOP_SEEKED, TOP_SEEKING, TOP_STALLED, TOP_SUBMIT, TOP_SUSPEND, TOP_TIME_UPDATE, TOP_TOGGLE, TOP_VOLUME_CHANGE, TOP_WAITING];
 
 var SimpleEventPlugin = {
-  eventTypes: eventTypes$4,
+    eventTypes: eventTypes$4,
 
-  isInteractiveTopLevelEventType: function (topLevelType) {
-    var config = topLevelEventsToDispatchConfig[topLevelType];
-    return config !== undefined && config.isInteractive === true;
-  },
+    isInteractiveTopLevelEventType: function (topLevelType) {
+        var config = topLevelEventsToDispatchConfig[topLevelType];
+        return config !== undefined && config.isInteractive === true;
+    },
 
 
-  extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
-    var dispatchConfig = topLevelEventsToDispatchConfig[topLevelType];
-    if (!dispatchConfig) {
-      return null;
+    extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
+        var dispatchConfig = topLevelEventsToDispatchConfig[topLevelType];
+        if (!dispatchConfig) {
+            return null;
+        }
+        var EventConstructor = undefined;
+        switch (topLevelType) {
+            case TOP_KEY_PRESS:
+                // Firefox creates a keypress event for function keys too. This removes
+                // the unwanted keypress events. Enter is however both printable and
+                // non-printable. One would expect Tab to be as well (but it isn't).
+                if (getEventCharCode(nativeEvent) === 0) {
+                    return null;
+                }
+                /* falls through */
+            case TOP_KEY_DOWN:
+            case TOP_KEY_UP:
+                EventConstructor = SyntheticKeyboardEvent;
+                break;
+            case TOP_BLUR:
+            case TOP_FOCUS:
+                EventConstructor = SyntheticFocusEvent;
+                break;
+            case TOP_CLICK:
+                // Firefox creates a click event on right mouse clicks. This removes the
+                // unwanted click events.
+                if (nativeEvent.button === 2) {
+                    return null;
+                }
+                /* falls through */
+            case TOP_AUX_CLICK:
+            case TOP_DOUBLE_CLICK:
+            case TOP_MOUSE_DOWN:
+            case TOP_MOUSE_MOVE:
+            case TOP_MOUSE_UP:
+                // TODO: Disabled elements should not respond to mouse events
+                /* falls through */
+            case TOP_MOUSE_OUT:
+            case TOP_MOUSE_OVER:
+            case TOP_CONTEXT_MENU:
+                EventConstructor = SyntheticMouseEvent;
+                break;
+            case TOP_DRAG:
+            case TOP_DRAG_END:
+            case TOP_DRAG_ENTER:
+            case TOP_DRAG_EXIT:
+            case TOP_DRAG_LEAVE:
+            case TOP_DRAG_OVER:
+            case TOP_DRAG_START:
+            case TOP_DROP:
+                EventConstructor = SyntheticDragEvent;
+                break;
+            case TOP_TOUCH_CANCEL:
+            case TOP_TOUCH_END:
+            case TOP_TOUCH_MOVE:
+            case TOP_TOUCH_START:
+                EventConstructor = SyntheticTouchEvent;
+                break;
+            case TOP_ANIMATION_END:
+            case TOP_ANIMATION_ITERATION:
+            case TOP_ANIMATION_START:
+                EventConstructor = SyntheticAnimationEvent;
+                break;
+            case TOP_TRANSITION_END:
+                EventConstructor = SyntheticTransitionEvent;
+                break;
+            case TOP_SCROLL:
+                EventConstructor = SyntheticUIEvent;
+                break;
+            case TOP_WHEEL:
+                EventConstructor = SyntheticWheelEvent;
+                break;
+            case TOP_COPY:
+            case TOP_CUT:
+            case TOP_PASTE:
+                EventConstructor = SyntheticClipboardEvent;
+                break;
+            case TOP_GOT_POINTER_CAPTURE:
+            case TOP_LOST_POINTER_CAPTURE:
+            case TOP_POINTER_CANCEL:
+            case TOP_POINTER_DOWN:
+            case TOP_POINTER_MOVE:
+            case TOP_POINTER_OUT:
+            case TOP_POINTER_OVER:
+            case TOP_POINTER_UP:
+                EventConstructor = SyntheticPointerEvent;
+                break;
+            default:
+                {
+                    if (knownHTMLTopLevelTypes.indexOf(topLevelType) === -1) {
+                        warningWithoutStack$1(false, 'SimpleEventPlugin: Unhandled event type, `%s`. This warning ' + 'is likely caused by a bug in React. Please file an issue.', topLevelType);
+                    }
+                }
+                // HTML Events
+                // @see http://www.w3.org/TR/html5/index.html#events-0
+                EventConstructor = SyntheticEvent;
+                break;
+        }
+        var event = EventConstructor.getPooled(dispatchConfig, targetInst, nativeEvent, nativeEventTarget);
+        accumulateTwoPhaseDispatches(event);
+        return event;
     }
-    var EventConstructor = void 0;
-    switch (topLevelType) {
-      case TOP_KEY_PRESS:
-        // Firefox creates a keypress event for function keys too. This removes
-        // the unwanted keypress events. Enter is however both printable and
-        // non-printable. One would expect Tab to be as well (but it isn't).
-        if (getEventCharCode(nativeEvent) === 0) {
-          return null;
-        }
-      /* falls through */
-      case TOP_KEY_DOWN:
-      case TOP_KEY_UP:
-        EventConstructor = SyntheticKeyboardEvent;
-        break;
-      case TOP_BLUR:
-      case TOP_FOCUS:
-        EventConstructor = SyntheticFocusEvent;
-        break;
-      case TOP_CLICK:
-        // Firefox creates a click event on right mouse clicks. This removes the
-        // unwanted click events.
-        if (nativeEvent.button === 2) {
-          return null;
-        }
-      /* falls through */
-      case TOP_AUX_CLICK:
-      case TOP_DOUBLE_CLICK:
-      case TOP_MOUSE_DOWN:
-      case TOP_MOUSE_MOVE:
-      case TOP_MOUSE_UP:
-      // TODO: Disabled elements should not respond to mouse events
-      /* falls through */
-      case TOP_MOUSE_OUT:
-      case TOP_MOUSE_OVER:
-      case TOP_CONTEXT_MENU:
-        EventConstructor = SyntheticMouseEvent;
-        break;
-      case TOP_DRAG:
-      case TOP_DRAG_END:
-      case TOP_DRAG_ENTER:
-      case TOP_DRAG_EXIT:
-      case TOP_DRAG_LEAVE:
-      case TOP_DRAG_OVER:
-      case TOP_DRAG_START:
-      case TOP_DROP:
-        EventConstructor = SyntheticDragEvent;
-        break;
-      case TOP_TOUCH_CANCEL:
-      case TOP_TOUCH_END:
-      case TOP_TOUCH_MOVE:
-      case TOP_TOUCH_START:
-        EventConstructor = SyntheticTouchEvent;
-        break;
-      case TOP_ANIMATION_END:
-      case TOP_ANIMATION_ITERATION:
-      case TOP_ANIMATION_START:
-        EventConstructor = SyntheticAnimationEvent;
-        break;
-      case TOP_TRANSITION_END:
-        EventConstructor = SyntheticTransitionEvent;
-        break;
-      case TOP_SCROLL:
-        EventConstructor = SyntheticUIEvent;
-        break;
-      case TOP_WHEEL:
-        EventConstructor = SyntheticWheelEvent;
-        break;
-      case TOP_COPY:
-      case TOP_CUT:
-      case TOP_PASTE:
-        EventConstructor = SyntheticClipboardEvent;
-        break;
-      case TOP_GOT_POINTER_CAPTURE:
-      case TOP_LOST_POINTER_CAPTURE:
-      case TOP_POINTER_CANCEL:
-      case TOP_POINTER_DOWN:
-      case TOP_POINTER_MOVE:
-      case TOP_POINTER_OUT:
-      case TOP_POINTER_OVER:
-      case TOP_POINTER_UP:
-        EventConstructor = SyntheticPointerEvent;
-        break;
-      default:
-        {
-          if (knownHTMLTopLevelTypes.indexOf(topLevelType) === -1) {
-            warningWithoutStack$1(false, 'SimpleEventPlugin: Unhandled event type, `%s`. This warning ' + 'is likely caused by a bug in React. Please file an issue.', topLevelType);
-          }
-        }
-        // HTML Events
-        // @see http://www.w3.org/TR/html5/index.html#events-0
-        EventConstructor = SyntheticEvent;
-        break;
-    }
-    var event = EventConstructor.getPooled(dispatchConfig, targetInst, nativeEvent, nativeEventTarget);
-    accumulateTwoPhaseDispatches(event);
-    return event;
-  }
 };
 
 var isInteractiveTopLevelEventType = SimpleEventPlugin.isInteractiveTopLevelEventType;
@@ -4863,82 +4816,82 @@ var callbackBookkeepingPool = [];
  * other). If React trees are not nested, returns null.
  */
 function findRootContainerNode(inst) {
-  // TODO: It may be a good idea to cache this to prevent unnecessary DOM
-  // traversal, but caching is difficult to do correctly without using a
-  // mutation observer to listen for all DOM changes.
-  while (inst.return) {
-    inst = inst.return;
-  }
-  if (inst.tag !== HostRoot) {
-    // This can happen if we're in a detached tree.
-    return null;
-  }
-  return inst.stateNode.containerInfo;
+    // TODO: It may be a good idea to cache this to prevent unnecessary DOM
+    // traversal, but caching is difficult to do correctly without using a
+    // mutation observer to listen for all DOM changes.
+    while (inst.return) {
+        inst = inst.return;
+    }
+    if (inst.tag !== HostRoot) {
+        // This can happen if we're in a detached tree.
+        return null;
+    }
+    return inst.stateNode.containerInfo;
 }
 
 // Used to store ancestor hierarchy in top level callback
 function getTopLevelCallbackBookKeeping(topLevelType, nativeEvent, targetInst) {
-  if (callbackBookkeepingPool.length) {
-    var instance = callbackBookkeepingPool.pop();
-    instance.topLevelType = topLevelType;
-    instance.nativeEvent = nativeEvent;
-    instance.targetInst = targetInst;
-    return instance;
-  }
-  return {
-    topLevelType: topLevelType,
-    nativeEvent: nativeEvent,
-    targetInst: targetInst,
-    ancestors: []
-  };
+    if (callbackBookkeepingPool.length) {
+        var instance = callbackBookkeepingPool.pop();
+        instance.topLevelType = topLevelType;
+        instance.nativeEvent = nativeEvent;
+        instance.targetInst = targetInst;
+        return instance;
+    }
+    return {
+        topLevelType: topLevelType,
+        nativeEvent: nativeEvent,
+        targetInst: targetInst,
+        ancestors: []
+    };
 }
 
 function releaseTopLevelCallbackBookKeeping(instance) {
-  instance.topLevelType = null;
-  instance.nativeEvent = null;
-  instance.targetInst = null;
-  instance.ancestors.length = 0;
-  if (callbackBookkeepingPool.length < CALLBACK_BOOKKEEPING_POOL_SIZE) {
-    callbackBookkeepingPool.push(instance);
-  }
+    instance.topLevelType = null;
+    instance.nativeEvent = null;
+    instance.targetInst = null;
+    instance.ancestors.length = 0;
+    if (callbackBookkeepingPool.length < CALLBACK_BOOKKEEPING_POOL_SIZE) {
+        callbackBookkeepingPool.push(instance);
+    }
 }
 
 function handleTopLevel(bookKeeping) {
-  var targetInst = bookKeeping.targetInst;
+    var targetInst = bookKeeping.targetInst;
 
-  // Loop through the hierarchy, in case there's any nested components.
-  // It's important that we build the array of ancestors before calling any
-  // event handlers, because event handlers can modify the DOM, leading to
-  // inconsistencies with ReactMount's node cache. See #1105.
-  var ancestor = targetInst;
-  do {
-    if (!ancestor) {
-      bookKeeping.ancestors.push(ancestor);
-      break;
-    }
-    var root = findRootContainerNode(ancestor);
-    if (!root) {
-      break;
-    }
-    bookKeeping.ancestors.push(ancestor);
-    ancestor = getClosestInstanceFromNode(root);
-  } while (ancestor);
+    // Loop through the hierarchy, in case there's any nested components.
+    // It's important that we build the array of ancestors before calling any
+    // event handlers, because event handlers can modify the DOM, leading to
+    // inconsistencies with ReactMount's node cache. See #1105.
+    var ancestor = targetInst;
+    do {
+        if (!ancestor) {
+            bookKeeping.ancestors.push(ancestor);
+            break;
+        }
+        var root = findRootContainerNode(ancestor);
+        if (!root) {
+            break;
+        }
+        bookKeeping.ancestors.push(ancestor);
+        ancestor = getClosestInstanceFromNode(root);
+    } while (ancestor);
 
-  for (var i = 0; i < bookKeeping.ancestors.length; i++) {
-    targetInst = bookKeeping.ancestors[i];
-    runExtractedEventsInBatch(bookKeeping.topLevelType, targetInst, bookKeeping.nativeEvent, getEventTarget(bookKeeping.nativeEvent));
-  }
+    for (var i = 0; i < bookKeeping.ancestors.length; i++) {
+        targetInst = bookKeeping.ancestors[i];
+        runExtractedEventsInBatch(bookKeeping.topLevelType, targetInst, bookKeeping.nativeEvent, getEventTarget(bookKeeping.nativeEvent));
+    }
 }
 
 // TODO: can we stop exporting these?
 var _enabled = true;
 
 function setEnabled(enabled) {
-  _enabled = !!enabled;
+    _enabled = !!enabled;
 }
 
 function isEnabled() {
-  return _enabled;
+    return _enabled;
 }
 
 /**
@@ -4951,14 +4904,14 @@ function isEnabled() {
  * @internal
  */
 function trapBubbledEvent(topLevelType, element) {
-  if (!element) {
-    return null;
-  }
-  var dispatch = isInteractiveTopLevelEventType(topLevelType) ? dispatchInteractiveEvent : dispatchEvent;
+    if (!element) {
+        return null;
+    }
+    var dispatch = isInteractiveTopLevelEventType(topLevelType) ? dispatchInteractiveEvent : dispatchEvent;
 
-  addEventBubbleListener(element, getRawEventName(topLevelType),
-  // Check if interactive and wrap in interactiveUpdates
-  dispatch.bind(null, topLevelType));
+    addEventBubbleListener(element, getRawEventName(topLevelType),
+        // Check if interactive and wrap in interactiveUpdates
+        dispatch.bind(null, topLevelType));
 }
 
 /**
@@ -4971,44 +4924,44 @@ function trapBubbledEvent(topLevelType, element) {
  * @internal
  */
 function trapCapturedEvent(topLevelType, element) {
-  if (!element) {
-    return null;
-  }
-  var dispatch = isInteractiveTopLevelEventType(topLevelType) ? dispatchInteractiveEvent : dispatchEvent;
+    if (!element) {
+        return null;
+    }
+    var dispatch = isInteractiveTopLevelEventType(topLevelType) ? dispatchInteractiveEvent : dispatchEvent;
 
-  addEventCaptureListener(element, getRawEventName(topLevelType),
-  // Check if interactive and wrap in interactiveUpdates
-  dispatch.bind(null, topLevelType));
+    addEventCaptureListener(element, getRawEventName(topLevelType),
+        // Check if interactive and wrap in interactiveUpdates
+        dispatch.bind(null, topLevelType));
 }
 
 function dispatchInteractiveEvent(topLevelType, nativeEvent) {
-  interactiveUpdates(dispatchEvent, topLevelType, nativeEvent);
+    interactiveUpdates(dispatchEvent, topLevelType, nativeEvent);
 }
 
 function dispatchEvent(topLevelType, nativeEvent) {
-  if (!_enabled) {
-    return;
-  }
+    if (!_enabled) {
+        return;
+    }
 
-  var nativeEventTarget = getEventTarget(nativeEvent);
-  var targetInst = getClosestInstanceFromNode(nativeEventTarget);
-  if (targetInst !== null && typeof targetInst.tag === 'number' && !isFiberMounted(targetInst)) {
-    // If we get an event (ex: img onload) before committing that
-    // component's mount, ignore it for now (that is, treat it as if it was an
-    // event on a non-React tree). We might also consider queueing events and
-    // dispatching them after the mount.
-    targetInst = null;
-  }
+    var nativeEventTarget = getEventTarget(nativeEvent);
+    var targetInst = getClosestInstanceFromNode(nativeEventTarget);
+    if (targetInst !== null && typeof targetInst.tag === 'number' && !isFiberMounted(targetInst)) {
+        // If we get an event (ex: img onload) before committing that
+        // component's mount, ignore it for now (that is, treat it as if it was an
+        // event on a non-React tree). We might also consider queueing events and
+        // dispatching them after the mount.
+        targetInst = null;
+    }
 
-  var bookKeeping = getTopLevelCallbackBookKeeping(topLevelType, nativeEvent, targetInst);
+    var bookKeeping = getTopLevelCallbackBookKeeping(topLevelType, nativeEvent, targetInst);
 
-  try {
-    // Event queue being processed in the same cycle allows
-    // `preventDefault`.
-    batchedUpdates(handleTopLevel, bookKeeping);
-  } finally {
-    releaseTopLevelCallbackBookKeeping(bookKeeping);
-  }
+    try {
+        // Event queue being processed in the same cycle allows
+        // `preventDefault`.
+        batchedUpdates(handleTopLevel, bookKeeping);
+    } finally {
+        releaseTopLevelCallbackBookKeeping(bookKeeping);
+    }
 }
 
 /**
@@ -5076,13 +5029,13 @@ var reactTopListenersCounter = 0;
 var topListenersIDKey = '_reactListenersID' + ('' + Math.random()).slice(2);
 
 function getListeningForDocument(mountAt) {
-  // In IE8, `mountAt` is a host object and doesn't have `hasOwnProperty`
-  // directly.
-  if (!Object.prototype.hasOwnProperty.call(mountAt, topListenersIDKey)) {
-    mountAt[topListenersIDKey] = reactTopListenersCounter++;
-    alreadyListeningTo[mountAt[topListenersIDKey]] = {};
-  }
-  return alreadyListeningTo[mountAt[topListenersIDKey]];
+    // In IE8, `mountAt` is a host object and doesn't have `hasOwnProperty`
+    // directly.
+    if (!Object.prototype.hasOwnProperty.call(mountAt, topListenersIDKey)) {
+        mountAt[topListenersIDKey] = reactTopListenersCounter++;
+        alreadyListeningTo[mountAt[topListenersIDKey]] = {};
+    }
+    return alreadyListeningTo[mountAt[topListenersIDKey]];
 }
 
 /**
@@ -5107,73 +5060,73 @@ function getListeningForDocument(mountAt) {
  * @param {object} mountAt Container where to mount the listener
  */
 function listenTo(registrationName, mountAt) {
-  var isListening = getListeningForDocument(mountAt);
-  var dependencies = registrationNameDependencies[registrationName];
+    var isListening = getListeningForDocument(mountAt);
+    var dependencies = registrationNameDependencies[registrationName];
 
-  for (var i = 0; i < dependencies.length; i++) {
-    var dependency = dependencies[i];
-    if (!(isListening.hasOwnProperty(dependency) && isListening[dependency])) {
-      switch (dependency) {
-        case TOP_SCROLL:
-          trapCapturedEvent(TOP_SCROLL, mountAt);
-          break;
-        case TOP_FOCUS:
-        case TOP_BLUR:
-          trapCapturedEvent(TOP_FOCUS, mountAt);
-          trapCapturedEvent(TOP_BLUR, mountAt);
-          // We set the flag for a single dependency later in this function,
-          // but this ensures we mark both as attached rather than just one.
-          isListening[TOP_BLUR] = true;
-          isListening[TOP_FOCUS] = true;
-          break;
-        case TOP_CANCEL:
-        case TOP_CLOSE:
-          if (isEventSupported(getRawEventName(dependency))) {
-            trapCapturedEvent(dependency, mountAt);
-          }
-          break;
-        case TOP_INVALID:
-        case TOP_SUBMIT:
-        case TOP_RESET:
-          // We listen to them on the target DOM elements.
-          // Some of them bubble so we don't want them to fire twice.
-          break;
-        default:
-          // By default, listen on the top level to all non-media events.
-          // Media events don't bubble so adding the listener wouldn't do anything.
-          var isMediaEvent = mediaEventTypes.indexOf(dependency) !== -1;
-          if (!isMediaEvent) {
-            trapBubbledEvent(dependency, mountAt);
-          }
-          break;
-      }
-      isListening[dependency] = true;
+    for (var i = 0; i < dependencies.length; i++) {
+        var dependency = dependencies[i];
+        if (!(isListening.hasOwnProperty(dependency) && isListening[dependency])) {
+            switch (dependency) {
+                case TOP_SCROLL:
+                    trapCapturedEvent(TOP_SCROLL, mountAt);
+                    break;
+                case TOP_FOCUS:
+                case TOP_BLUR:
+                    trapCapturedEvent(TOP_FOCUS, mountAt);
+                    trapCapturedEvent(TOP_BLUR, mountAt);
+                    // We set the flag for a single dependency later in this function,
+                    // but this ensures we mark both as attached rather than just one.
+                    isListening[TOP_BLUR] = true;
+                    isListening[TOP_FOCUS] = true;
+                    break;
+                case TOP_CANCEL:
+                case TOP_CLOSE:
+                    if (isEventSupported(getRawEventName(dependency))) {
+                        trapCapturedEvent(dependency, mountAt);
+                    }
+                    break;
+                case TOP_INVALID:
+                case TOP_SUBMIT:
+                case TOP_RESET:
+                    // We listen to them on the target DOM elements.
+                    // Some of them bubble so we don't want them to fire twice.
+                    break;
+                default:
+                    // By default, listen on the top level to all non-media events.
+                    // Media events don't bubble so adding the listener wouldn't do anything.
+                    var isMediaEvent = mediaEventTypes.indexOf(dependency) !== -1;
+                    if (!isMediaEvent) {
+                        trapBubbledEvent(dependency, mountAt);
+                    }
+                    break;
+            }
+            isListening[dependency] = true;
+        }
     }
-  }
 }
 
 function isListeningToAllDependencies(registrationName, mountAt) {
-  var isListening = getListeningForDocument(mountAt);
-  var dependencies = registrationNameDependencies[registrationName];
-  for (var i = 0; i < dependencies.length; i++) {
-    var dependency = dependencies[i];
-    if (!(isListening.hasOwnProperty(dependency) && isListening[dependency])) {
-      return false;
+    var isListening = getListeningForDocument(mountAt);
+    var dependencies = registrationNameDependencies[registrationName];
+    for (var i = 0; i < dependencies.length; i++) {
+        var dependency = dependencies[i];
+        if (!(isListening.hasOwnProperty(dependency) && isListening[dependency])) {
+            return false;
+        }
     }
-  }
-  return true;
+    return true;
 }
 
 function getActiveElement(doc) {
-  doc = doc || (typeof document !== 'undefined' ? document : undefined);
-  if (typeof doc === 'undefined') {
-    return null;
-  }
-  try {
-    return doc.activeElement || doc.body;
-  } catch (e) {
-    return doc.body;
-  }
+    doc = doc || (typeof document !== 'undefined' ? document : undefined);
+    if (typeof doc === 'undefined') {
+        return null;
+    }
+    try {
+        return doc.activeElement || doc.body;
+    } catch (e) {
+        return doc.body;
+    }
 }
 
 /**
@@ -5183,10 +5136,10 @@ function getActiveElement(doc) {
  * @return {DOMElement|DOMTextNode}
  */
 function getLeafNode(node) {
-  while (node && node.firstChild) {
-    node = node.firstChild;
-  }
-  return node;
+    while (node && node.firstChild) {
+        node = node.firstChild;
+    }
+    return node;
 }
 
 /**
@@ -5197,12 +5150,12 @@ function getLeafNode(node) {
  * @return {?DOMElement|DOMTextNode}
  */
 function getSiblingNode(node) {
-  while (node) {
-    if (node.nextSibling) {
-      return node.nextSibling;
+    while (node) {
+        if (node.nextSibling) {
+            return node.nextSibling;
+        }
+        node = node.parentNode;
     }
-    node = node.parentNode;
-  }
 }
 
 /**
@@ -5213,26 +5166,26 @@ function getSiblingNode(node) {
  * @return {?object}
  */
 function getNodeForCharacterOffset(root, offset) {
-  var node = getLeafNode(root);
-  var nodeStart = 0;
-  var nodeEnd = 0;
+    var node = getLeafNode(root);
+    var nodeStart = 0;
+    var nodeEnd = 0;
 
-  while (node) {
-    if (node.nodeType === TEXT_NODE) {
-      nodeEnd = nodeStart + node.textContent.length;
+    while (node) {
+        if (node.nodeType === TEXT_NODE) {
+            nodeEnd = nodeStart + node.textContent.length;
 
-      if (nodeStart <= offset && nodeEnd >= offset) {
-        return {
-          node: node,
-          offset: offset - nodeStart
-        };
-      }
+            if (nodeStart <= offset && nodeEnd >= offset) {
+                return {
+                    node: node,
+                    offset: offset - nodeStart
+                };
+            }
 
-      nodeStart = nodeEnd;
+            nodeStart = nodeEnd;
+        }
+
+        node = getLeafNode(getSiblingNode(node));
     }
-
-    node = getLeafNode(getSiblingNode(node));
-  }
 }
 
 /**
@@ -5240,38 +5193,38 @@ function getNodeForCharacterOffset(root, offset) {
  * @return {?object}
  */
 function getOffsets(outerNode) {
-  var ownerDocument = outerNode.ownerDocument;
+    var ownerDocument = outerNode.ownerDocument;
 
-  var win = ownerDocument && ownerDocument.defaultView || window;
-  var selection = win.getSelection && win.getSelection();
+    var win = ownerDocument && ownerDocument.defaultView || window;
+    var selection = win.getSelection && win.getSelection();
 
-  if (!selection || selection.rangeCount === 0) {
-    return null;
-  }
+    if (!selection || selection.rangeCount === 0) {
+        return null;
+    }
 
-  var anchorNode = selection.anchorNode,
-      anchorOffset = selection.anchorOffset,
-      focusNode = selection.focusNode,
-      focusOffset = selection.focusOffset;
+    var anchorNode = selection.anchorNode,
+        anchorOffset = selection.anchorOffset,
+        focusNode = selection.focusNode,
+        focusOffset = selection.focusOffset;
 
-  // In Firefox, anchorNode and focusNode can be "anonymous divs", e.g. the
-  // up/down buttons on an <input type="number">. Anonymous divs do not seem to
-  // expose properties, triggering a "Permission denied error" if any of its
-  // properties are accessed. The only seemingly possible way to avoid erroring
-  // is to access a property that typically works for non-anonymous divs and
-  // catch any error that may otherwise arise. See
-  // https://bugzilla.mozilla.org/show_bug.cgi?id=208427
+    // In Firefox, anchorNode and focusNode can be "anonymous divs", e.g. the
+    // up/down buttons on an <input type="number">. Anonymous divs do not seem to
+    // expose properties, triggering a "Permission denied error" if any of its
+    // properties are accessed. The only seemingly possible way to avoid erroring
+    // is to access a property that typically works for non-anonymous divs and
+    // catch any error that may otherwise arise. See
+    // https://bugzilla.mozilla.org/show_bug.cgi?id=208427
 
-  try {
-    /* eslint-disable no-unused-expressions */
-    anchorNode.nodeType;
-    focusNode.nodeType;
-    /* eslint-enable no-unused-expressions */
-  } catch (e) {
-    return null;
-  }
+    try {
+        /* eslint-disable no-unused-expressions */
+        anchorNode.nodeType;
+        focusNode.nodeType;
+        /* eslint-enable no-unused-expressions */
+    } catch (e) {
+        return null;
+    }
 
-  return getModernOffsetsFromPoints(outerNode, anchorNode, anchorOffset, focusNode, focusOffset);
+    return getModernOffsetsFromPoints(outerNode, anchorNode, anchorOffset, focusNode, focusOffset);
 }
 
 /**
@@ -5284,72 +5237,72 @@ function getOffsets(outerNode) {
  * Exported only for testing.
  */
 function getModernOffsetsFromPoints(outerNode, anchorNode, anchorOffset, focusNode, focusOffset) {
-  var length = 0;
-  var start = -1;
-  var end = -1;
-  var indexWithinAnchor = 0;
-  var indexWithinFocus = 0;
-  var node = outerNode;
-  var parentNode = null;
+    var length = 0;
+    var start = -1;
+    var end = -1;
+    var indexWithinAnchor = 0;
+    var indexWithinFocus = 0;
+    var node = outerNode;
+    var parentNode = null;
 
-  outer: while (true) {
-    var next = null;
+    outer: while (true) {
+        var next = null;
 
-    while (true) {
-      if (node === anchorNode && (anchorOffset === 0 || node.nodeType === TEXT_NODE)) {
-        start = length + anchorOffset;
-      }
-      if (node === focusNode && (focusOffset === 0 || node.nodeType === TEXT_NODE)) {
-        end = length + focusOffset;
-      }
+        while (true) {
+            if (node === anchorNode && (anchorOffset === 0 || node.nodeType === TEXT_NODE)) {
+                start = length + anchorOffset;
+            }
+            if (node === focusNode && (focusOffset === 0 || node.nodeType === TEXT_NODE)) {
+                end = length + focusOffset;
+            }
 
-      if (node.nodeType === TEXT_NODE) {
-        length += node.nodeValue.length;
-      }
+            if (node.nodeType === TEXT_NODE) {
+                length += node.nodeValue.length;
+            }
 
-      if ((next = node.firstChild) === null) {
-        break;
-      }
-      // Moving from `node` to its first child `next`.
-      parentNode = node;
-      node = next;
+            if ((next = node.firstChild) === null) {
+                break;
+            }
+            // Moving from `node` to its first child `next`.
+            parentNode = node;
+            node = next;
+        }
+
+        while (true) {
+            if (node === outerNode) {
+                // If `outerNode` has children, this is always the second time visiting
+                // it. If it has no children, this is still the first loop, and the only
+                // valid selection is anchorNode and focusNode both equal to this node
+                // and both offsets 0, in which case we will have handled above.
+                break outer;
+            }
+            if (parentNode === anchorNode && ++indexWithinAnchor === anchorOffset) {
+                start = length;
+            }
+            if (parentNode === focusNode && ++indexWithinFocus === focusOffset) {
+                end = length;
+            }
+            if ((next = node.nextSibling) !== null) {
+                break;
+            }
+            node = parentNode;
+            parentNode = node.parentNode;
+        }
+
+        // Moving from `node` to its next sibling `next`.
+        node = next;
     }
 
-    while (true) {
-      if (node === outerNode) {
-        // If `outerNode` has children, this is always the second time visiting
-        // it. If it has no children, this is still the first loop, and the only
-        // valid selection is anchorNode and focusNode both equal to this node
-        // and both offsets 0, in which case we will have handled above.
-        break outer;
-      }
-      if (parentNode === anchorNode && ++indexWithinAnchor === anchorOffset) {
-        start = length;
-      }
-      if (parentNode === focusNode && ++indexWithinFocus === focusOffset) {
-        end = length;
-      }
-      if ((next = node.nextSibling) !== null) {
-        break;
-      }
-      node = parentNode;
-      parentNode = node.parentNode;
+    if (start === -1 || end === -1) {
+        // This should never happen. (Would happen if the anchor/focus nodes aren't
+        // actually inside the passed-in node.)
+        return null;
     }
 
-    // Moving from `node` to its next sibling `next`.
-    node = next;
-  }
-
-  if (start === -1 || end === -1) {
-    // This should never happen. (Would happen if the anchor/focus nodes aren't
-    // actually inside the passed-in node.)
-    return null;
-  }
-
-  return {
-    start: start,
-    end: end
-  };
+    return {
+        start: start,
+        end: end
+    };
 }
 
 /**
@@ -5365,104 +5318,104 @@ function getModernOffsetsFromPoints(outerNode, anchorNode, anchorOffset, focusNo
  * @param {object} offsets
  */
 function setOffsets(node, offsets) {
-  var doc = node.ownerDocument || document;
-  var win = doc && doc.defaultView || window;
+    var doc = node.ownerDocument || document;
+    var win = doc && doc.defaultView || window;
 
-  // Edge fails with "Object expected" in some scenarios.
-  // (For instance: TinyMCE editor used in a list component that supports pasting to add more,
-  // fails when pasting 100+ items)
-  if (!win.getSelection) {
-    return;
-  }
-
-  var selection = win.getSelection();
-  var length = node.textContent.length;
-  var start = Math.min(offsets.start, length);
-  var end = offsets.end === undefined ? start : Math.min(offsets.end, length);
-
-  // IE 11 uses modern selection, but doesn't support the extend method.
-  // Flip backward selections, so we can set with a single range.
-  if (!selection.extend && start > end) {
-    var temp = end;
-    end = start;
-    start = temp;
-  }
-
-  var startMarker = getNodeForCharacterOffset(node, start);
-  var endMarker = getNodeForCharacterOffset(node, end);
-
-  if (startMarker && endMarker) {
-    if (selection.rangeCount === 1 && selection.anchorNode === startMarker.node && selection.anchorOffset === startMarker.offset && selection.focusNode === endMarker.node && selection.focusOffset === endMarker.offset) {
-      return;
+    // Edge fails with "Object expected" in some scenarios.
+    // (For instance: TinyMCE editor used in a list component that supports pasting to add more,
+    // fails when pasting 100+ items)
+    if (!win.getSelection) {
+        return;
     }
-    var range = doc.createRange();
-    range.setStart(startMarker.node, startMarker.offset);
-    selection.removeAllRanges();
 
-    if (start > end) {
-      selection.addRange(range);
-      selection.extend(endMarker.node, endMarker.offset);
-    } else {
-      range.setEnd(endMarker.node, endMarker.offset);
-      selection.addRange(range);
+    var selection = win.getSelection();
+    var length = node.textContent.length;
+    var start = Math.min(offsets.start, length);
+    var end = offsets.end === undefined ? start : Math.min(offsets.end, length);
+
+    // IE 11 uses modern selection, but doesn't support the extend method.
+    // Flip backward selections, so we can set with a single range.
+    if (!selection.extend && start > end) {
+        var temp = end;
+        end = start;
+        start = temp;
     }
-  }
+
+    var startMarker = getNodeForCharacterOffset(node, start);
+    var endMarker = getNodeForCharacterOffset(node, end);
+
+    if (startMarker && endMarker) {
+        if (selection.rangeCount === 1 && selection.anchorNode === startMarker.node && selection.anchorOffset === startMarker.offset && selection.focusNode === endMarker.node && selection.focusOffset === endMarker.offset) {
+            return;
+        }
+        var range = doc.createRange();
+        range.setStart(startMarker.node, startMarker.offset);
+        selection.removeAllRanges();
+
+        if (start > end) {
+            selection.addRange(range);
+            selection.extend(endMarker.node, endMarker.offset);
+        } else {
+            range.setEnd(endMarker.node, endMarker.offset);
+            selection.addRange(range);
+        }
+    }
 }
 
 function isTextNode(node) {
-  return node && node.nodeType === TEXT_NODE;
+    return node && node.nodeType === TEXT_NODE;
 }
 
 function containsNode(outerNode, innerNode) {
-  if (!outerNode || !innerNode) {
-    return false;
-  } else if (outerNode === innerNode) {
-    return true;
-  } else if (isTextNode(outerNode)) {
-    return false;
-  } else if (isTextNode(innerNode)) {
-    return containsNode(outerNode, innerNode.parentNode);
-  } else if ('contains' in outerNode) {
-    return outerNode.contains(innerNode);
-  } else if (outerNode.compareDocumentPosition) {
-    return !!(outerNode.compareDocumentPosition(innerNode) & 16);
-  } else {
-    return false;
-  }
+    if (!outerNode || !innerNode) {
+        return false;
+    } else if (outerNode === innerNode) {
+        return true;
+    } else if (isTextNode(outerNode)) {
+        return false;
+    } else if (isTextNode(innerNode)) {
+        return containsNode(outerNode, innerNode.parentNode);
+    } else if ('contains' in outerNode) {
+        return outerNode.contains(innerNode);
+    } else if (outerNode.compareDocumentPosition) {
+        return !!(outerNode.compareDocumentPosition(innerNode) & 16);
+    } else {
+        return false;
+    }
 }
 
 function isInDocument(node) {
-  return node && node.ownerDocument && containsNode(node.ownerDocument.documentElement, node);
+    return node && node.ownerDocument && containsNode(node.ownerDocument.documentElement, node);
 }
 
 function isSameOriginFrame(iframe) {
-  try {
-    // Accessing the contentDocument of a HTMLIframeElement can cause the browser
-    // to throw, e.g. if it has a cross-origin src attribute.
-    // Safari will show an error in the console when the access results in "Blocked a frame with origin". e.g:
-    // iframe.contentDocument.defaultView;
-    // A safety way is to access one of the cross origin properties: Window or Location
-    // Which might result in "SecurityError" DOM Exception and it is compatible to Safari.
-    // https://html.spec.whatwg.org/multipage/browsers.html#integration-with-idl
+    try {
+        // Accessing the contentDocument of a HTMLIframeElement can cause the browser
+        // to throw, e.g. if it has a cross-origin src attribute.
+        // Safari will show an error in the console when the access results in "Blocked a frame with origin". e.g:
+        // iframe.contentDocument.defaultView;
+        // A safety way is to access one of the cross origin properties: Window or Location
+        // Which might result in "SecurityError" DOM Exception and it is compatible to Safari.
+        // https://html.spec.whatwg.org/multipage/browsers.html#integration-with-idl
 
-    return typeof iframe.contentWindow.location.href === 'string';
-  } catch (err) {
-    return false;
-  }
+        return typeof iframe.contentWindow.location.href === 'string';
+    } catch (err) {
+        return false;
+    }
 }
 
 function getActiveElementDeep() {
-  var win = window;
-  var element = getActiveElement();
-  while (element instanceof win.HTMLIFrameElement) {
-    if (isSameOriginFrame(element)) {
-      win = element.contentWindow;
-    } else {
-      return element;
+    var win = window;
+    var element = getActiveElement();
+    while (element instanceof win.HTMLIFrameElement) {
+        if (isSameOriginFrame(element)) {
+            win = element.contentWindow;
+        } else {
+            return element;
+        }
+        element = getActiveElement(win.document);
     }
-    element = getActiveElement(win.document);
-  }
-  return element;
+    return element;
 }
 
 /**
@@ -5478,16 +5431,16 @@ function getActiveElementDeep() {
  * and `selectionEnd` rows.
  */
 function hasSelectionCapabilities(elem) {
-  var nodeName = elem && elem.nodeName && elem.nodeName.toLowerCase();
-  return nodeName && (nodeName === 'input' && (elem.type === 'text' || elem.type === 'search' || elem.type === 'tel' || elem.type === 'url' || elem.type === 'password') || nodeName === 'textarea' || elem.contentEditable === 'true');
+    var nodeName = elem && elem.nodeName && elem.nodeName.toLowerCase();
+    return nodeName && (nodeName === 'input' && (elem.type === 'text' || elem.type === 'search' || elem.type === 'tel' || elem.type === 'url' || elem.type === 'password') || nodeName === 'textarea' || elem.contentEditable === 'true');
 }
 
 function getSelectionInformation() {
-  var focusedElem = getActiveElementDeep();
-  return {
-    focusedElem: focusedElem,
-    selectionRange: hasSelectionCapabilities(focusedElem) ? getSelection$1(focusedElem) : null
-  };
+    var focusedElem = getActiveElementDeep();
+    return {
+        focusedElem: focusedElem,
+        selectionRange: hasSelectionCapabilities(focusedElem) ? getSelection$1(focusedElem) : null
+    };
 }
 
 /**
@@ -5496,37 +5449,37 @@ function getSelectionInformation() {
  * nodes and place them back in, resulting in focus being lost.
  */
 function restoreSelection(priorSelectionInformation) {
-  var curFocusedElem = getActiveElementDeep();
-  var priorFocusedElem = priorSelectionInformation.focusedElem;
-  var priorSelectionRange = priorSelectionInformation.selectionRange;
-  if (curFocusedElem !== priorFocusedElem && isInDocument(priorFocusedElem)) {
-    if (priorSelectionRange !== null && hasSelectionCapabilities(priorFocusedElem)) {
-      setSelection(priorFocusedElem, priorSelectionRange);
-    }
+    var curFocusedElem = getActiveElementDeep();
+    var priorFocusedElem = priorSelectionInformation.focusedElem;
+    var priorSelectionRange = priorSelectionInformation.selectionRange;
+    if (curFocusedElem !== priorFocusedElem && isInDocument(priorFocusedElem)) {
+        if (priorSelectionRange !== null && hasSelectionCapabilities(priorFocusedElem)) {
+            setSelection(priorFocusedElem, priorSelectionRange);
+        }
 
-    // Focusing a node can change the scroll position, which is undesirable
-    var ancestors = [];
-    var ancestor = priorFocusedElem;
-    while (ancestor = ancestor.parentNode) {
-      if (ancestor.nodeType === ELEMENT_NODE) {
-        ancestors.push({
-          element: ancestor,
-          left: ancestor.scrollLeft,
-          top: ancestor.scrollTop
-        });
-      }
-    }
+        // Focusing a node can change the scroll position, which is undesirable
+        var ancestors = [];
+        var ancestor = priorFocusedElem;
+        while (ancestor = ancestor.parentNode) {
+            if (ancestor.nodeType === ELEMENT_NODE) {
+                ancestors.push({
+                    element: ancestor,
+                    left: ancestor.scrollLeft,
+                    top: ancestor.scrollTop
+                });
+            }
+        }
 
-    if (typeof priorFocusedElem.focus === 'function') {
-      priorFocusedElem.focus();
-    }
+        if (typeof priorFocusedElem.focus === 'function') {
+            priorFocusedElem.focus();
+        }
 
-    for (var i = 0; i < ancestors.length; i++) {
-      var info = ancestors[i];
-      info.element.scrollLeft = info.left;
-      info.element.scrollTop = info.top;
+        for (var i = 0; i < ancestors.length; i++) {
+            var info = ancestors[i];
+            info.element.scrollLeft = info.left;
+            info.element.scrollTop = info.top;
+        }
     }
-  }
 }
 
 /**
@@ -5536,20 +5489,23 @@ function restoreSelection(priorSelectionInformation) {
  * -@return {start: selectionStart, end: selectionEnd}
  */
 function getSelection$1(input) {
-  var selection = void 0;
+    var selection = undefined;
 
-  if ('selectionStart' in input) {
-    // Modern browser with input or textarea.
-    selection = {
-      start: input.selectionStart,
-      end: input.selectionEnd
+    if ('selectionStart' in input) {
+        // Modern browser with input or textarea.
+        selection = {
+            start: input.selectionStart,
+            end: input.selectionEnd
+        };
+    } else {
+        // Content editable or old IE textarea.
+        selection = getOffsets(input);
+    }
+
+    return selection || {
+        start: 0,
+        end: 0
     };
-  } else {
-    // Content editable or old IE textarea.
-    selection = getOffsets(input);
-  }
-
-  return selection || { start: 0, end: 0 };
 }
 
 /**
@@ -5559,31 +5515,31 @@ function getSelection$1(input) {
  * -@offsets   Object of same form that is returned from get*
  */
 function setSelection(input, offsets) {
-  var start = offsets.start,
-      end = offsets.end;
+    var start = offsets.start,
+        end = offsets.end;
 
-  if (end === undefined) {
-    end = start;
-  }
+    if (end === undefined) {
+        end = start;
+    }
 
-  if ('selectionStart' in input) {
-    input.selectionStart = start;
-    input.selectionEnd = Math.min(end, input.value.length);
-  } else {
-    setOffsets(input, offsets);
-  }
+    if ('selectionStart' in input) {
+        input.selectionStart = start;
+        input.selectionEnd = Math.min(end, input.value.length);
+    } else {
+        setOffsets(input, offsets);
+    }
 }
 
 var skipSelectionChangeEvent = canUseDOM && 'documentMode' in document && document.documentMode <= 11;
 
 var eventTypes$3 = {
-  select: {
-    phasedRegistrationNames: {
-      bubbled: 'onSelect',
-      captured: 'onSelectCapture'
-    },
-    dependencies: [TOP_BLUR, TOP_CONTEXT_MENU, TOP_DRAG_END, TOP_FOCUS, TOP_KEY_DOWN, TOP_KEY_UP, TOP_MOUSE_DOWN, TOP_MOUSE_UP, TOP_SELECTION_CHANGE]
-  }
+    select: {
+        phasedRegistrationNames: {
+            bubbled: 'onSelect',
+            captured: 'onSelectCapture'
+        },
+        dependencies: [TOP_BLUR, TOP_CONTEXT_MENU, TOP_DRAG_END, TOP_FOCUS, TOP_KEY_DOWN, TOP_KEY_UP, TOP_MOUSE_DOWN, TOP_MOUSE_UP, TOP_SELECTION_CHANGE]
+    }
 };
 
 var activeElement$1 = null;
@@ -5601,21 +5557,21 @@ var mouseDown = false;
  * @return {object}
  */
 function getSelection(node) {
-  if ('selectionStart' in node && hasSelectionCapabilities(node)) {
-    return {
-      start: node.selectionStart,
-      end: node.selectionEnd
-    };
-  } else {
-    var win = node.ownerDocument && node.ownerDocument.defaultView || window;
-    var selection = win.getSelection();
-    return {
-      anchorNode: selection.anchorNode,
-      anchorOffset: selection.anchorOffset,
-      focusNode: selection.focusNode,
-      focusOffset: selection.focusOffset
-    };
-  }
+    if ('selectionStart' in node && hasSelectionCapabilities(node)) {
+        return {
+            start: node.selectionStart,
+            end: node.selectionEnd
+        };
+    } else {
+        var win = node.ownerDocument && node.ownerDocument.defaultView || window;
+        var selection = win.getSelection();
+        return {
+            anchorNode: selection.anchorNode,
+            anchorOffset: selection.anchorOffset,
+            focusNode: selection.focusNode,
+            focusOffset: selection.focusOffset
+        };
+    }
 }
 
 /**
@@ -5625,7 +5581,7 @@ function getSelection(node) {
  * @return {Document}
  */
 function getEventTargetDocument(eventTarget) {
-  return eventTarget.window === eventTarget ? eventTarget.document : eventTarget.nodeType === DOCUMENT_NODE ? eventTarget : eventTarget.ownerDocument;
+    return eventTarget.window === eventTarget ? eventTarget.document : eventTarget.nodeType === DOCUMENT_NODE ? eventTarget : eventTarget.ownerDocument;
 }
 
 /**
@@ -5636,32 +5592,32 @@ function getEventTargetDocument(eventTarget) {
  * @return {?SyntheticEvent}
  */
 function constructSelectEvent(nativeEvent, nativeEventTarget) {
-  // Ensure we have the right element, and that the user is not dragging a
-  // selection (this matches native `select` event behavior). In HTML5, select
-  // fires only on input and textarea thus if there's no focused element we
-  // won't dispatch.
-  var doc = getEventTargetDocument(nativeEventTarget);
+    // Ensure we have the right element, and that the user is not dragging a
+    // selection (this matches native `select` event behavior). In HTML5, select
+    // fires only on input and textarea thus if there's no focused element we
+    // won't dispatch.
+    var doc = getEventTargetDocument(nativeEventTarget);
 
-  if (mouseDown || activeElement$1 == null || activeElement$1 !== getActiveElement(doc)) {
+    if (mouseDown || activeElement$1 == null || activeElement$1 !== getActiveElement(doc)) {
+        return null;
+    }
+
+    // Only fire when selection has actually changed.
+    var currentSelection = getSelection(activeElement$1);
+    if (!lastSelection || !shallowEqual(lastSelection, currentSelection)) {
+        lastSelection = currentSelection;
+
+        var syntheticEvent = SyntheticEvent.getPooled(eventTypes$3.select, activeElementInst$1, nativeEvent, nativeEventTarget);
+
+        syntheticEvent.type = 'select';
+        syntheticEvent.target = activeElement$1;
+
+        accumulateTwoPhaseDispatches(syntheticEvent);
+
+        return syntheticEvent;
+    }
+
     return null;
-  }
-
-  // Only fire when selection has actually changed.
-  var currentSelection = getSelection(activeElement$1);
-  if (!lastSelection || !shallowEqual(lastSelection, currentSelection)) {
-    lastSelection = currentSelection;
-
-    var syntheticEvent = SyntheticEvent.getPooled(eventTypes$3.select, activeElementInst$1, nativeEvent, nativeEventTarget);
-
-    syntheticEvent.type = 'select';
-    syntheticEvent.target = activeElement$1;
-
-    accumulateTwoPhaseDispatches(syntheticEvent);
-
-    return syntheticEvent;
-  }
-
-  return null;
 }
 
 /**
@@ -5679,63 +5635,63 @@ function constructSelectEvent(nativeEvent, nativeEventTarget) {
  * - Fires after user input.
  */
 var SelectEventPlugin = {
-  eventTypes: eventTypes$3,
+    eventTypes: eventTypes$3,
 
-  extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
-    var doc = getEventTargetDocument(nativeEventTarget);
-    // Track whether all listeners exists for this plugin. If none exist, we do
-    // not extract events. See #3639.
-    if (!doc || !isListeningToAllDependencies('onSelect', doc)) {
-      return null;
-    }
-
-    var targetNode = targetInst ? getNodeFromInstance$1(targetInst) : window;
-
-    switch (topLevelType) {
-      // Track the input node that has focus.
-      case TOP_FOCUS:
-        if (isTextInputElement(targetNode) || targetNode.contentEditable === 'true') {
-          activeElement$1 = targetNode;
-          activeElementInst$1 = targetInst;
-          lastSelection = null;
+    extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
+        var doc = getEventTargetDocument(nativeEventTarget);
+        // Track whether all listeners exists for this plugin. If none exist, we do
+        // not extract events. See #3639.
+        if (!doc || !isListeningToAllDependencies('onSelect', doc)) {
+            return null;
         }
-        break;
-      case TOP_BLUR:
-        activeElement$1 = null;
-        activeElementInst$1 = null;
-        lastSelection = null;
-        break;
-      // Don't fire the event while the user is dragging. This matches the
-      // semantics of the native select event.
-      case TOP_MOUSE_DOWN:
-        mouseDown = true;
-        break;
-      case TOP_CONTEXT_MENU:
-      case TOP_MOUSE_UP:
-      case TOP_DRAG_END:
-        mouseDown = false;
-        return constructSelectEvent(nativeEvent, nativeEventTarget);
-      // Chrome and IE fire non-standard event when selection is changed (and
-      // sometimes when it hasn't). IE's event fires out of order with respect
-      // to key and input events on deletion, so we discard it.
-      //
-      // Firefox doesn't support selectionchange, so check selection status
-      // after each key entry. The selection changes after keydown and before
-      // keyup, but we check on keydown as well in the case of holding down a
-      // key, when multiple keydown events are fired but only one keyup is.
-      // This is also our approach for IE handling, for the reason above.
-      case TOP_SELECTION_CHANGE:
-        if (skipSelectionChangeEvent) {
-          break;
-        }
-      // falls through
-      case TOP_KEY_DOWN:
-      case TOP_KEY_UP:
-        return constructSelectEvent(nativeEvent, nativeEventTarget);
-    }
 
-    return null;
-  }
+        var targetNode = targetInst ? getNodeFromInstance$1(targetInst) : window;
+
+        switch (topLevelType) {
+            // Track the input node that has focus.
+            case TOP_FOCUS:
+                if (isTextInputElement(targetNode) || targetNode.contentEditable === 'true') {
+                    activeElement$1 = targetNode;
+                    activeElementInst$1 = targetInst;
+                    lastSelection = null;
+                }
+                break;
+            case TOP_BLUR:
+                activeElement$1 = null;
+                activeElementInst$1 = null;
+                lastSelection = null;
+                break;
+                // Don't fire the event while the user is dragging. This matches the
+                // semantics of the native select event.
+            case TOP_MOUSE_DOWN:
+                mouseDown = true;
+                break;
+            case TOP_CONTEXT_MENU:
+            case TOP_MOUSE_UP:
+            case TOP_DRAG_END:
+                mouseDown = false;
+                return constructSelectEvent(nativeEvent, nativeEventTarget);
+                // Chrome and IE fire non-standard event when selection is changed (and
+                // sometimes when it hasn't). IE's event fires out of order with respect
+                // to key and input events on deletion, so we discard it.
+                //
+                // Firefox doesn't support selectionchange, so check selection status
+                // after each key entry. The selection changes after keydown and before
+                // keyup, but we check on keydown as well in the case of holding down a
+                // key, when multiple keydown events are fired but only one keyup is.
+                // This is also our approach for IE handling, for the reason above.
+            case TOP_SELECTION_CHANGE:
+                if (skipSelectionChangeEvent) {
+                    break;
+                }
+                // falls through
+            case TOP_KEY_DOWN:
+            case TOP_KEY_UP:
+                return constructSelectEvent(nativeEvent, nativeEventTarget);
+        }
+
+        return null;
+    }
 };
 
 /**
@@ -5749,35 +5705,35 @@ setComponentTree(getFiberCurrentPropsFromNode$1, getInstanceFromNode$1, getNodeF
  * them).
  */
 injection.injectEventPluginsByName({
-  SimpleEventPlugin: SimpleEventPlugin,
-  EnterLeaveEventPlugin: EnterLeaveEventPlugin,
-  ChangeEventPlugin: ChangeEventPlugin,
-  SelectEventPlugin: SelectEventPlugin,
-  BeforeInputEventPlugin: BeforeInputEventPlugin
+    SimpleEventPlugin: SimpleEventPlugin,
+    EnterLeaveEventPlugin: EnterLeaveEventPlugin,
+    ChangeEventPlugin: ChangeEventPlugin,
+    SelectEventPlugin: SelectEventPlugin,
+    BeforeInputEventPlugin: BeforeInputEventPlugin
 });
 
 var didWarnSelectedSetOnOption = false;
 var didWarnInvalidChild = false;
 
 function flattenChildren(children) {
-  var content = '';
+    var content = '';
 
-  // Flatten children. We'll warn if they are invalid
-  // during validateProps() which runs for hydration too.
-  // Note that this would throw on non-element objects.
-  // Elements are stringified (which is normally irrelevant
-  // but matters for <fbt>).
-  React.Children.forEach(children, function (child) {
-    if (child == null) {
-      return;
-    }
-    content += child;
-    // Note: we don't warn about invalid children here.
-    // Instead, this is done separately below so that
-    // it happens during the hydration codepath too.
-  });
+    // Flatten children. We'll warn if they are invalid
+    // during validateProps() which runs for hydration too.
+    // Note that this would throw on non-element objects.
+    // Elements are stringified (which is normally irrelevant
+    // but matters for <fbt>).
+    React.Children.forEach(children, function (child) {
+        if (child == null) {
+            return;
+        }
+        content += child;
+        // Note: we don't warn about invalid children here.
+        // Instead, this is done separately below so that
+        // it happens during the hydration codepath too.
+    });
 
-  return content;
+    return content;
 }
 
 /**
@@ -5785,68 +5741,70 @@ function flattenChildren(children) {
  */
 
 function validateProps(element, props) {
-  {
-    // This mirrors the codepath above, but runs for hydration too.
-    // Warn about invalid children here so that client and hydration are consistent.
-    // TODO: this seems like it could cause a DEV-only throw for hydration
-    // if children contains a non-element object. We should try to avoid that.
-    if (typeof props.children === 'object' && props.children !== null) {
-      React.Children.forEach(props.children, function (child) {
-        if (child == null) {
-          return;
+    {
+        // This mirrors the codepath above, but runs for hydration too.
+        // Warn about invalid children here so that client and hydration are consistent.
+        // TODO: this seems like it could cause a DEV-only throw for hydration
+        // if children contains a non-element object. We should try to avoid that.
+        if (typeof props.children === 'object' && props.children !== null) {
+            React.Children.forEach(props.children, function (child) {
+                if (child == null) {
+                    return;
+                }
+                if (typeof child === 'string' || typeof child === 'number') {
+                    return;
+                }
+                if (typeof child.type !== 'string') {
+                    return;
+                }
+                if (!didWarnInvalidChild) {
+                    didWarnInvalidChild = true;
+                    warning$1(false, 'Only strings and numbers are supported as <option> children.');
+                }
+            });
         }
-        if (typeof child === 'string' || typeof child === 'number') {
-          return;
-        }
-        if (typeof child.type !== 'string') {
-          return;
-        }
-        if (!didWarnInvalidChild) {
-          didWarnInvalidChild = true;
-          warning$1(false, 'Only strings and numbers are supported as <option> children.');
-        }
-      });
-    }
 
-    // TODO: Remove support for `selected` in <option>.
-    if (props.selected != null && !didWarnSelectedSetOnOption) {
-      warning$1(false, 'Use the `defaultValue` or `value` props on <select> instead of ' + 'setting `selected` on <option>.');
-      didWarnSelectedSetOnOption = true;
+        // TODO: Remove support for `selected` in <option>.
+        if (props.selected != null && !didWarnSelectedSetOnOption) {
+            warning$1(false, 'Use the `defaultValue` or `value` props on <select> instead of ' + 'setting `selected` on <option>.');
+            didWarnSelectedSetOnOption = true;
+        }
     }
-  }
 }
 
 function postMountWrapper$1(element, props) {
-  // value="" should make a value attribute (#6219)
-  if (props.value != null) {
-    element.setAttribute('value', toString(getToStringValue(props.value)));
-  }
+    // value="" should make a value attribute (#6219)
+    if (props.value != null) {
+        element.setAttribute('value', toString(getToStringValue(props.value)));
+    }
 }
 
 function getHostProps$1(element, props) {
-  var hostProps = _assign({ children: undefined }, props);
-  var content = flattenChildren(props.children);
+    var hostProps = _assign({
+        children: undefined
+    }, props);
+    var content = flattenChildren(props.children);
 
-  if (content) {
-    hostProps.children = content;
-  }
+    if (content) {
+        hostProps.children = content;
+    }
 
-  return hostProps;
+    return hostProps;
 }
 
 // TODO: direct imports like some-package/src/* are bad. Fix me.
-var didWarnValueDefaultValue$1 = void 0;
+var didWarnValueDefaultValue$1 = undefined;
 
 {
-  didWarnValueDefaultValue$1 = false;
+    didWarnValueDefaultValue$1 = false;
 }
 
 function getDeclarationErrorAddendum() {
-  var ownerName = getCurrentFiberOwnerNameInDevOrNull();
-  if (ownerName) {
-    return '\n\nCheck the render method of `' + ownerName + '`.';
-  }
-  return '';
+    var ownerName = getCurrentFiberOwnerNameInDevOrNull();
+    if (ownerName) {
+        return '\n\nCheck the render method of `' + ownerName + '`.';
+    }
+    return '';
 }
 
 var valuePropNames = ['value', 'defaultValue'];
@@ -5855,62 +5813,62 @@ var valuePropNames = ['value', 'defaultValue'];
  * Validation function for `value` and `defaultValue`.
  */
 function checkSelectPropTypes(props) {
-  ReactControlledValuePropTypes.checkPropTypes('select', props);
+    ReactControlledValuePropTypes.checkPropTypes('select', props);
 
-  for (var i = 0; i < valuePropNames.length; i++) {
-    var propName = valuePropNames[i];
-    if (props[propName] == null) {
-      continue;
+    for (var i = 0; i < valuePropNames.length; i++) {
+        var propName = valuePropNames[i];
+        if (props[propName] == null) {
+            continue;
+        }
+        var isArray = Array.isArray(props[propName]);
+        if (props.multiple && !isArray) {
+            warning$1(false, 'The `%s` prop supplied to <select> must be an array if ' + '`multiple` is true.%s', propName, getDeclarationErrorAddendum());
+        } else if (!props.multiple && isArray) {
+            warning$1(false, 'The `%s` prop supplied to <select> must be a scalar ' + 'value if `multiple` is false.%s', propName, getDeclarationErrorAddendum());
+        }
     }
-    var isArray = Array.isArray(props[propName]);
-    if (props.multiple && !isArray) {
-      warning$1(false, 'The `%s` prop supplied to <select> must be an array if ' + '`multiple` is true.%s', propName, getDeclarationErrorAddendum());
-    } else if (!props.multiple && isArray) {
-      warning$1(false, 'The `%s` prop supplied to <select> must be a scalar ' + 'value if `multiple` is false.%s', propName, getDeclarationErrorAddendum());
-    }
-  }
 }
 
 function updateOptions(node, multiple, propValue, setDefaultSelected) {
-  var options = node.options;
+    var options = node.options;
 
-  if (multiple) {
-    var selectedValues = propValue;
-    var selectedValue = {};
-    for (var i = 0; i < selectedValues.length; i++) {
-      // Prefix to avoid chaos with special keys.
-      selectedValue['$' + selectedValues[i]] = true;
-    }
-    for (var _i = 0; _i < options.length; _i++) {
-      var selected = selectedValue.hasOwnProperty('$' + options[_i].value);
-      if (options[_i].selected !== selected) {
-        options[_i].selected = selected;
-      }
-      if (selected && setDefaultSelected) {
-        options[_i].defaultSelected = true;
-      }
-    }
-  } else {
-    // Do not set `select.value` as exact behavior isn't consistent across all
-    // browsers for all cases.
-    var _selectedValue = toString(getToStringValue(propValue));
-    var defaultSelected = null;
-    for (var _i2 = 0; _i2 < options.length; _i2++) {
-      if (options[_i2].value === _selectedValue) {
-        options[_i2].selected = true;
-        if (setDefaultSelected) {
-          options[_i2].defaultSelected = true;
+    if (multiple) {
+        var selectedValues = propValue;
+        var selectedValue = {};
+        for (var i = 0; i < selectedValues.length; i++) {
+            // Prefix to avoid chaos with special keys.
+            selectedValue['$' + selectedValues[i]] = true;
         }
-        return;
-      }
-      if (defaultSelected === null && !options[_i2].disabled) {
-        defaultSelected = options[_i2];
-      }
+        for (var _i = 0; _i < options.length; _i++) {
+            var selected = selectedValue.hasOwnProperty('$' + options[_i].value);
+            if (options[_i].selected !== selected) {
+                options[_i].selected = selected;
+            }
+            if (selected && setDefaultSelected) {
+                options[_i].defaultSelected = true;
+            }
+        }
+    } else {
+        // Do not set `select.value` as exact behavior isn't consistent across all
+        // browsers for all cases.
+        var _selectedValue = toString(getToStringValue(propValue));
+        var defaultSelected = null;
+        for (var _i2 = 0; _i2 < options.length; _i2++) {
+            if (options[_i2].value === _selectedValue) {
+                options[_i2].selected = true;
+                if (setDefaultSelected) {
+                    options[_i2].defaultSelected = true;
+                }
+                return;
+            }
+            if (defaultSelected === null && !options[_i2].disabled) {
+                defaultSelected = options[_i2];
+            }
+        }
+        if (defaultSelected !== null) {
+            defaultSelected.selected = true;
+        }
     }
-    if (defaultSelected !== null) {
-      defaultSelected.selected = true;
-    }
-  }
 }
 
 /**
@@ -5930,66 +5888,65 @@ function updateOptions(node, multiple, propValue, setDefaultSelected) {
  */
 
 function getHostProps$2(element, props) {
-  return _assign({}, props, {
-    value: undefined
-  });
+    return _assign({}, props, {
+        value: undefined
+    });
 }
 
 function initWrapperState$1(element, props) {
-  var node = element;
-  {
-    checkSelectPropTypes(props);
-  }
-
-  node._wrapperState = {
-    wasMultiple: !!props.multiple
-  };
-
-  {
-    if (props.value !== undefined && props.defaultValue !== undefined && !didWarnValueDefaultValue$1) {
-      warning$1(false, 'Select elements must be either controlled or uncontrolled ' + '(specify either the value prop, or the defaultValue prop, but not ' + 'both). Decide between using a controlled or uncontrolled select ' + 'element and remove one of these props. More info: ' + 'https://fb.me/react-controlled-components');
-      didWarnValueDefaultValue$1 = true;
+    var node = element; {
+        checkSelectPropTypes(props);
     }
-  }
+
+    node._wrapperState = {
+        wasMultiple: !!props.multiple
+    };
+
+    {
+        if (props.value !== undefined && props.defaultValue !== undefined && !didWarnValueDefaultValue$1) {
+            warning$1(false, 'Select elements must be either controlled or uncontrolled ' + '(specify either the value prop, or the defaultValue prop, but not ' + 'both). Decide between using a controlled or uncontrolled select ' + 'element and remove one of these props. More info: ' + 'https://fb.me/react-controlled-components');
+            didWarnValueDefaultValue$1 = true;
+        }
+    }
 }
 
 function postMountWrapper$2(element, props) {
-  var node = element;
-  node.multiple = !!props.multiple;
-  var value = props.value;
-  if (value != null) {
-    updateOptions(node, !!props.multiple, value, false);
-  } else if (props.defaultValue != null) {
-    updateOptions(node, !!props.multiple, props.defaultValue, true);
-  }
+    var node = element;
+    node.multiple = !!props.multiple;
+    var value = props.value;
+    if (value != null) {
+        updateOptions(node, !!props.multiple, value, false);
+    } else if (props.defaultValue != null) {
+        updateOptions(node, !!props.multiple, props.defaultValue, true);
+    }
 }
 
 function postUpdateWrapper(element, props) {
-  var node = element;
-  var wasMultiple = node._wrapperState.wasMultiple;
-  node._wrapperState.wasMultiple = !!props.multiple;
+    var node = element;
+    var wasMultiple = node._wrapperState.wasMultiple;
+    node._wrapperState.wasMultiple = !!props.multiple;
 
-  var value = props.value;
-  if (value != null) {
-    updateOptions(node, !!props.multiple, value, false);
-  } else if (wasMultiple !== !!props.multiple) {
-    // For simplicity, reapply `defaultValue` if `multiple` is toggled.
-    if (props.defaultValue != null) {
-      updateOptions(node, !!props.multiple, props.defaultValue, true);
-    } else {
-      // Revert the select back to its default unselected state.
-      updateOptions(node, !!props.multiple, props.multiple ? [] : '', false);
+    var value = props.value;
+    if (value != null) {
+        updateOptions(node, !!props.multiple, value, false);
+    } else if (wasMultiple !== !!props.multiple) {
+        // For simplicity, reapply `defaultValue` if `multiple` is toggled.
+        if (props.defaultValue != null) {
+            updateOptions(node, !!props.multiple, props.defaultValue, true);
+        } else {
+            // Revert the select back to its default unselected state.
+            updateOptions(node, !!props.multiple, props.multiple ? [] : '', false);
+        }
     }
-  }
 }
 
 function restoreControlledState$2(element, props) {
-  var node = element;
-  var value = props.value;
+    var node = element;
+    var value = props.value;
 
-  if (value != null) {
-    updateOptions(node, !!props.multiple, value, false);
-  }
+    if (value != null) {
+        updateOptions(node, !!props.multiple, value, false);
+    }
 }
 
 var didWarnValDefaultVal = false;
@@ -6011,103 +5968,101 @@ var didWarnValDefaultVal = false;
  */
 
 function getHostProps$3(element, props) {
-  var node = element;
-  !(props.dangerouslySetInnerHTML == null) ? invariant(false, '`dangerouslySetInnerHTML` does not make sense on <textarea>.') : void 0;
+    var node = element;
+    !(props.dangerouslySetInnerHTML == null) ? invariant(false, '`dangerouslySetInnerHTML` does not make sense on <textarea>.'): undefined;
 
-  // Always set children to the same thing. In IE9, the selection range will
-  // get reset if `textContent` is mutated.  We could add a check in setTextContent
-  // to only set the value if/when the value differs from the node value (which would
-  // completely solve this IE9 bug), but Sebastian+Sophie seemed to like this
-  // solution. The value can be a boolean or object so that's why it's forced
-  // to be a string.
-  var hostProps = _assign({}, props, {
-    value: undefined,
-    defaultValue: undefined,
-    children: toString(node._wrapperState.initialValue)
-  });
+    // Always set children to the same thing. In IE9, the selection range will
+    // get reset if `textContent` is mutated.  We could add a check in setTextContent
+    // to only set the value if/when the value differs from the node value (which would
+    // completely solve this IE9 bug), but Sebastian+Sophie seemed to like this
+    // solution. The value can be a boolean or object so that's why it's forced
+    // to be a string.
+    var hostProps = _assign({}, props, {
+        value: undefined,
+        defaultValue: undefined,
+        children: toString(node._wrapperState.initialValue)
+    });
 
-  return hostProps;
+    return hostProps;
 }
 
 function initWrapperState$2(element, props) {
-  var node = element;
-  {
-    ReactControlledValuePropTypes.checkPropTypes('textarea', props);
-    if (props.value !== undefined && props.defaultValue !== undefined && !didWarnValDefaultVal) {
-      warning$1(false, '%s contains a textarea with both value and defaultValue props. ' + 'Textarea elements must be either controlled or uncontrolled ' + '(specify either the value prop, or the defaultValue prop, but not ' + 'both). Decide between using a controlled or uncontrolled textarea ' + 'and remove one of these props. More info: ' + 'https://fb.me/react-controlled-components', getCurrentFiberOwnerNameInDevOrNull() || 'A component');
-      didWarnValDefaultVal = true;
+    var node = element; {
+        ReactControlledValuePropTypes.checkPropTypes('textarea', props);
+        if (props.value !== undefined && props.defaultValue !== undefined && !didWarnValDefaultVal) {
+            warning$1(false, '%s contains a textarea with both value and defaultValue props. ' + 'Textarea elements must be either controlled or uncontrolled ' + '(specify either the value prop, or the defaultValue prop, but not ' + 'both). Decide between using a controlled or uncontrolled textarea ' + 'and remove one of these props. More info: ' + 'https://fb.me/react-controlled-components', getCurrentFiberOwnerNameInDevOrNull() || 'A component');
+            didWarnValDefaultVal = true;
+        }
     }
-  }
 
-  var initialValue = props.value;
+    var initialValue = props.value;
 
-  // Only bother fetching default value if we're going to use it
-  if (initialValue == null) {
-    var defaultValue = props.defaultValue;
-    // TODO (yungsters): Remove support for children content in <textarea>.
-    var children = props.children;
-    if (children != null) {
-      {
-        warning$1(false, 'Use the `defaultValue` or `value` props instead of setting ' + 'children on <textarea>.');
-      }
-      !(defaultValue == null) ? invariant(false, 'If you supply `defaultValue` on a <textarea>, do not pass children.') : void 0;
-      if (Array.isArray(children)) {
-        !(children.length <= 1) ? invariant(false, '<textarea> can only have at most one child.') : void 0;
-        children = children[0];
-      }
+    // Only bother fetching default value if we're going to use it
+    if (initialValue == null) {
+        var defaultValue = props.defaultValue;
+        // TODO (yungsters): Remove support for children content in <textarea>.
+        var children = props.children;
+        if (children != null) {
+            {
+                warning$1(false, 'Use the `defaultValue` or `value` props instead of setting ' + 'children on <textarea>.');
+            }!(defaultValue == null) ? invariant(false, 'If you supply `defaultValue` on a <textarea>, do not pass children.'): undefined;
+            if (Array.isArray(children)) {
+                !(children.length <= 1) ? invariant(false, '<textarea> can only have at most one child.'): undefined;
+                children = children[0];
+            }
 
-      defaultValue = children;
+            defaultValue = children;
+        }
+        if (defaultValue == null) {
+            defaultValue = '';
+        }
+        initialValue = defaultValue;
     }
-    if (defaultValue == null) {
-      defaultValue = '';
-    }
-    initialValue = defaultValue;
-  }
 
-  node._wrapperState = {
-    initialValue: getToStringValue(initialValue)
-  };
+    node._wrapperState = {
+        initialValue: getToStringValue(initialValue)
+    };
 }
 
 function updateWrapper$1(element, props) {
-  var node = element;
-  var value = getToStringValue(props.value);
-  var defaultValue = getToStringValue(props.defaultValue);
-  if (value != null) {
-    // Cast `value` to a string to ensure the value is set correctly. While
-    // browsers typically do this as necessary, jsdom doesn't.
-    var newValue = toString(value);
-    // To avoid side effects (such as losing text selection), only set value if changed
-    if (newValue !== node.value) {
-      node.value = newValue;
+    var node = element;
+    var value = getToStringValue(props.value);
+    var defaultValue = getToStringValue(props.defaultValue);
+    if (value != null) {
+        // Cast `value` to a string to ensure the value is set correctly. While
+        // browsers typically do this as necessary, jsdom doesn't.
+        var newValue = toString(value);
+        // To avoid side effects (such as losing text selection), only set value if changed
+        if (newValue !== node.value) {
+            node.value = newValue;
+        }
+        if (props.defaultValue == null && node.defaultValue !== newValue) {
+            node.defaultValue = newValue;
+        }
     }
-    if (props.defaultValue == null && node.defaultValue !== newValue) {
-      node.defaultValue = newValue;
+    if (defaultValue != null) {
+        node.defaultValue = toString(defaultValue);
     }
-  }
-  if (defaultValue != null) {
-    node.defaultValue = toString(defaultValue);
-  }
 }
 
 function postMountWrapper$3(element, props) {
-  var node = element;
-  // This is in postMount because we need access to the DOM node, which is not
-  // available until after the component has mounted.
-  var textContent = node.textContent;
+    var node = element;
+    // This is in postMount because we need access to the DOM node, which is not
+    // available until after the component has mounted.
+    var textContent = node.textContent;
 
-  // Only set node.value if textContent is equal to the expected
-  // initial value. In IE10/IE11 there is a bug where the placeholder attribute
-  // will populate textContent as well.
-  // https://developer.microsoft.com/microsoft-edge/platform/issues/101525/
-  if (textContent === node._wrapperState.initialValue) {
-    node.value = textContent;
-  }
+    // Only set node.value if textContent is equal to the expected
+    // initial value. In IE10/IE11 there is a bug where the placeholder attribute
+    // will populate textContent as well.
+    // https://developer.microsoft.com/microsoft-edge/platform/issues/101525/
+    if (textContent === node._wrapperState.initialValue) {
+        node.value = textContent;
+    }
 }
 
 function restoreControlledState$3(element, props) {
-  // DOM component is still mounted; update
-  updateWrapper$1(element, props);
+    // DOM component is still mounted; update
+    updateWrapper$1(element, props);
 }
 
 var HTML_NAMESPACE$1 = 'http://www.w3.org/1999/xhtml';
@@ -6115,34 +6070,34 @@ var MATH_NAMESPACE = 'http://www.w3.org/1998/Math/MathML';
 var SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 
 var Namespaces = {
-  html: HTML_NAMESPACE$1,
-  mathml: MATH_NAMESPACE,
-  svg: SVG_NAMESPACE
+    html: HTML_NAMESPACE$1,
+    mathml: MATH_NAMESPACE,
+    svg: SVG_NAMESPACE
 };
 
 // Assumes there is no parent namespace.
 function getIntrinsicNamespace(type) {
-  switch (type) {
-    case 'svg':
-      return SVG_NAMESPACE;
-    case 'math':
-      return MATH_NAMESPACE;
-    default:
-      return HTML_NAMESPACE$1;
-  }
+    switch (type) {
+        case 'svg':
+            return SVG_NAMESPACE;
+        case 'math':
+            return MATH_NAMESPACE;
+        default:
+            return HTML_NAMESPACE$1;
+    }
 }
 
 function getChildNamespace(parentNamespace, type) {
-  if (parentNamespace == null || parentNamespace === HTML_NAMESPACE$1) {
-    // No (or default) parent namespace: potential entry point.
-    return getIntrinsicNamespace(type);
-  }
-  if (parentNamespace === SVG_NAMESPACE && type === 'foreignObject') {
-    // We're leaving SVG.
-    return HTML_NAMESPACE$1;
-  }
-  // By default, pass namespace below.
-  return parentNamespace;
+    if (parentNamespace == null || parentNamespace === HTML_NAMESPACE$1) {
+        // No (or default) parent namespace: potential entry point.
+        return getIntrinsicNamespace(type);
+    }
+    if (parentNamespace === SVG_NAMESPACE && type === 'foreignObject') {
+        // We're leaving SVG.
+        return HTML_NAMESPACE$1;
+    }
+    // By default, pass namespace below.
+    return parentNamespace;
 }
 
 /* globals MSApp */
@@ -6151,19 +6106,19 @@ function getChildNamespace(parentNamespace, type) {
  * Create a function which has 'unsafe' privileges (required by windows8 apps)
  */
 var createMicrosoftUnsafeLocalFunction = function (func) {
-  if (typeof MSApp !== 'undefined' && MSApp.execUnsafeLocalFunction) {
-    return function (arg0, arg1, arg2, arg3) {
-      MSApp.execUnsafeLocalFunction(function () {
-        return func(arg0, arg1, arg2, arg3);
-      });
-    };
-  } else {
-    return func;
-  }
+    if (typeof MSApp !== 'undefined' && MSApp.execUnsafeLocalFunction) {
+        return function (arg0, arg1, arg2, arg3) {
+            MSApp.execUnsafeLocalFunction(function () {
+                return func(arg0, arg1, arg2, arg3);
+            });
+        };
+    } else {
+        return func;
+    }
 };
 
 // SVG temp container for IE lacking innerHTML
-var reusableSVGContainer = void 0;
+var reusableSVGContainer = undefined;
 
 /**
  * Set the innerHTML property of a node
@@ -6173,23 +6128,23 @@ var reusableSVGContainer = void 0;
  * @internal
  */
 var setInnerHTML = createMicrosoftUnsafeLocalFunction(function (node, html) {
-  // IE does not have innerHTML for SVG nodes, so instead we inject the
-  // new markup in a temp node and then move the child nodes across into
-  // the target node
+    // IE does not have innerHTML for SVG nodes, so instead we inject the
+    // new markup in a temp node and then move the child nodes across into
+    // the target node
 
-  if (node.namespaceURI === Namespaces.svg && !('innerHTML' in node)) {
-    reusableSVGContainer = reusableSVGContainer || document.createElement('div');
-    reusableSVGContainer.innerHTML = '<svg>' + html + '</svg>';
-    var svgNode = reusableSVGContainer.firstChild;
-    while (node.firstChild) {
-      node.removeChild(node.firstChild);
+    if (node.namespaceURI === Namespaces.svg && !('innerHTML' in node)) {
+        reusableSVGContainer = reusableSVGContainer || document.createElement('div');
+        reusableSVGContainer.innerHTML = '<svg>' + html + '</svg>';
+        var svgNode = reusableSVGContainer.firstChild;
+        while (node.firstChild) {
+            node.removeChild(node.firstChild);
+        }
+        while (svgNode.firstChild) {
+            node.appendChild(svgNode.firstChild);
+        }
+    } else {
+        node.innerHTML = html;
     }
-    while (svgNode.firstChild) {
-      node.appendChild(svgNode.firstChild);
-    }
-  } else {
-    node.innerHTML = html;
-  }
 });
 
 /**
@@ -6202,117 +6157,117 @@ var setInnerHTML = createMicrosoftUnsafeLocalFunction(function (node, html) {
  * @internal
  */
 var setTextContent = function (node, text) {
-  if (text) {
-    var firstChild = node.firstChild;
+    if (text) {
+        var firstChild = node.firstChild;
 
-    if (firstChild && firstChild === node.lastChild && firstChild.nodeType === TEXT_NODE) {
-      firstChild.nodeValue = text;
-      return;
+        if (firstChild && firstChild === node.lastChild && firstChild.nodeType === TEXT_NODE) {
+            firstChild.nodeValue = text;
+            return;
+        }
     }
-  }
-  node.textContent = text;
+    node.textContent = text;
 };
 
 // List derived from Gecko source code:
 // https://github.com/mozilla/gecko-dev/blob/4e638efc71/layout/style/test/property_database.js
 var shorthandToLonghand = {
-  animation: ['animationDelay', 'animationDirection', 'animationDuration', 'animationFillMode', 'animationIterationCount', 'animationName', 'animationPlayState', 'animationTimingFunction'],
-  background: ['backgroundAttachment', 'backgroundClip', 'backgroundColor', 'backgroundImage', 'backgroundOrigin', 'backgroundPositionX', 'backgroundPositionY', 'backgroundRepeat', 'backgroundSize'],
-  backgroundPosition: ['backgroundPositionX', 'backgroundPositionY'],
-  border: ['borderBottomColor', 'borderBottomStyle', 'borderBottomWidth', 'borderImageOutset', 'borderImageRepeat', 'borderImageSlice', 'borderImageSource', 'borderImageWidth', 'borderLeftColor', 'borderLeftStyle', 'borderLeftWidth', 'borderRightColor', 'borderRightStyle', 'borderRightWidth', 'borderTopColor', 'borderTopStyle', 'borderTopWidth'],
-  borderBlockEnd: ['borderBlockEndColor', 'borderBlockEndStyle', 'borderBlockEndWidth'],
-  borderBlockStart: ['borderBlockStartColor', 'borderBlockStartStyle', 'borderBlockStartWidth'],
-  borderBottom: ['borderBottomColor', 'borderBottomStyle', 'borderBottomWidth'],
-  borderColor: ['borderBottomColor', 'borderLeftColor', 'borderRightColor', 'borderTopColor'],
-  borderImage: ['borderImageOutset', 'borderImageRepeat', 'borderImageSlice', 'borderImageSource', 'borderImageWidth'],
-  borderInlineEnd: ['borderInlineEndColor', 'borderInlineEndStyle', 'borderInlineEndWidth'],
-  borderInlineStart: ['borderInlineStartColor', 'borderInlineStartStyle', 'borderInlineStartWidth'],
-  borderLeft: ['borderLeftColor', 'borderLeftStyle', 'borderLeftWidth'],
-  borderRadius: ['borderBottomLeftRadius', 'borderBottomRightRadius', 'borderTopLeftRadius', 'borderTopRightRadius'],
-  borderRight: ['borderRightColor', 'borderRightStyle', 'borderRightWidth'],
-  borderStyle: ['borderBottomStyle', 'borderLeftStyle', 'borderRightStyle', 'borderTopStyle'],
-  borderTop: ['borderTopColor', 'borderTopStyle', 'borderTopWidth'],
-  borderWidth: ['borderBottomWidth', 'borderLeftWidth', 'borderRightWidth', 'borderTopWidth'],
-  columnRule: ['columnRuleColor', 'columnRuleStyle', 'columnRuleWidth'],
-  columns: ['columnCount', 'columnWidth'],
-  flex: ['flexBasis', 'flexGrow', 'flexShrink'],
-  flexFlow: ['flexDirection', 'flexWrap'],
-  font: ['fontFamily', 'fontFeatureSettings', 'fontKerning', 'fontLanguageOverride', 'fontSize', 'fontSizeAdjust', 'fontStretch', 'fontStyle', 'fontVariant', 'fontVariantAlternates', 'fontVariantCaps', 'fontVariantEastAsian', 'fontVariantLigatures', 'fontVariantNumeric', 'fontVariantPosition', 'fontWeight', 'lineHeight'],
-  fontVariant: ['fontVariantAlternates', 'fontVariantCaps', 'fontVariantEastAsian', 'fontVariantLigatures', 'fontVariantNumeric', 'fontVariantPosition'],
-  gap: ['columnGap', 'rowGap'],
-  grid: ['gridAutoColumns', 'gridAutoFlow', 'gridAutoRows', 'gridTemplateAreas', 'gridTemplateColumns', 'gridTemplateRows'],
-  gridArea: ['gridColumnEnd', 'gridColumnStart', 'gridRowEnd', 'gridRowStart'],
-  gridColumn: ['gridColumnEnd', 'gridColumnStart'],
-  gridColumnGap: ['columnGap'],
-  gridGap: ['columnGap', 'rowGap'],
-  gridRow: ['gridRowEnd', 'gridRowStart'],
-  gridRowGap: ['rowGap'],
-  gridTemplate: ['gridTemplateAreas', 'gridTemplateColumns', 'gridTemplateRows'],
-  listStyle: ['listStyleImage', 'listStylePosition', 'listStyleType'],
-  margin: ['marginBottom', 'marginLeft', 'marginRight', 'marginTop'],
-  marker: ['markerEnd', 'markerMid', 'markerStart'],
-  mask: ['maskClip', 'maskComposite', 'maskImage', 'maskMode', 'maskOrigin', 'maskPositionX', 'maskPositionY', 'maskRepeat', 'maskSize'],
-  maskPosition: ['maskPositionX', 'maskPositionY'],
-  outline: ['outlineColor', 'outlineStyle', 'outlineWidth'],
-  overflow: ['overflowX', 'overflowY'],
-  padding: ['paddingBottom', 'paddingLeft', 'paddingRight', 'paddingTop'],
-  placeContent: ['alignContent', 'justifyContent'],
-  placeItems: ['alignItems', 'justifyItems'],
-  placeSelf: ['alignSelf', 'justifySelf'],
-  textDecoration: ['textDecorationColor', 'textDecorationLine', 'textDecorationStyle'],
-  textEmphasis: ['textEmphasisColor', 'textEmphasisStyle'],
-  transition: ['transitionDelay', 'transitionDuration', 'transitionProperty', 'transitionTimingFunction'],
-  wordWrap: ['overflowWrap']
+    animation: ['animationDelay', 'animationDirection', 'animationDuration', 'animationFillMode', 'animationIterationCount', 'animationName', 'animationPlayState', 'animationTimingFunction'],
+    background: ['backgroundAttachment', 'backgroundClip', 'backgroundColor', 'backgroundImage', 'backgroundOrigin', 'backgroundPositionX', 'backgroundPositionY', 'backgroundRepeat', 'backgroundSize'],
+    backgroundPosition: ['backgroundPositionX', 'backgroundPositionY'],
+    border: ['borderBottomColor', 'borderBottomStyle', 'borderBottomWidth', 'borderImageOutset', 'borderImageRepeat', 'borderImageSlice', 'borderImageSource', 'borderImageWidth', 'borderLeftColor', 'borderLeftStyle', 'borderLeftWidth', 'borderRightColor', 'borderRightStyle', 'borderRightWidth', 'borderTopColor', 'borderTopStyle', 'borderTopWidth'],
+    borderBlockEnd: ['borderBlockEndColor', 'borderBlockEndStyle', 'borderBlockEndWidth'],
+    borderBlockStart: ['borderBlockStartColor', 'borderBlockStartStyle', 'borderBlockStartWidth'],
+    borderBottom: ['borderBottomColor', 'borderBottomStyle', 'borderBottomWidth'],
+    borderColor: ['borderBottomColor', 'borderLeftColor', 'borderRightColor', 'borderTopColor'],
+    borderImage: ['borderImageOutset', 'borderImageRepeat', 'borderImageSlice', 'borderImageSource', 'borderImageWidth'],
+    borderInlineEnd: ['borderInlineEndColor', 'borderInlineEndStyle', 'borderInlineEndWidth'],
+    borderInlineStart: ['borderInlineStartColor', 'borderInlineStartStyle', 'borderInlineStartWidth'],
+    borderLeft: ['borderLeftColor', 'borderLeftStyle', 'borderLeftWidth'],
+    borderRadius: ['borderBottomLeftRadius', 'borderBottomRightRadius', 'borderTopLeftRadius', 'borderTopRightRadius'],
+    borderRight: ['borderRightColor', 'borderRightStyle', 'borderRightWidth'],
+    borderStyle: ['borderBottomStyle', 'borderLeftStyle', 'borderRightStyle', 'borderTopStyle'],
+    borderTop: ['borderTopColor', 'borderTopStyle', 'borderTopWidth'],
+    borderWidth: ['borderBottomWidth', 'borderLeftWidth', 'borderRightWidth', 'borderTopWidth'],
+    columnRule: ['columnRuleColor', 'columnRuleStyle', 'columnRuleWidth'],
+    columns: ['columnCount', 'columnWidth'],
+    flex: ['flexBasis', 'flexGrow', 'flexShrink'],
+    flexFlow: ['flexDirection', 'flexWrap'],
+    font: ['fontFamily', 'fontFeatureSettings', 'fontKerning', 'fontLanguageOverride', 'fontSize', 'fontSizeAdjust', 'fontStretch', 'fontStyle', 'fontVariant', 'fontVariantAlternates', 'fontVariantCaps', 'fontVariantEastAsian', 'fontVariantLigatures', 'fontVariantNumeric', 'fontVariantPosition', 'fontWeight', 'lineHeight'],
+    fontVariant: ['fontVariantAlternates', 'fontVariantCaps', 'fontVariantEastAsian', 'fontVariantLigatures', 'fontVariantNumeric', 'fontVariantPosition'],
+    gap: ['columnGap', 'rowGap'],
+    grid: ['gridAutoColumns', 'gridAutoFlow', 'gridAutoRows', 'gridTemplateAreas', 'gridTemplateColumns', 'gridTemplateRows'],
+    gridArea: ['gridColumnEnd', 'gridColumnStart', 'gridRowEnd', 'gridRowStart'],
+    gridColumn: ['gridColumnEnd', 'gridColumnStart'],
+    gridColumnGap: ['columnGap'],
+    gridGap: ['columnGap', 'rowGap'],
+    gridRow: ['gridRowEnd', 'gridRowStart'],
+    gridRowGap: ['rowGap'],
+    gridTemplate: ['gridTemplateAreas', 'gridTemplateColumns', 'gridTemplateRows'],
+    listStyle: ['listStyleImage', 'listStylePosition', 'listStyleType'],
+    margin: ['marginBottom', 'marginLeft', 'marginRight', 'marginTop'],
+    marker: ['markerEnd', 'markerMid', 'markerStart'],
+    mask: ['maskClip', 'maskComposite', 'maskImage', 'maskMode', 'maskOrigin', 'maskPositionX', 'maskPositionY', 'maskRepeat', 'maskSize'],
+    maskPosition: ['maskPositionX', 'maskPositionY'],
+    outline: ['outlineColor', 'outlineStyle', 'outlineWidth'],
+    overflow: ['overflowX', 'overflowY'],
+    padding: ['paddingBottom', 'paddingLeft', 'paddingRight', 'paddingTop'],
+    placeContent: ['alignContent', 'justifyContent'],
+    placeItems: ['alignItems', 'justifyItems'],
+    placeSelf: ['alignSelf', 'justifySelf'],
+    textDecoration: ['textDecorationColor', 'textDecorationLine', 'textDecorationStyle'],
+    textEmphasis: ['textEmphasisColor', 'textEmphasisStyle'],
+    transition: ['transitionDelay', 'transitionDuration', 'transitionProperty', 'transitionTimingFunction'],
+    wordWrap: ['overflowWrap']
 };
 
 /**
  * CSS properties which accept numbers but are not in units of "px".
  */
 var isUnitlessNumber = {
-  animationIterationCount: true,
-  borderImageOutset: true,
-  borderImageSlice: true,
-  borderImageWidth: true,
-  boxFlex: true,
-  boxFlexGroup: true,
-  boxOrdinalGroup: true,
-  columnCount: true,
-  columns: true,
-  flex: true,
-  flexGrow: true,
-  flexPositive: true,
-  flexShrink: true,
-  flexNegative: true,
-  flexOrder: true,
-  gridArea: true,
-  gridRow: true,
-  gridRowEnd: true,
-  gridRowSpan: true,
-  gridRowStart: true,
-  gridColumn: true,
-  gridColumnEnd: true,
-  gridColumnSpan: true,
-  gridColumnStart: true,
-  fontWeight: true,
-  lineClamp: true,
-  lineHeight: true,
-  opacity: true,
-  order: true,
-  orphans: true,
-  tabSize: true,
-  widows: true,
-  zIndex: true,
-  zoom: true,
+    animationIterationCount: true,
+    borderImageOutset: true,
+    borderImageSlice: true,
+    borderImageWidth: true,
+    boxFlex: true,
+    boxFlexGroup: true,
+    boxOrdinalGroup: true,
+    columnCount: true,
+    columns: true,
+    flex: true,
+    flexGrow: true,
+    flexPositive: true,
+    flexShrink: true,
+    flexNegative: true,
+    flexOrder: true,
+    gridArea: true,
+    gridRow: true,
+    gridRowEnd: true,
+    gridRowSpan: true,
+    gridRowStart: true,
+    gridColumn: true,
+    gridColumnEnd: true,
+    gridColumnSpan: true,
+    gridColumnStart: true,
+    fontWeight: true,
+    lineClamp: true,
+    lineHeight: true,
+    opacity: true,
+    order: true,
+    orphans: true,
+    tabSize: true,
+    widows: true,
+    zIndex: true,
+    zoom: true,
 
-  // SVG-related properties
-  fillOpacity: true,
-  floodOpacity: true,
-  stopOpacity: true,
-  strokeDasharray: true,
-  strokeDashoffset: true,
-  strokeMiterlimit: true,
-  strokeOpacity: true,
-  strokeWidth: true
+    // SVG-related properties
+    fillOpacity: true,
+    floodOpacity: true,
+    stopOpacity: true,
+    strokeDasharray: true,
+    strokeDashoffset: true,
+    strokeMiterlimit: true,
+    strokeOpacity: true,
+    strokeWidth: true
 };
 
 /**
@@ -6322,7 +6277,7 @@ var isUnitlessNumber = {
  * WebkitTransitionDuration
  */
 function prefixKey(prefix, key) {
-  return prefix + key.charAt(0).toUpperCase() + key.substring(1);
+    return prefix + key.charAt(0).toUpperCase() + key.substring(1);
 }
 
 /**
@@ -6334,9 +6289,9 @@ var prefixes = ['Webkit', 'ms', 'Moz', 'O'];
 // Using Object.keys here, or else the vanilla for-in loop makes IE8 go into an
 // infinite loop, because it iterates over the newly added props too.
 Object.keys(isUnitlessNumber).forEach(function (prop) {
-  prefixes.forEach(function (prefix) {
-    isUnitlessNumber[prefixKey(prefix, prop)] = isUnitlessNumber[prop];
-  });
+    prefixes.forEach(function (prefix) {
+        isUnitlessNumber[prefixKey(prefix, prop)] = isUnitlessNumber[prop];
+    });
 });
 
 /**
@@ -6349,26 +6304,26 @@ Object.keys(isUnitlessNumber).forEach(function (prop) {
  * @return {string} Normalized style value with dimensions applied.
  */
 function dangerousStyleValue(name, value, isCustomProperty) {
-  // Note that we've removed escapeTextForBrowser() calls here since the
-  // whole string will be escaped when the attribute is injected into
-  // the markup. If you provide unsafe user data here they can inject
-  // arbitrary CSS which may be problematic (I couldn't repro this):
-  // https://www.owasp.org/index.php/XSS_Filter_Evasion_Cheat_Sheet
-  // http://www.thespanner.co.uk/2007/11/26/ultimate-xss-css-injection/
-  // This is not an XSS hole but instead a potential CSS injection issue
-  // which has lead to a greater discussion about how we're going to
-  // trust URLs moving forward. See #2115901
+    // Note that we've removed escapeTextForBrowser() calls here since the
+    // whole string will be escaped when the attribute is injected into
+    // the markup. If you provide unsafe user data here they can inject
+    // arbitrary CSS which may be problematic (I couldn't repro this):
+    // https://www.owasp.org/index.php/XSS_Filter_Evasion_Cheat_Sheet
+    // http://www.thespanner.co.uk/2007/11/26/ultimate-xss-css-injection/
+    // This is not an XSS hole but instead a potential CSS injection issue
+    // which has lead to a greater discussion about how we're going to
+    // trust URLs moving forward. See #2115901
 
-  var isEmpty = value == null || typeof value === 'boolean' || value === '';
-  if (isEmpty) {
-    return '';
-  }
+    var isEmpty = value == null || typeof value === 'boolean' || value === '';
+    if (isEmpty) {
+        return '';
+    }
 
-  if (!isCustomProperty && typeof value === 'number' && value !== 0 && !(isUnitlessNumber.hasOwnProperty(name) && isUnitlessNumber[name])) {
-    return value + 'px'; // Presumes implicit 'px' suffix for unitless numbers
-  }
+    if (!isCustomProperty && typeof value === 'number' && value !== 0 && !(isUnitlessNumber.hasOwnProperty(name) && isUnitlessNumber[name])) {
+        return value + 'px'; // Presumes implicit 'px' suffix for unitless numbers
+    }
 
-  return ('' + value).trim();
+    return ('' + value).trim();
 }
 
 var uppercasePattern = /([A-Z])/g;
@@ -6388,97 +6343,97 @@ var msPattern = /^ms-/;
  * is converted to `-ms-`.
  */
 function hyphenateStyleName(name) {
-  return name.replace(uppercasePattern, '-$1').toLowerCase().replace(msPattern, '-ms-');
+    return name.replace(uppercasePattern, '-$1').toLowerCase().replace(msPattern, '-ms-');
 }
 
 var warnValidStyle = function () {};
 
 {
-  // 'msTransform' is correct, but the other prefixes should be capitalized
-  var badVendoredStyleNamePattern = /^(?:webkit|moz|o)[A-Z]/;
-  var msPattern$1 = /^-ms-/;
-  var hyphenPattern = /-(.)/g;
+    // 'msTransform' is correct, but the other prefixes should be capitalized
+    var badVendoredStyleNamePattern = /^(?:webkit|moz|o)[A-Z]/;
+    var msPattern$1 = /^-ms-/;
+    var hyphenPattern = /-(.)/g;
 
-  // style values shouldn't contain a semicolon
-  var badStyleValueWithSemicolonPattern = /;\s*$/;
+    // style values shouldn't contain a semicolon
+    var badStyleValueWithSemicolonPattern = /;\s*$/;
 
-  var warnedStyleNames = {};
-  var warnedStyleValues = {};
-  var warnedForNaNValue = false;
-  var warnedForInfinityValue = false;
+    var warnedStyleNames = {};
+    var warnedStyleValues = {};
+    var warnedForNaNValue = false;
+    var warnedForInfinityValue = false;
 
-  var camelize = function (string) {
-    return string.replace(hyphenPattern, function (_, character) {
-      return character.toUpperCase();
-    });
-  };
+    var camelize = function (string) {
+        return string.replace(hyphenPattern, function (_, character) {
+            return character.toUpperCase();
+        });
+    };
 
-  var warnHyphenatedStyleName = function (name) {
-    if (warnedStyleNames.hasOwnProperty(name) && warnedStyleNames[name]) {
-      return;
-    }
+    var warnHyphenatedStyleName = function (name) {
+        if (warnedStyleNames.hasOwnProperty(name) && warnedStyleNames[name]) {
+            return;
+        }
 
-    warnedStyleNames[name] = true;
-    warning$1(false, 'Unsupported style property %s. Did you mean %s?', name,
-    // As Andi Smith suggests
-    // (http://www.andismith.com/blog/2012/02/modernizr-prefixed/), an `-ms` prefix
-    // is converted to lowercase `ms`.
-    camelize(name.replace(msPattern$1, 'ms-')));
-  };
+        warnedStyleNames[name] = true;
+        warning$1(false, 'Unsupported style property %s. Did you mean %s?', name,
+            // As Andi Smith suggests
+            // (http://www.andismith.com/blog/2012/02/modernizr-prefixed/), an `-ms` prefix
+            // is converted to lowercase `ms`.
+            camelize(name.replace(msPattern$1, 'ms-')));
+    };
 
-  var warnBadVendoredStyleName = function (name) {
-    if (warnedStyleNames.hasOwnProperty(name) && warnedStyleNames[name]) {
-      return;
-    }
+    var warnBadVendoredStyleName = function (name) {
+        if (warnedStyleNames.hasOwnProperty(name) && warnedStyleNames[name]) {
+            return;
+        }
 
-    warnedStyleNames[name] = true;
-    warning$1(false, 'Unsupported vendor-prefixed style property %s. Did you mean %s?', name, name.charAt(0).toUpperCase() + name.slice(1));
-  };
+        warnedStyleNames[name] = true;
+        warning$1(false, 'Unsupported vendor-prefixed style property %s. Did you mean %s?', name, name.charAt(0).toUpperCase() + name.slice(1));
+    };
 
-  var warnStyleValueWithSemicolon = function (name, value) {
-    if (warnedStyleValues.hasOwnProperty(value) && warnedStyleValues[value]) {
-      return;
-    }
+    var warnStyleValueWithSemicolon = function (name, value) {
+        if (warnedStyleValues.hasOwnProperty(value) && warnedStyleValues[value]) {
+            return;
+        }
 
-    warnedStyleValues[value] = true;
-    warning$1(false, "Style property values shouldn't contain a semicolon. " + 'Try "%s: %s" instead.', name, value.replace(badStyleValueWithSemicolonPattern, ''));
-  };
+        warnedStyleValues[value] = true;
+        warning$1(false, "Style property values shouldn't contain a semicolon. " + 'Try "%s: %s" instead.', name, value.replace(badStyleValueWithSemicolonPattern, ''));
+    };
 
-  var warnStyleValueIsNaN = function (name, value) {
-    if (warnedForNaNValue) {
-      return;
-    }
+    var warnStyleValueIsNaN = function (name, value) {
+        if (warnedForNaNValue) {
+            return;
+        }
 
-    warnedForNaNValue = true;
-    warning$1(false, '`NaN` is an invalid value for the `%s` css style property.', name);
-  };
+        warnedForNaNValue = true;
+        warning$1(false, '`NaN` is an invalid value for the `%s` css style property.', name);
+    };
 
-  var warnStyleValueIsInfinity = function (name, value) {
-    if (warnedForInfinityValue) {
-      return;
-    }
+    var warnStyleValueIsInfinity = function (name, value) {
+        if (warnedForInfinityValue) {
+            return;
+        }
 
-    warnedForInfinityValue = true;
-    warning$1(false, '`Infinity` is an invalid value for the `%s` css style property.', name);
-  };
+        warnedForInfinityValue = true;
+        warning$1(false, '`Infinity` is an invalid value for the `%s` css style property.', name);
+    };
 
-  warnValidStyle = function (name, value) {
-    if (name.indexOf('-') > -1) {
-      warnHyphenatedStyleName(name);
-    } else if (badVendoredStyleNamePattern.test(name)) {
-      warnBadVendoredStyleName(name);
-    } else if (badStyleValueWithSemicolonPattern.test(value)) {
-      warnStyleValueWithSemicolon(name, value);
-    }
+    warnValidStyle = function (name, value) {
+        if (name.indexOf('-') > -1) {
+            warnHyphenatedStyleName(name);
+        } else if (badVendoredStyleNamePattern.test(name)) {
+            warnBadVendoredStyleName(name);
+        } else if (badStyleValueWithSemicolonPattern.test(value)) {
+            warnStyleValueWithSemicolon(name, value);
+        }
 
-    if (typeof value === 'number') {
-      if (isNaN(value)) {
-        warnStyleValueIsNaN(name, value);
-      } else if (!isFinite(value)) {
-        warnStyleValueIsInfinity(name, value);
-      }
-    }
-  };
+        if (typeof value === 'number') {
+            if (isNaN(value)) {
+                warnStyleValueIsNaN(name, value);
+            } else if (!isFinite(value)) {
+                warnStyleValueIsInfinity(name, value);
+            }
+        }
+    };
 }
 
 var warnValidStyle$1 = warnValidStyle;
@@ -6494,24 +6449,24 @@ var warnValidStyle$1 = warnValidStyle;
  * comparison. It is only used in DEV for SSR validation.
  */
 function createDangerousStringForStyles(styles) {
-  {
-    var serialized = '';
-    var delimiter = '';
-    for (var styleName in styles) {
-      if (!styles.hasOwnProperty(styleName)) {
-        continue;
-      }
-      var styleValue = styles[styleName];
-      if (styleValue != null) {
-        var isCustomProperty = styleName.indexOf('--') === 0;
-        serialized += delimiter + hyphenateStyleName(styleName) + ':';
-        serialized += dangerousStyleValue(styleName, styleValue, isCustomProperty);
+    {
+        var serialized = '';
+        var delimiter = '';
+        for (var styleName in styles) {
+            if (!styles.hasOwnProperty(styleName)) {
+                continue;
+            }
+            var styleValue = styles[styleName];
+            if (styleValue != null) {
+                var isCustomProperty = styleName.indexOf('--') === 0;
+                serialized += delimiter + hyphenateStyleName(styleName) + ':';
+                serialized += dangerousStyleValue(styleName, styleValue, isCustomProperty);
 
-        delimiter = ';';
-      }
+                delimiter = ';';
+            }
+        }
+        return serialized || null;
     }
-    return serialized || null;
-  }
 }
 
 /**
@@ -6522,31 +6477,30 @@ function createDangerousStringForStyles(styles) {
  * @param {object} styles
  */
 function setValueForStyles(node, styles) {
-  var style = node.style;
-  for (var styleName in styles) {
-    if (!styles.hasOwnProperty(styleName)) {
-      continue;
+    var style = node.style;
+    for (var styleName in styles) {
+        if (!styles.hasOwnProperty(styleName)) {
+            continue;
+        }
+        var isCustomProperty = styleName.indexOf('--') === 0; {
+            if (!isCustomProperty) {
+                warnValidStyle$1(styleName, styles[styleName]);
+            }
+        }
+        var styleValue = dangerousStyleValue(styleName, styles[styleName], isCustomProperty);
+        if (styleName === 'float') {
+            styleName = 'cssFloat';
+        }
+        if (isCustomProperty) {
+            style.setProperty(styleName, styleValue);
+        } else {
+            style[styleName] = styleValue;
+        }
     }
-    var isCustomProperty = styleName.indexOf('--') === 0;
-    {
-      if (!isCustomProperty) {
-        warnValidStyle$1(styleName, styles[styleName]);
-      }
-    }
-    var styleValue = dangerousStyleValue(styleName, styles[styleName], isCustomProperty);
-    if (styleName === 'float') {
-      styleName = 'cssFloat';
-    }
-    if (isCustomProperty) {
-      style.setProperty(styleName, styleValue);
-    } else {
-      style[styleName] = styleValue;
-    }
-  }
 }
 
 function isValueEmpty(value) {
-  return value == null || typeof value === 'boolean' || value === '';
+    return value == null || typeof value === 'boolean' || value === '';
 }
 
 /**
@@ -6558,14 +6512,14 @@ function isValueEmpty(value) {
  * shorthand". That is, the values are the property that each was derived from.
  */
 function expandShorthandMap(styles) {
-  var expanded = {};
-  for (var key in styles) {
-    var longhands = shorthandToLonghand[key] || [key];
-    for (var i = 0; i < longhands.length; i++) {
-      expanded[longhands[i]] = key;
+    var expanded = {};
+    for (var key in styles) {
+        var longhands = shorthandToLonghand[key] || [key];
+        for (var i = 0; i < longhands.length; i++) {
+            expanded[longhands[i]] = key;
+        }
     }
-  }
-  return expanded;
+    return expanded;
 }
 
 /**
@@ -6583,652 +6537,649 @@ function expandShorthandMap(styles) {
  *   becomes .style.fontVariant = ''
  */
 function validateShorthandPropertyCollisionInDev(styleUpdates, nextStyles) {
-  if (!warnAboutShorthandPropertyCollision) {
-    return;
-  }
-
-  if (!nextStyles) {
-    return;
-  }
-
-  var expandedUpdates = expandShorthandMap(styleUpdates);
-  var expandedStyles = expandShorthandMap(nextStyles);
-  var warnedAbout = {};
-  for (var key in expandedUpdates) {
-    var originalKey = expandedUpdates[key];
-    var correctOriginalKey = expandedStyles[key];
-    if (correctOriginalKey && originalKey !== correctOriginalKey) {
-      var warningKey = originalKey + ',' + correctOriginalKey;
-      if (warnedAbout[warningKey]) {
-        continue;
-      }
-      warnedAbout[warningKey] = true;
-      warning$1(false, '%s a style property during rerender (%s) when a ' + 'conflicting property is set (%s) can lead to styling bugs. To ' + "avoid this, don't mix shorthand and non-shorthand properties " + 'for the same value; instead, replace the shorthand with ' + 'separate values.', isValueEmpty(styleUpdates[originalKey]) ? 'Removing' : 'Updating', originalKey, correctOriginalKey);
+    if (!warnAboutShorthandPropertyCollision) {
+        return;
     }
-  }
+
+    if (!nextStyles) {
+        return;
+    }
+
+    var expandedUpdates = expandShorthandMap(styleUpdates);
+    var expandedStyles = expandShorthandMap(nextStyles);
+    var warnedAbout = {};
+    for (var key in expandedUpdates) {
+        var originalKey = expandedUpdates[key];
+        var correctOriginalKey = expandedStyles[key];
+        if (correctOriginalKey && originalKey !== correctOriginalKey) {
+            var warningKey = originalKey + ',' + correctOriginalKey;
+            if (warnedAbout[warningKey]) {
+                continue;
+            }
+            warnedAbout[warningKey] = true;
+            warning$1(false, '%s a style property during rerender (%s) when a ' + 'conflicting property is set (%s) can lead to styling bugs. To ' + "avoid this, don't mix shorthand and non-shorthand properties " + 'for the same value; instead, replace the shorthand with ' + 'separate values.', isValueEmpty(styleUpdates[originalKey]) ? 'Removing' : 'Updating', originalKey, correctOriginalKey);
+        }
+    }
 }
 
 // For HTML, certain tags should omit their close tag. We keep a whitelist for
 // those special-case tags.
 
 var omittedCloseTags = {
-  area: true,
-  base: true,
-  br: true,
-  col: true,
-  embed: true,
-  hr: true,
-  img: true,
-  input: true,
-  keygen: true,
-  link: true,
-  meta: true,
-  param: true,
-  source: true,
-  track: true,
-  wbr: true
-  // NOTE: menuitem's close tag should be omitted, but that causes problems.
+    area: true,
+    base: true,
+    br: true,
+    col: true,
+    embed: true,
+    hr: true,
+    img: true,
+    input: true,
+    keygen: true,
+    link: true,
+    meta: true,
+    param: true,
+    source: true,
+    track: true,
+    wbr: true
+    // NOTE: menuitem's close tag should be omitted, but that causes problems.
 };
 
 // For HTML, certain tags cannot have children. This has the same purpose as
 // `omittedCloseTags` except that `menuitem` should still have its closing tag.
 
 var voidElementTags = _assign({
-  menuitem: true
+    menuitem: true
 }, omittedCloseTags);
 
 // TODO: We can remove this if we add invariantWithStack()
 // or add stack by default to invariants where possible.
 var HTML$1 = '__html';
 
-var ReactDebugCurrentFrame$2 = null;
-{
-  ReactDebugCurrentFrame$2 = ReactSharedInternals.ReactDebugCurrentFrame;
+var ReactDebugCurrentFrame$2 = null; {
+    ReactDebugCurrentFrame$2 = ReactSharedInternals.ReactDebugCurrentFrame;
 }
 
 function assertValidProps(tag, props) {
-  if (!props) {
-    return;
-  }
-  // Note the use of `==` which checks for null or undefined.
-  if (voidElementTags[tag]) {
-    !(props.children == null && props.dangerouslySetInnerHTML == null) ? invariant(false, '%s is a void element tag and must neither have `children` nor use `dangerouslySetInnerHTML`.%s', tag, ReactDebugCurrentFrame$2.getStackAddendum()) : void 0;
-  }
-  if (props.dangerouslySetInnerHTML != null) {
-    !(props.children == null) ? invariant(false, 'Can only set one of `children` or `props.dangerouslySetInnerHTML`.') : void 0;
-    !(typeof props.dangerouslySetInnerHTML === 'object' && HTML$1 in props.dangerouslySetInnerHTML) ? invariant(false, '`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`. Please visit https://fb.me/react-invariant-dangerously-set-inner-html for more information.') : void 0;
-  }
-  {
-    !(props.suppressContentEditableWarning || !props.contentEditable || props.children == null) ? warning$1(false, 'A component is `contentEditable` and contains `children` managed by ' + 'React. It is now your responsibility to guarantee that none of ' + 'those nodes are unexpectedly modified or duplicated. This is ' + 'probably not intentional.') : void 0;
-  }
-  !(props.style == null || typeof props.style === 'object') ? invariant(false, 'The `style` prop expects a mapping from style properties to values, not a string. For example, style={{marginRight: spacing + \'em\'}} when using JSX.%s', ReactDebugCurrentFrame$2.getStackAddendum()) : void 0;
+    if (!props) {
+        return;
+    }
+    // Note the use of `==` which checks for null or undefined.
+    if (voidElementTags[tag]) {
+        !(props.children == null && props.dangerouslySetInnerHTML == null) ? invariant(false, '%s is a void element tag and must neither have `children` nor use `dangerouslySetInnerHTML`.%s', tag, ReactDebugCurrentFrame$2.getStackAddendum()): undefined;
+    }
+    if (props.dangerouslySetInnerHTML != null) {
+        !(props.children == null) ? invariant(false, 'Can only set one of `children` or `props.dangerouslySetInnerHTML`.'): undefined;
+        !(typeof props.dangerouslySetInnerHTML === 'object' && HTML$1 in props.dangerouslySetInnerHTML) ? invariant(false, '`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`. Please visit https://fb.me/react-invariant-dangerously-set-inner-html for more information.'): undefined;
+    } {
+        !(props.suppressContentEditableWarning || !props.contentEditable || props.children == null) ? warning$1(false, 'A component is `contentEditable` and contains `children` managed by ' + 'React. It is now your responsibility to guarantee that none of ' + 'those nodes are unexpectedly modified or duplicated. This is ' + 'probably not intentional.'): undefined;
+    }!(props.style == null || typeof props.style === 'object') ? invariant(false, 'The `style` prop expects a mapping from style properties to values, not a string. For example, style={{marginRight: spacing + \'em\'}} when using JSX.%s', ReactDebugCurrentFrame$2.getStackAddendum()): undefined;
 }
 
 function isCustomComponent(tagName, props) {
-  if (tagName.indexOf('-') === -1) {
-    return typeof props.is === 'string';
-  }
-  switch (tagName) {
-    // These are reserved SVG and MathML elements.
-    // We don't mind this whitelist too much because we expect it to never grow.
-    // The alternative is to track the namespace in a few places which is convoluted.
-    // https://w3c.github.io/webcomponents/spec/custom/#custom-elements-core-concepts
-    case 'annotation-xml':
-    case 'color-profile':
-    case 'font-face':
-    case 'font-face-src':
-    case 'font-face-uri':
-    case 'font-face-format':
-    case 'font-face-name':
-    case 'missing-glyph':
-      return false;
-    default:
-      return true;
-  }
+    if (tagName.indexOf('-') === -1) {
+        return typeof props.is === 'string';
+    }
+    switch (tagName) {
+        // These are reserved SVG and MathML elements.
+        // We don't mind this whitelist too much because we expect it to never grow.
+        // The alternative is to track the namespace in a few places which is convoluted.
+        // https://w3c.github.io/webcomponents/spec/custom/#custom-elements-core-concepts
+        case 'annotation-xml':
+        case 'color-profile':
+        case 'font-face':
+        case 'font-face-src':
+        case 'font-face-uri':
+        case 'font-face-format':
+        case 'font-face-name':
+        case 'missing-glyph':
+            return false;
+        default:
+            return true;
+    }
 }
 
 // When adding attributes to the HTML or SVG whitelist, be sure to
 // also add them to this module to ensure casing and incorrect name
 // warnings.
 var possibleStandardNames = {
-  // HTML
-  accept: 'accept',
-  acceptcharset: 'acceptCharset',
-  'accept-charset': 'acceptCharset',
-  accesskey: 'accessKey',
-  action: 'action',
-  allowfullscreen: 'allowFullScreen',
-  alt: 'alt',
-  as: 'as',
-  async: 'async',
-  autocapitalize: 'autoCapitalize',
-  autocomplete: 'autoComplete',
-  autocorrect: 'autoCorrect',
-  autofocus: 'autoFocus',
-  autoplay: 'autoPlay',
-  autosave: 'autoSave',
-  capture: 'capture',
-  cellpadding: 'cellPadding',
-  cellspacing: 'cellSpacing',
-  challenge: 'challenge',
-  charset: 'charSet',
-  checked: 'checked',
-  children: 'children',
-  cite: 'cite',
-  class: 'className',
-  classid: 'classID',
-  classname: 'className',
-  cols: 'cols',
-  colspan: 'colSpan',
-  content: 'content',
-  contenteditable: 'contentEditable',
-  contextmenu: 'contextMenu',
-  controls: 'controls',
-  controlslist: 'controlsList',
-  coords: 'coords',
-  crossorigin: 'crossOrigin',
-  dangerouslysetinnerhtml: 'dangerouslySetInnerHTML',
-  data: 'data',
-  datetime: 'dateTime',
-  default: 'default',
-  defaultchecked: 'defaultChecked',
-  defaultvalue: 'defaultValue',
-  defer: 'defer',
-  dir: 'dir',
-  disabled: 'disabled',
-  download: 'download',
-  draggable: 'draggable',
-  enctype: 'encType',
-  for: 'htmlFor',
-  form: 'form',
-  formmethod: 'formMethod',
-  formaction: 'formAction',
-  formenctype: 'formEncType',
-  formnovalidate: 'formNoValidate',
-  formtarget: 'formTarget',
-  frameborder: 'frameBorder',
-  headers: 'headers',
-  height: 'height',
-  hidden: 'hidden',
-  high: 'high',
-  href: 'href',
-  hreflang: 'hrefLang',
-  htmlfor: 'htmlFor',
-  httpequiv: 'httpEquiv',
-  'http-equiv': 'httpEquiv',
-  icon: 'icon',
-  id: 'id',
-  innerhtml: 'innerHTML',
-  inputmode: 'inputMode',
-  integrity: 'integrity',
-  is: 'is',
-  itemid: 'itemID',
-  itemprop: 'itemProp',
-  itemref: 'itemRef',
-  itemscope: 'itemScope',
-  itemtype: 'itemType',
-  keyparams: 'keyParams',
-  keytype: 'keyType',
-  kind: 'kind',
-  label: 'label',
-  lang: 'lang',
-  list: 'list',
-  loop: 'loop',
-  low: 'low',
-  manifest: 'manifest',
-  marginwidth: 'marginWidth',
-  marginheight: 'marginHeight',
-  max: 'max',
-  maxlength: 'maxLength',
-  media: 'media',
-  mediagroup: 'mediaGroup',
-  method: 'method',
-  min: 'min',
-  minlength: 'minLength',
-  multiple: 'multiple',
-  muted: 'muted',
-  name: 'name',
-  nomodule: 'noModule',
-  nonce: 'nonce',
-  novalidate: 'noValidate',
-  open: 'open',
-  optimum: 'optimum',
-  pattern: 'pattern',
-  placeholder: 'placeholder',
-  playsinline: 'playsInline',
-  poster: 'poster',
-  preload: 'preload',
-  profile: 'profile',
-  radiogroup: 'radioGroup',
-  readonly: 'readOnly',
-  referrerpolicy: 'referrerPolicy',
-  rel: 'rel',
-  required: 'required',
-  reversed: 'reversed',
-  role: 'role',
-  rows: 'rows',
-  rowspan: 'rowSpan',
-  sandbox: 'sandbox',
-  scope: 'scope',
-  scoped: 'scoped',
-  scrolling: 'scrolling',
-  seamless: 'seamless',
-  selected: 'selected',
-  shape: 'shape',
-  size: 'size',
-  sizes: 'sizes',
-  span: 'span',
-  spellcheck: 'spellCheck',
-  src: 'src',
-  srcdoc: 'srcDoc',
-  srclang: 'srcLang',
-  srcset: 'srcSet',
-  start: 'start',
-  step: 'step',
-  style: 'style',
-  summary: 'summary',
-  tabindex: 'tabIndex',
-  target: 'target',
-  title: 'title',
-  type: 'type',
-  usemap: 'useMap',
-  value: 'value',
-  width: 'width',
-  wmode: 'wmode',
-  wrap: 'wrap',
+    // HTML
+    accept: 'accept',
+    acceptcharset: 'acceptCharset',
+    'accept-charset': 'acceptCharset',
+    accesskey: 'accessKey',
+    action: 'action',
+    allowfullscreen: 'allowFullScreen',
+    alt: 'alt',
+    as: 'as',
+    async: 'async',
+    autocapitalize: 'autoCapitalize',
+    autocomplete: 'autoComplete',
+    autocorrect: 'autoCorrect',
+    autofocus: 'autoFocus',
+    autoplay: 'autoPlay',
+    autosave: 'autoSave',
+    capture: 'capture',
+    cellpadding: 'cellPadding',
+    cellspacing: 'cellSpacing',
+    challenge: 'challenge',
+    charset: 'charSet',
+    checked: 'checked',
+    children: 'children',
+    cite: 'cite',
+    class: 'className',
+    classid: 'classID',
+    classname: 'className',
+    cols: 'cols',
+    colspan: 'colSpan',
+    content: 'content',
+    contenteditable: 'contentEditable',
+    contextmenu: 'contextMenu',
+    controls: 'controls',
+    controlslist: 'controlsList',
+    coords: 'coords',
+    crossorigin: 'crossOrigin',
+    dangerouslysetinnerhtml: 'dangerouslySetInnerHTML',
+    data: 'data',
+    datetime: 'dateTime',
+    default: 'default',
+    defaultchecked: 'defaultChecked',
+    defaultvalue: 'defaultValue',
+    defer: 'defer',
+    dir: 'dir',
+    disabled: 'disabled',
+    download: 'download',
+    draggable: 'draggable',
+    enctype: 'encType',
+    for: 'htmlFor',
+    form: 'form',
+    formmethod: 'formMethod',
+    formaction: 'formAction',
+    formenctype: 'formEncType',
+    formnovalidate: 'formNoValidate',
+    formtarget: 'formTarget',
+    frameborder: 'frameBorder',
+    headers: 'headers',
+    height: 'height',
+    hidden: 'hidden',
+    high: 'high',
+    href: 'href',
+    hreflang: 'hrefLang',
+    htmlfor: 'htmlFor',
+    httpequiv: 'httpEquiv',
+    'http-equiv': 'httpEquiv',
+    icon: 'icon',
+    id: 'id',
+    innerhtml: 'innerHTML',
+    inputmode: 'inputMode',
+    integrity: 'integrity',
+    is: 'is',
+    itemid: 'itemID',
+    itemprop: 'itemProp',
+    itemref: 'itemRef',
+    itemscope: 'itemScope',
+    itemtype: 'itemType',
+    keyparams: 'keyParams',
+    keytype: 'keyType',
+    kind: 'kind',
+    label: 'label',
+    lang: 'lang',
+    list: 'list',
+    loop: 'loop',
+    low: 'low',
+    manifest: 'manifest',
+    marginwidth: 'marginWidth',
+    marginheight: 'marginHeight',
+    max: 'max',
+    maxlength: 'maxLength',
+    media: 'media',
+    mediagroup: 'mediaGroup',
+    method: 'method',
+    min: 'min',
+    minlength: 'minLength',
+    multiple: 'multiple',
+    muted: 'muted',
+    name: 'name',
+    nomodule: 'noModule',
+    nonce: 'nonce',
+    novalidate: 'noValidate',
+    open: 'open',
+    optimum: 'optimum',
+    pattern: 'pattern',
+    placeholder: 'placeholder',
+    playsinline: 'playsInline',
+    poster: 'poster',
+    preload: 'preload',
+    profile: 'profile',
+    radiogroup: 'radioGroup',
+    readonly: 'readOnly',
+    referrerpolicy: 'referrerPolicy',
+    rel: 'rel',
+    required: 'required',
+    reversed: 'reversed',
+    role: 'role',
+    rows: 'rows',
+    rowspan: 'rowSpan',
+    sandbox: 'sandbox',
+    scope: 'scope',
+    scoped: 'scoped',
+    scrolling: 'scrolling',
+    seamless: 'seamless',
+    selected: 'selected',
+    shape: 'shape',
+    size: 'size',
+    sizes: 'sizes',
+    span: 'span',
+    spellcheck: 'spellCheck',
+    src: 'src',
+    srcdoc: 'srcDoc',
+    srclang: 'srcLang',
+    srcset: 'srcSet',
+    start: 'start',
+    step: 'step',
+    style: 'style',
+    summary: 'summary',
+    tabindex: 'tabIndex',
+    target: 'target',
+    title: 'title',
+    type: 'type',
+    usemap: 'useMap',
+    value: 'value',
+    width: 'width',
+    wmode: 'wmode',
+    wrap: 'wrap',
 
-  // SVG
-  about: 'about',
-  accentheight: 'accentHeight',
-  'accent-height': 'accentHeight',
-  accumulate: 'accumulate',
-  additive: 'additive',
-  alignmentbaseline: 'alignmentBaseline',
-  'alignment-baseline': 'alignmentBaseline',
-  allowreorder: 'allowReorder',
-  alphabetic: 'alphabetic',
-  amplitude: 'amplitude',
-  arabicform: 'arabicForm',
-  'arabic-form': 'arabicForm',
-  ascent: 'ascent',
-  attributename: 'attributeName',
-  attributetype: 'attributeType',
-  autoreverse: 'autoReverse',
-  azimuth: 'azimuth',
-  basefrequency: 'baseFrequency',
-  baselineshift: 'baselineShift',
-  'baseline-shift': 'baselineShift',
-  baseprofile: 'baseProfile',
-  bbox: 'bbox',
-  begin: 'begin',
-  bias: 'bias',
-  by: 'by',
-  calcmode: 'calcMode',
-  capheight: 'capHeight',
-  'cap-height': 'capHeight',
-  clip: 'clip',
-  clippath: 'clipPath',
-  'clip-path': 'clipPath',
-  clippathunits: 'clipPathUnits',
-  cliprule: 'clipRule',
-  'clip-rule': 'clipRule',
-  color: 'color',
-  colorinterpolation: 'colorInterpolation',
-  'color-interpolation': 'colorInterpolation',
-  colorinterpolationfilters: 'colorInterpolationFilters',
-  'color-interpolation-filters': 'colorInterpolationFilters',
-  colorprofile: 'colorProfile',
-  'color-profile': 'colorProfile',
-  colorrendering: 'colorRendering',
-  'color-rendering': 'colorRendering',
-  contentscripttype: 'contentScriptType',
-  contentstyletype: 'contentStyleType',
-  cursor: 'cursor',
-  cx: 'cx',
-  cy: 'cy',
-  d: 'd',
-  datatype: 'datatype',
-  decelerate: 'decelerate',
-  descent: 'descent',
-  diffuseconstant: 'diffuseConstant',
-  direction: 'direction',
-  display: 'display',
-  divisor: 'divisor',
-  dominantbaseline: 'dominantBaseline',
-  'dominant-baseline': 'dominantBaseline',
-  dur: 'dur',
-  dx: 'dx',
-  dy: 'dy',
-  edgemode: 'edgeMode',
-  elevation: 'elevation',
-  enablebackground: 'enableBackground',
-  'enable-background': 'enableBackground',
-  end: 'end',
-  exponent: 'exponent',
-  externalresourcesrequired: 'externalResourcesRequired',
-  fill: 'fill',
-  fillopacity: 'fillOpacity',
-  'fill-opacity': 'fillOpacity',
-  fillrule: 'fillRule',
-  'fill-rule': 'fillRule',
-  filter: 'filter',
-  filterres: 'filterRes',
-  filterunits: 'filterUnits',
-  floodopacity: 'floodOpacity',
-  'flood-opacity': 'floodOpacity',
-  floodcolor: 'floodColor',
-  'flood-color': 'floodColor',
-  focusable: 'focusable',
-  fontfamily: 'fontFamily',
-  'font-family': 'fontFamily',
-  fontsize: 'fontSize',
-  'font-size': 'fontSize',
-  fontsizeadjust: 'fontSizeAdjust',
-  'font-size-adjust': 'fontSizeAdjust',
-  fontstretch: 'fontStretch',
-  'font-stretch': 'fontStretch',
-  fontstyle: 'fontStyle',
-  'font-style': 'fontStyle',
-  fontvariant: 'fontVariant',
-  'font-variant': 'fontVariant',
-  fontweight: 'fontWeight',
-  'font-weight': 'fontWeight',
-  format: 'format',
-  from: 'from',
-  fx: 'fx',
-  fy: 'fy',
-  g1: 'g1',
-  g2: 'g2',
-  glyphname: 'glyphName',
-  'glyph-name': 'glyphName',
-  glyphorientationhorizontal: 'glyphOrientationHorizontal',
-  'glyph-orientation-horizontal': 'glyphOrientationHorizontal',
-  glyphorientationvertical: 'glyphOrientationVertical',
-  'glyph-orientation-vertical': 'glyphOrientationVertical',
-  glyphref: 'glyphRef',
-  gradienttransform: 'gradientTransform',
-  gradientunits: 'gradientUnits',
-  hanging: 'hanging',
-  horizadvx: 'horizAdvX',
-  'horiz-adv-x': 'horizAdvX',
-  horizoriginx: 'horizOriginX',
-  'horiz-origin-x': 'horizOriginX',
-  ideographic: 'ideographic',
-  imagerendering: 'imageRendering',
-  'image-rendering': 'imageRendering',
-  in2: 'in2',
-  in: 'in',
-  inlist: 'inlist',
-  intercept: 'intercept',
-  k1: 'k1',
-  k2: 'k2',
-  k3: 'k3',
-  k4: 'k4',
-  k: 'k',
-  kernelmatrix: 'kernelMatrix',
-  kernelunitlength: 'kernelUnitLength',
-  kerning: 'kerning',
-  keypoints: 'keyPoints',
-  keysplines: 'keySplines',
-  keytimes: 'keyTimes',
-  lengthadjust: 'lengthAdjust',
-  letterspacing: 'letterSpacing',
-  'letter-spacing': 'letterSpacing',
-  lightingcolor: 'lightingColor',
-  'lighting-color': 'lightingColor',
-  limitingconeangle: 'limitingConeAngle',
-  local: 'local',
-  markerend: 'markerEnd',
-  'marker-end': 'markerEnd',
-  markerheight: 'markerHeight',
-  markermid: 'markerMid',
-  'marker-mid': 'markerMid',
-  markerstart: 'markerStart',
-  'marker-start': 'markerStart',
-  markerunits: 'markerUnits',
-  markerwidth: 'markerWidth',
-  mask: 'mask',
-  maskcontentunits: 'maskContentUnits',
-  maskunits: 'maskUnits',
-  mathematical: 'mathematical',
-  mode: 'mode',
-  numoctaves: 'numOctaves',
-  offset: 'offset',
-  opacity: 'opacity',
-  operator: 'operator',
-  order: 'order',
-  orient: 'orient',
-  orientation: 'orientation',
-  origin: 'origin',
-  overflow: 'overflow',
-  overlineposition: 'overlinePosition',
-  'overline-position': 'overlinePosition',
-  overlinethickness: 'overlineThickness',
-  'overline-thickness': 'overlineThickness',
-  paintorder: 'paintOrder',
-  'paint-order': 'paintOrder',
-  panose1: 'panose1',
-  'panose-1': 'panose1',
-  pathlength: 'pathLength',
-  patterncontentunits: 'patternContentUnits',
-  patterntransform: 'patternTransform',
-  patternunits: 'patternUnits',
-  pointerevents: 'pointerEvents',
-  'pointer-events': 'pointerEvents',
-  points: 'points',
-  pointsatx: 'pointsAtX',
-  pointsaty: 'pointsAtY',
-  pointsatz: 'pointsAtZ',
-  prefix: 'prefix',
-  preservealpha: 'preserveAlpha',
-  preserveaspectratio: 'preserveAspectRatio',
-  primitiveunits: 'primitiveUnits',
-  property: 'property',
-  r: 'r',
-  radius: 'radius',
-  refx: 'refX',
-  refy: 'refY',
-  renderingintent: 'renderingIntent',
-  'rendering-intent': 'renderingIntent',
-  repeatcount: 'repeatCount',
-  repeatdur: 'repeatDur',
-  requiredextensions: 'requiredExtensions',
-  requiredfeatures: 'requiredFeatures',
-  resource: 'resource',
-  restart: 'restart',
-  result: 'result',
-  results: 'results',
-  rotate: 'rotate',
-  rx: 'rx',
-  ry: 'ry',
-  scale: 'scale',
-  security: 'security',
-  seed: 'seed',
-  shaperendering: 'shapeRendering',
-  'shape-rendering': 'shapeRendering',
-  slope: 'slope',
-  spacing: 'spacing',
-  specularconstant: 'specularConstant',
-  specularexponent: 'specularExponent',
-  speed: 'speed',
-  spreadmethod: 'spreadMethod',
-  startoffset: 'startOffset',
-  stddeviation: 'stdDeviation',
-  stemh: 'stemh',
-  stemv: 'stemv',
-  stitchtiles: 'stitchTiles',
-  stopcolor: 'stopColor',
-  'stop-color': 'stopColor',
-  stopopacity: 'stopOpacity',
-  'stop-opacity': 'stopOpacity',
-  strikethroughposition: 'strikethroughPosition',
-  'strikethrough-position': 'strikethroughPosition',
-  strikethroughthickness: 'strikethroughThickness',
-  'strikethrough-thickness': 'strikethroughThickness',
-  string: 'string',
-  stroke: 'stroke',
-  strokedasharray: 'strokeDasharray',
-  'stroke-dasharray': 'strokeDasharray',
-  strokedashoffset: 'strokeDashoffset',
-  'stroke-dashoffset': 'strokeDashoffset',
-  strokelinecap: 'strokeLinecap',
-  'stroke-linecap': 'strokeLinecap',
-  strokelinejoin: 'strokeLinejoin',
-  'stroke-linejoin': 'strokeLinejoin',
-  strokemiterlimit: 'strokeMiterlimit',
-  'stroke-miterlimit': 'strokeMiterlimit',
-  strokewidth: 'strokeWidth',
-  'stroke-width': 'strokeWidth',
-  strokeopacity: 'strokeOpacity',
-  'stroke-opacity': 'strokeOpacity',
-  suppresscontenteditablewarning: 'suppressContentEditableWarning',
-  suppresshydrationwarning: 'suppressHydrationWarning',
-  surfacescale: 'surfaceScale',
-  systemlanguage: 'systemLanguage',
-  tablevalues: 'tableValues',
-  targetx: 'targetX',
-  targety: 'targetY',
-  textanchor: 'textAnchor',
-  'text-anchor': 'textAnchor',
-  textdecoration: 'textDecoration',
-  'text-decoration': 'textDecoration',
-  textlength: 'textLength',
-  textrendering: 'textRendering',
-  'text-rendering': 'textRendering',
-  to: 'to',
-  transform: 'transform',
-  typeof: 'typeof',
-  u1: 'u1',
-  u2: 'u2',
-  underlineposition: 'underlinePosition',
-  'underline-position': 'underlinePosition',
-  underlinethickness: 'underlineThickness',
-  'underline-thickness': 'underlineThickness',
-  unicode: 'unicode',
-  unicodebidi: 'unicodeBidi',
-  'unicode-bidi': 'unicodeBidi',
-  unicoderange: 'unicodeRange',
-  'unicode-range': 'unicodeRange',
-  unitsperem: 'unitsPerEm',
-  'units-per-em': 'unitsPerEm',
-  unselectable: 'unselectable',
-  valphabetic: 'vAlphabetic',
-  'v-alphabetic': 'vAlphabetic',
-  values: 'values',
-  vectoreffect: 'vectorEffect',
-  'vector-effect': 'vectorEffect',
-  version: 'version',
-  vertadvy: 'vertAdvY',
-  'vert-adv-y': 'vertAdvY',
-  vertoriginx: 'vertOriginX',
-  'vert-origin-x': 'vertOriginX',
-  vertoriginy: 'vertOriginY',
-  'vert-origin-y': 'vertOriginY',
-  vhanging: 'vHanging',
-  'v-hanging': 'vHanging',
-  videographic: 'vIdeographic',
-  'v-ideographic': 'vIdeographic',
-  viewbox: 'viewBox',
-  viewtarget: 'viewTarget',
-  visibility: 'visibility',
-  vmathematical: 'vMathematical',
-  'v-mathematical': 'vMathematical',
-  vocab: 'vocab',
-  widths: 'widths',
-  wordspacing: 'wordSpacing',
-  'word-spacing': 'wordSpacing',
-  writingmode: 'writingMode',
-  'writing-mode': 'writingMode',
-  x1: 'x1',
-  x2: 'x2',
-  x: 'x',
-  xchannelselector: 'xChannelSelector',
-  xheight: 'xHeight',
-  'x-height': 'xHeight',
-  xlinkactuate: 'xlinkActuate',
-  'xlink:actuate': 'xlinkActuate',
-  xlinkarcrole: 'xlinkArcrole',
-  'xlink:arcrole': 'xlinkArcrole',
-  xlinkhref: 'xlinkHref',
-  'xlink:href': 'xlinkHref',
-  xlinkrole: 'xlinkRole',
-  'xlink:role': 'xlinkRole',
-  xlinkshow: 'xlinkShow',
-  'xlink:show': 'xlinkShow',
-  xlinktitle: 'xlinkTitle',
-  'xlink:title': 'xlinkTitle',
-  xlinktype: 'xlinkType',
-  'xlink:type': 'xlinkType',
-  xmlbase: 'xmlBase',
-  'xml:base': 'xmlBase',
-  xmllang: 'xmlLang',
-  'xml:lang': 'xmlLang',
-  xmlns: 'xmlns',
-  'xml:space': 'xmlSpace',
-  xmlnsxlink: 'xmlnsXlink',
-  'xmlns:xlink': 'xmlnsXlink',
-  xmlspace: 'xmlSpace',
-  y1: 'y1',
-  y2: 'y2',
-  y: 'y',
-  ychannelselector: 'yChannelSelector',
-  z: 'z',
-  zoomandpan: 'zoomAndPan'
+    // SVG
+    about: 'about',
+    accentheight: 'accentHeight',
+    'accent-height': 'accentHeight',
+    accumulate: 'accumulate',
+    additive: 'additive',
+    alignmentbaseline: 'alignmentBaseline',
+    'alignment-baseline': 'alignmentBaseline',
+    allowreorder: 'allowReorder',
+    alphabetic: 'alphabetic',
+    amplitude: 'amplitude',
+    arabicform: 'arabicForm',
+    'arabic-form': 'arabicForm',
+    ascent: 'ascent',
+    attributename: 'attributeName',
+    attributetype: 'attributeType',
+    autoreverse: 'autoReverse',
+    azimuth: 'azimuth',
+    basefrequency: 'baseFrequency',
+    baselineshift: 'baselineShift',
+    'baseline-shift': 'baselineShift',
+    baseprofile: 'baseProfile',
+    bbox: 'bbox',
+    begin: 'begin',
+    bias: 'bias',
+    by: 'by',
+    calcmode: 'calcMode',
+    capheight: 'capHeight',
+    'cap-height': 'capHeight',
+    clip: 'clip',
+    clippath: 'clipPath',
+    'clip-path': 'clipPath',
+    clippathunits: 'clipPathUnits',
+    cliprule: 'clipRule',
+    'clip-rule': 'clipRule',
+    color: 'color',
+    colorinterpolation: 'colorInterpolation',
+    'color-interpolation': 'colorInterpolation',
+    colorinterpolationfilters: 'colorInterpolationFilters',
+    'color-interpolation-filters': 'colorInterpolationFilters',
+    colorprofile: 'colorProfile',
+    'color-profile': 'colorProfile',
+    colorrendering: 'colorRendering',
+    'color-rendering': 'colorRendering',
+    contentscripttype: 'contentScriptType',
+    contentstyletype: 'contentStyleType',
+    cursor: 'cursor',
+    cx: 'cx',
+    cy: 'cy',
+    d: 'd',
+    datatype: 'datatype',
+    decelerate: 'decelerate',
+    descent: 'descent',
+    diffuseconstant: 'diffuseConstant',
+    direction: 'direction',
+    display: 'display',
+    divisor: 'divisor',
+    dominantbaseline: 'dominantBaseline',
+    'dominant-baseline': 'dominantBaseline',
+    dur: 'dur',
+    dx: 'dx',
+    dy: 'dy',
+    edgemode: 'edgeMode',
+    elevation: 'elevation',
+    enablebackground: 'enableBackground',
+    'enable-background': 'enableBackground',
+    end: 'end',
+    exponent: 'exponent',
+    externalresourcesrequired: 'externalResourcesRequired',
+    fill: 'fill',
+    fillopacity: 'fillOpacity',
+    'fill-opacity': 'fillOpacity',
+    fillrule: 'fillRule',
+    'fill-rule': 'fillRule',
+    filter: 'filter',
+    filterres: 'filterRes',
+    filterunits: 'filterUnits',
+    floodopacity: 'floodOpacity',
+    'flood-opacity': 'floodOpacity',
+    floodcolor: 'floodColor',
+    'flood-color': 'floodColor',
+    focusable: 'focusable',
+    fontfamily: 'fontFamily',
+    'font-family': 'fontFamily',
+    fontsize: 'fontSize',
+    'font-size': 'fontSize',
+    fontsizeadjust: 'fontSizeAdjust',
+    'font-size-adjust': 'fontSizeAdjust',
+    fontstretch: 'fontStretch',
+    'font-stretch': 'fontStretch',
+    fontstyle: 'fontStyle',
+    'font-style': 'fontStyle',
+    fontvariant: 'fontVariant',
+    'font-variant': 'fontVariant',
+    fontweight: 'fontWeight',
+    'font-weight': 'fontWeight',
+    format: 'format',
+    from: 'from',
+    fx: 'fx',
+    fy: 'fy',
+    g1: 'g1',
+    g2: 'g2',
+    glyphname: 'glyphName',
+    'glyph-name': 'glyphName',
+    glyphorientationhorizontal: 'glyphOrientationHorizontal',
+    'glyph-orientation-horizontal': 'glyphOrientationHorizontal',
+    glyphorientationvertical: 'glyphOrientationVertical',
+    'glyph-orientation-vertical': 'glyphOrientationVertical',
+    glyphref: 'glyphRef',
+    gradienttransform: 'gradientTransform',
+    gradientunits: 'gradientUnits',
+    hanging: 'hanging',
+    horizadvx: 'horizAdvX',
+    'horiz-adv-x': 'horizAdvX',
+    horizoriginx: 'horizOriginX',
+    'horiz-origin-x': 'horizOriginX',
+    ideographic: 'ideographic',
+    imagerendering: 'imageRendering',
+    'image-rendering': 'imageRendering',
+    in2: 'in2',
+    in: 'in',
+    inlist: 'inlist',
+    intercept: 'intercept',
+    k1: 'k1',
+    k2: 'k2',
+    k3: 'k3',
+    k4: 'k4',
+    k: 'k',
+    kernelmatrix: 'kernelMatrix',
+    kernelunitlength: 'kernelUnitLength',
+    kerning: 'kerning',
+    keypoints: 'keyPoints',
+    keysplines: 'keySplines',
+    keytimes: 'keyTimes',
+    lengthadjust: 'lengthAdjust',
+    letterspacing: 'letterSpacing',
+    'letter-spacing': 'letterSpacing',
+    lightingcolor: 'lightingColor',
+    'lighting-color': 'lightingColor',
+    limitingconeangle: 'limitingConeAngle',
+    local: 'local',
+    markerend: 'markerEnd',
+    'marker-end': 'markerEnd',
+    markerheight: 'markerHeight',
+    markermid: 'markerMid',
+    'marker-mid': 'markerMid',
+    markerstart: 'markerStart',
+    'marker-start': 'markerStart',
+    markerunits: 'markerUnits',
+    markerwidth: 'markerWidth',
+    mask: 'mask',
+    maskcontentunits: 'maskContentUnits',
+    maskunits: 'maskUnits',
+    mathematical: 'mathematical',
+    mode: 'mode',
+    numoctaves: 'numOctaves',
+    offset: 'offset',
+    opacity: 'opacity',
+    operator: 'operator',
+    order: 'order',
+    orient: 'orient',
+    orientation: 'orientation',
+    origin: 'origin',
+    overflow: 'overflow',
+    overlineposition: 'overlinePosition',
+    'overline-position': 'overlinePosition',
+    overlinethickness: 'overlineThickness',
+    'overline-thickness': 'overlineThickness',
+    paintorder: 'paintOrder',
+    'paint-order': 'paintOrder',
+    panose1: 'panose1',
+    'panose-1': 'panose1',
+    pathlength: 'pathLength',
+    patterncontentunits: 'patternContentUnits',
+    patterntransform: 'patternTransform',
+    patternunits: 'patternUnits',
+    pointerevents: 'pointerEvents',
+    'pointer-events': 'pointerEvents',
+    points: 'points',
+    pointsatx: 'pointsAtX',
+    pointsaty: 'pointsAtY',
+    pointsatz: 'pointsAtZ',
+    prefix: 'prefix',
+    preservealpha: 'preserveAlpha',
+    preserveaspectratio: 'preserveAspectRatio',
+    primitiveunits: 'primitiveUnits',
+    property: 'property',
+    r: 'r',
+    radius: 'radius',
+    refx: 'refX',
+    refy: 'refY',
+    renderingintent: 'renderingIntent',
+    'rendering-intent': 'renderingIntent',
+    repeatcount: 'repeatCount',
+    repeatdur: 'repeatDur',
+    requiredextensions: 'requiredExtensions',
+    requiredfeatures: 'requiredFeatures',
+    resource: 'resource',
+    restart: 'restart',
+    result: 'result',
+    results: 'results',
+    rotate: 'rotate',
+    rx: 'rx',
+    ry: 'ry',
+    scale: 'scale',
+    security: 'security',
+    seed: 'seed',
+    shaperendering: 'shapeRendering',
+    'shape-rendering': 'shapeRendering',
+    slope: 'slope',
+    spacing: 'spacing',
+    specularconstant: 'specularConstant',
+    specularexponent: 'specularExponent',
+    speed: 'speed',
+    spreadmethod: 'spreadMethod',
+    startoffset: 'startOffset',
+    stddeviation: 'stdDeviation',
+    stemh: 'stemh',
+    stemv: 'stemv',
+    stitchtiles: 'stitchTiles',
+    stopcolor: 'stopColor',
+    'stop-color': 'stopColor',
+    stopopacity: 'stopOpacity',
+    'stop-opacity': 'stopOpacity',
+    strikethroughposition: 'strikethroughPosition',
+    'strikethrough-position': 'strikethroughPosition',
+    strikethroughthickness: 'strikethroughThickness',
+    'strikethrough-thickness': 'strikethroughThickness',
+    string: 'string',
+    stroke: 'stroke',
+    strokedasharray: 'strokeDasharray',
+    'stroke-dasharray': 'strokeDasharray',
+    strokedashoffset: 'strokeDashoffset',
+    'stroke-dashoffset': 'strokeDashoffset',
+    strokelinecap: 'strokeLinecap',
+    'stroke-linecap': 'strokeLinecap',
+    strokelinejoin: 'strokeLinejoin',
+    'stroke-linejoin': 'strokeLinejoin',
+    strokemiterlimit: 'strokeMiterlimit',
+    'stroke-miterlimit': 'strokeMiterlimit',
+    strokewidth: 'strokeWidth',
+    'stroke-width': 'strokeWidth',
+    strokeopacity: 'strokeOpacity',
+    'stroke-opacity': 'strokeOpacity',
+    suppresscontenteditablewarning: 'suppressContentEditableWarning',
+    suppresshydrationwarning: 'suppressHydrationWarning',
+    surfacescale: 'surfaceScale',
+    systemlanguage: 'systemLanguage',
+    tablevalues: 'tableValues',
+    targetx: 'targetX',
+    targety: 'targetY',
+    textanchor: 'textAnchor',
+    'text-anchor': 'textAnchor',
+    textdecoration: 'textDecoration',
+    'text-decoration': 'textDecoration',
+    textlength: 'textLength',
+    textrendering: 'textRendering',
+    'text-rendering': 'textRendering',
+    to: 'to',
+    transform: 'transform',
+    typeof: 'typeof',
+    u1: 'u1',
+    u2: 'u2',
+    underlineposition: 'underlinePosition',
+    'underline-position': 'underlinePosition',
+    underlinethickness: 'underlineThickness',
+    'underline-thickness': 'underlineThickness',
+    unicode: 'unicode',
+    unicodebidi: 'unicodeBidi',
+    'unicode-bidi': 'unicodeBidi',
+    unicoderange: 'unicodeRange',
+    'unicode-range': 'unicodeRange',
+    unitsperem: 'unitsPerEm',
+    'units-per-em': 'unitsPerEm',
+    unselectable: 'unselectable',
+    valphabetic: 'vAlphabetic',
+    'v-alphabetic': 'vAlphabetic',
+    values: 'values',
+    vectoreffect: 'vectorEffect',
+    'vector-effect': 'vectorEffect',
+    version: 'version',
+    vertadvy: 'vertAdvY',
+    'vert-adv-y': 'vertAdvY',
+    vertoriginx: 'vertOriginX',
+    'vert-origin-x': 'vertOriginX',
+    vertoriginy: 'vertOriginY',
+    'vert-origin-y': 'vertOriginY',
+    vhanging: 'vHanging',
+    'v-hanging': 'vHanging',
+    videographic: 'vIdeographic',
+    'v-ideographic': 'vIdeographic',
+    viewbox: 'viewBox',
+    viewtarget: 'viewTarget',
+    visibility: 'visibility',
+    vmathematical: 'vMathematical',
+    'v-mathematical': 'vMathematical',
+    vocab: 'vocab',
+    widths: 'widths',
+    wordspacing: 'wordSpacing',
+    'word-spacing': 'wordSpacing',
+    writingmode: 'writingMode',
+    'writing-mode': 'writingMode',
+    x1: 'x1',
+    x2: 'x2',
+    x: 'x',
+    xchannelselector: 'xChannelSelector',
+    xheight: 'xHeight',
+    'x-height': 'xHeight',
+    xlinkactuate: 'xlinkActuate',
+    'xlink:actuate': 'xlinkActuate',
+    xlinkarcrole: 'xlinkArcrole',
+    'xlink:arcrole': 'xlinkArcrole',
+    xlinkhref: 'xlinkHref',
+    'xlink:href': 'xlinkHref',
+    xlinkrole: 'xlinkRole',
+    'xlink:role': 'xlinkRole',
+    xlinkshow: 'xlinkShow',
+    'xlink:show': 'xlinkShow',
+    xlinktitle: 'xlinkTitle',
+    'xlink:title': 'xlinkTitle',
+    xlinktype: 'xlinkType',
+    'xlink:type': 'xlinkType',
+    xmlbase: 'xmlBase',
+    'xml:base': 'xmlBase',
+    xmllang: 'xmlLang',
+    'xml:lang': 'xmlLang',
+    xmlns: 'xmlns',
+    'xml:space': 'xmlSpace',
+    xmlnsxlink: 'xmlnsXlink',
+    'xmlns:xlink': 'xmlnsXlink',
+    xmlspace: 'xmlSpace',
+    y1: 'y1',
+    y2: 'y2',
+    y: 'y',
+    ychannelselector: 'yChannelSelector',
+    z: 'z',
+    zoomandpan: 'zoomAndPan'
 };
 
 var ariaProperties = {
-  'aria-current': 0, // state
-  'aria-details': 0,
-  'aria-disabled': 0, // state
-  'aria-hidden': 0, // state
-  'aria-invalid': 0, // state
-  'aria-keyshortcuts': 0,
-  'aria-label': 0,
-  'aria-roledescription': 0,
-  // Widget Attributes
-  'aria-autocomplete': 0,
-  'aria-checked': 0,
-  'aria-expanded': 0,
-  'aria-haspopup': 0,
-  'aria-level': 0,
-  'aria-modal': 0,
-  'aria-multiline': 0,
-  'aria-multiselectable': 0,
-  'aria-orientation': 0,
-  'aria-placeholder': 0,
-  'aria-pressed': 0,
-  'aria-readonly': 0,
-  'aria-required': 0,
-  'aria-selected': 0,
-  'aria-sort': 0,
-  'aria-valuemax': 0,
-  'aria-valuemin': 0,
-  'aria-valuenow': 0,
-  'aria-valuetext': 0,
-  // Live Region Attributes
-  'aria-atomic': 0,
-  'aria-busy': 0,
-  'aria-live': 0,
-  'aria-relevant': 0,
-  // Drag-and-Drop Attributes
-  'aria-dropeffect': 0,
-  'aria-grabbed': 0,
-  // Relationship Attributes
-  'aria-activedescendant': 0,
-  'aria-colcount': 0,
-  'aria-colindex': 0,
-  'aria-colspan': 0,
-  'aria-controls': 0,
-  'aria-describedby': 0,
-  'aria-errormessage': 0,
-  'aria-flowto': 0,
-  'aria-labelledby': 0,
-  'aria-owns': 0,
-  'aria-posinset': 0,
-  'aria-rowcount': 0,
-  'aria-rowindex': 0,
-  'aria-rowspan': 0,
-  'aria-setsize': 0
+    'aria-current': 0, // state
+    'aria-details': 0,
+    'aria-disabled': 0, // state
+    'aria-hidden': 0, // state
+    'aria-invalid': 0, // state
+    'aria-keyshortcuts': 0,
+    'aria-label': 0,
+    'aria-roledescription': 0,
+    // Widget Attributes
+    'aria-autocomplete': 0,
+    'aria-checked': 0,
+    'aria-expanded': 0,
+    'aria-haspopup': 0,
+    'aria-level': 0,
+    'aria-modal': 0,
+    'aria-multiline': 0,
+    'aria-multiselectable': 0,
+    'aria-orientation': 0,
+    'aria-placeholder': 0,
+    'aria-pressed': 0,
+    'aria-readonly': 0,
+    'aria-required': 0,
+    'aria-selected': 0,
+    'aria-sort': 0,
+    'aria-valuemax': 0,
+    'aria-valuemin': 0,
+    'aria-valuenow': 0,
+    'aria-valuetext': 0,
+    // Live Region Attributes
+    'aria-atomic': 0,
+    'aria-busy': 0,
+    'aria-live': 0,
+    'aria-relevant': 0,
+    // Drag-and-Drop Attributes
+    'aria-dropeffect': 0,
+    'aria-grabbed': 0,
+    // Relationship Attributes
+    'aria-activedescendant': 0,
+    'aria-colcount': 0,
+    'aria-colindex': 0,
+    'aria-colspan': 0,
+    'aria-controls': 0,
+    'aria-describedby': 0,
+    'aria-errormessage': 0,
+    'aria-flowto': 0,
+    'aria-labelledby': 0,
+    'aria-owns': 0,
+    'aria-posinset': 0,
+    'aria-rowcount': 0,
+    'aria-rowindex': 0,
+    'aria-rowspan': 0,
+    'aria-setsize': 0
 };
 
 var warnedProperties = {};
@@ -7238,66 +7189,66 @@ var rARIACamel = new RegExp('^(aria)[A-Z][' + ATTRIBUTE_NAME_CHAR + ']*$');
 var hasOwnProperty$2 = Object.prototype.hasOwnProperty;
 
 function validateProperty(tagName, name) {
-  if (hasOwnProperty$2.call(warnedProperties, name) && warnedProperties[name]) {
+    if (hasOwnProperty$2.call(warnedProperties, name) && warnedProperties[name]) {
+        return true;
+    }
+
+    if (rARIACamel.test(name)) {
+        var ariaName = 'aria-' + name.slice(4).toLowerCase();
+        var correctName = ariaProperties.hasOwnProperty(ariaName) ? ariaName : null;
+
+        // If this is an aria-* attribute, but is not listed in the known DOM
+        // DOM properties, then it is an invalid aria-* attribute.
+        if (correctName == null) {
+            warning$1(false, 'Invalid ARIA attribute `%s`. ARIA attributes follow the pattern aria-* and must be lowercase.', name);
+            warnedProperties[name] = true;
+            return true;
+        }
+        // aria-* attributes should be lowercase; suggest the lowercase version.
+        if (name !== correctName) {
+            warning$1(false, 'Invalid ARIA attribute `%s`. Did you mean `%s`?', name, correctName);
+            warnedProperties[name] = true;
+            return true;
+        }
+    }
+
+    if (rARIA.test(name)) {
+        var lowerCasedName = name.toLowerCase();
+        var standardName = ariaProperties.hasOwnProperty(lowerCasedName) ? lowerCasedName : null;
+
+        // If this is an aria-* attribute, but is not listed in the known DOM
+        // DOM properties, then it is an invalid aria-* attribute.
+        if (standardName == null) {
+            warnedProperties[name] = true;
+            return false;
+        }
+        // aria-* attributes should be lowercase; suggest the lowercase version.
+        if (name !== standardName) {
+            warning$1(false, 'Unknown ARIA attribute `%s`. Did you mean `%s`?', name, standardName);
+            warnedProperties[name] = true;
+            return true;
+        }
+    }
+
     return true;
-  }
-
-  if (rARIACamel.test(name)) {
-    var ariaName = 'aria-' + name.slice(4).toLowerCase();
-    var correctName = ariaProperties.hasOwnProperty(ariaName) ? ariaName : null;
-
-    // If this is an aria-* attribute, but is not listed in the known DOM
-    // DOM properties, then it is an invalid aria-* attribute.
-    if (correctName == null) {
-      warning$1(false, 'Invalid ARIA attribute `%s`. ARIA attributes follow the pattern aria-* and must be lowercase.', name);
-      warnedProperties[name] = true;
-      return true;
-    }
-    // aria-* attributes should be lowercase; suggest the lowercase version.
-    if (name !== correctName) {
-      warning$1(false, 'Invalid ARIA attribute `%s`. Did you mean `%s`?', name, correctName);
-      warnedProperties[name] = true;
-      return true;
-    }
-  }
-
-  if (rARIA.test(name)) {
-    var lowerCasedName = name.toLowerCase();
-    var standardName = ariaProperties.hasOwnProperty(lowerCasedName) ? lowerCasedName : null;
-
-    // If this is an aria-* attribute, but is not listed in the known DOM
-    // DOM properties, then it is an invalid aria-* attribute.
-    if (standardName == null) {
-      warnedProperties[name] = true;
-      return false;
-    }
-    // aria-* attributes should be lowercase; suggest the lowercase version.
-    if (name !== standardName) {
-      warning$1(false, 'Unknown ARIA attribute `%s`. Did you mean `%s`?', name, standardName);
-      warnedProperties[name] = true;
-      return true;
-    }
-  }
-
-  return true;
 }
 
 function warnInvalidARIAProps(type, props) {
-  var invalidProps = [];
+    var invalidProps = [];
 
-  for (var key in props) {
-    var isValid = validateProperty(type, key);
-    if (!isValid) {
-      invalidProps.push(key);
+    for (var key in props) {
+        var isValid = validateProperty(type, key);
+        if (!isValid) {
+            invalidProps.push(key);
+        }
     }
-  }
 
-  var unknownPropString = invalidProps.map(function (prop) {
-    return '`' + prop + '`';
-  }).join(', ');
+    var unknownPropString = invalidProps.map(function (prop) {
+        return '`' + prop + '`';
+    }).join(', ');
 
-  if (invalidProps.length === 1) {
-    warning$1(false, 'Invalid aria prop %s on <%s> tag. ' + 'For details, see https://fb.me/invalid-aria-prop', unknownPropString, type);
+    if (invalidProps.length === 1) {
+        warning$1(false, 'Invalid aria prop %s on <%s> tag. ' + 'For details, see https://fb.me/invalid-aria-prop', unknownPropString, type);
   } else if (invalidProps.length > 1) {
     warning$1(false, 'Invalid aria props %s on <%s> tag. ' + 'For details, see https://fb.me/invalid-aria-prop', unknownPropString, type);
   }
@@ -7498,18 +7449,18 @@ var HTML = '__html';
 var HTML_NAMESPACE = Namespaces.html;
 
 
-var warnedUnknownTags = void 0;
-var suppressHydrationWarning = void 0;
+var warnedUnknownTags = undefined;
+var suppressHydrationWarning = undefined;
 
-var validatePropertiesInDevelopment = void 0;
-var warnForTextDifference = void 0;
-var warnForPropDifference = void 0;
-var warnForExtraAttributes = void 0;
-var warnForInvalidEventListener = void 0;
-var canDiffStyleForHydrationWarning = void 0;
+var validatePropertiesInDevelopment = undefined;
+var warnForTextDifference = undefined;
+var warnForPropDifference = undefined;
+var warnForExtraAttributes = undefined;
+var warnForInvalidEventListener = undefined;
+var canDiffStyleForHydrationWarning = undefined;
 
-var normalizeMarkupForTextOrAttribute = void 0;
-var normalizeHTML = void 0;
+var normalizeMarkupForTextOrAttribute = undefined;
+var normalizeHTML = undefined;
 
 {
   warnedUnknownTags = {
@@ -7713,12 +7664,12 @@ function updateDOMProperties(domElement, updatePayload, wasCustomComponentTag, i
 }
 
 function createElement(type, props, rootContainerElement, parentNamespace) {
-  var isCustomComponentTag = void 0;
+  var isCustomComponentTag = undefined;
 
   // We create tags in the namespace of their parent container, except HTML
   // tags get no namespace.
   var ownerDocument = getOwnerDocumentFromRootContainer(rootContainerElement);
-  var domElement = void 0;
+  var domElement = undefined;
   var namespaceURI = parentNamespace;
   if (namespaceURI === HTML_NAMESPACE) {
     namespaceURI = getIntrinsicNamespace(type);
@@ -7728,7 +7679,7 @@ function createElement(type, props, rootContainerElement, parentNamespace) {
       isCustomComponentTag = isCustomComponent(type, props);
       // Should this check be gated by parent namespace? Not sure we want to
       // allow <SVG> or <mATH>.
-      !(isCustomComponentTag || type === type.toLowerCase()) ? warning$1(false, '<%s /> is using incorrect casing. ' + 'Use PascalCase for React components, ' + 'or lowercase for HTML elements.', type) : void 0;
+      !(isCustomComponentTag || type === type.toLowerCase()) ? warning$1(false, '<%s /> is using incorrect casing. ' + 'Use PascalCase for React components, ' + 'or lowercase for HTML elements.', type) : undefined;
     }
 
     if (type === 'script') {
@@ -7799,7 +7750,7 @@ function setInitialProperties(domElement, tag, rawProps, rootContainerElement) {
   }
 
   // TODO: Make sure that we check isMounted before firing any of these events.
-  var props = void 0;
+  var props = undefined;
   switch (tag) {
     case 'iframe':
     case 'object':
@@ -7906,8 +7857,8 @@ function diffProperties(domElement, tag, lastRawProps, nextRawProps, rootContain
 
   var updatePayload = null;
 
-  var lastProps = void 0;
-  var nextProps = void 0;
+  var lastProps = undefined;
+  var nextProps = undefined;
   switch (tag) {
     case 'input':
       lastProps = getHostProps(domElement, lastRawProps);
@@ -7941,8 +7892,8 @@ function diffProperties(domElement, tag, lastRawProps, nextRawProps, rootContain
 
   assertValidProps(tag, nextProps);
 
-  var propKey = void 0;
-  var styleName = void 0;
+  var propKey = undefined;
+  var styleName = undefined;
   var styleUpdates = null;
   for (propKey in lastProps) {
     if (nextProps.hasOwnProperty(propKey) || !lastProps.hasOwnProperty(propKey) || lastProps[propKey] == null) {
@@ -8112,8 +8063,8 @@ function getPossibleStandardName(propName) {
 }
 
 function diffHydratedProperties(domElement, tag, rawProps, parentNamespace, rootContainerElement) {
-  var isCustomComponentTag = void 0;
-  var extraAttributeNames = void 0;
+  var isCustomComponentTag = undefined;
+  var extraAttributeNames = undefined;
 
   {
     suppressHydrationWarning = rawProps[SUPPRESS_HYDRATION_WARNING$1] === true;
@@ -8249,7 +8200,7 @@ function diffHydratedProperties(domElement, tag, rawProps, parentNamespace, root
     // Convince Flow we've calculated it (it's DEV-only in this method.)
     typeof isCustomComponentTag === 'boolean') {
       // Validate that the properties correspond to their expected values.
-      var serverValue = void 0;
+      var serverValue = undefined;
       var propertyInfo = getPropertyInfo(propKey);
       if (suppressHydrationWarning) {
         // Don't bother comparing. We're ignoring all these warnings.
@@ -8686,7 +8637,7 @@ var updatedAncestorInfo = function () {};
     var parentTag = parentInfo && parentInfo.tag;
 
     if (childText != null) {
-      !(childTag == null) ? warningWithoutStack$1(false, 'validateDOMNesting: when childText is passed, childTag should be null') : void 0;
+      !(childTag == null) ? warningWithoutStack$1(false, 'validateDOMNesting: when childText is passed, childTag should be null') : undefined;
       childTag = '#text';
     }
 
@@ -8731,25 +8682,6 @@ var updatedAncestorInfo = function () {};
   };
 }
 
-var ReactInternals$1 = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
-
-var _ReactInternals$Sched = ReactInternals$1.Scheduler;
-var unstable_cancelCallback = _ReactInternals$Sched.unstable_cancelCallback;
-var unstable_now = _ReactInternals$Sched.unstable_now;
-var unstable_scheduleCallback = _ReactInternals$Sched.unstable_scheduleCallback;
-var unstable_shouldYield = _ReactInternals$Sched.unstable_shouldYield;
-var unstable_getFirstCallbackNode = _ReactInternals$Sched.unstable_getFirstCallbackNode;
-var unstable_runWithPriority = _ReactInternals$Sched.unstable_runWithPriority;
-var unstable_next = _ReactInternals$Sched.unstable_next;
-var unstable_continueExecution = _ReactInternals$Sched.unstable_continueExecution;
-var unstable_pauseExecution = _ReactInternals$Sched.unstable_pauseExecution;
-var unstable_getCurrentPriorityLevel = _ReactInternals$Sched.unstable_getCurrentPriorityLevel;
-var unstable_ImmediatePriority = _ReactInternals$Sched.unstable_ImmediatePriority;
-var unstable_UserBlockingPriority = _ReactInternals$Sched.unstable_UserBlockingPriority;
-var unstable_NormalPriority = _ReactInternals$Sched.unstable_NormalPriority;
-var unstable_LowPriority = _ReactInternals$Sched.unstable_LowPriority;
-var unstable_IdlePriority = _ReactInternals$Sched.unstable_IdlePriority;
-
 // Renderers that don't support persistence
 // can re-export everything from this module.
 
@@ -8768,7 +8700,7 @@ var cloneHiddenInstance = shim;
 var cloneUnhiddenInstance = shim;
 var createHiddenTextInstance = shim;
 
-var SUPPRESS_HYDRATION_WARNING = void 0;
+var SUPPRESS_HYDRATION_WARNING = undefined;
 {
   SUPPRESS_HYDRATION_WARNING = 'suppressHydrationWarning';
 }
@@ -8793,8 +8725,8 @@ function shouldAutoFocusHostComponent(type, props) {
 }
 
 function getRootHostContext(rootContainerInstance) {
-  var type = void 0;
-  var namespace = void 0;
+  var type = undefined;
+  var namespace = undefined;
   var nodeType = rootContainerInstance.nodeType;
   switch (nodeType) {
     case DOCUMENT_NODE:
@@ -8851,7 +8783,7 @@ function resetAfterCommit(containerInfo) {
 }
 
 function createInstance(type, props, rootContainerInstance, hostContext, internalInstanceHandle) {
-  var parentNamespace = void 0;
+  var parentNamespace = undefined;
   {
     // TODO: take namespace into account when validating.
     var hostContextDev = hostContext;
@@ -8915,8 +8847,8 @@ var isPrimaryRenderer = true;
 var scheduleTimeout = typeof setTimeout === 'function' ? setTimeout : undefined;
 var cancelTimeout = typeof clearTimeout === 'function' ? clearTimeout : undefined;
 var noTimeout = -1;
-var schedulePassiveEffects = unstable_scheduleCallback;
-var cancelPassiveEffects = unstable_cancelCallback;
+var schedulePassiveEffects = scheduler.unstable_scheduleCallback;
+var cancelPassiveEffects = scheduler.unstable_cancelCallback;
 
 // -------------------
 //     Mutation
@@ -8957,7 +8889,7 @@ function appendChild(parentInstance, child) {
 }
 
 function appendChildToContainer(container, child) {
-  var parentNode = void 0;
+  var parentNode = undefined;
   if (container.nodeType === COMMENT_NODE) {
     parentNode = container.parentNode;
     parentNode.insertBefore(child, container);
@@ -9118,7 +9050,7 @@ function hydrateInstance(instance, type, props, rootContainerInstance, hostConte
   // TODO: Possibly defer this until the commit phase where all the events
   // get attached.
   updateFiberProps(instance, props);
-  var parentNamespace = void 0;
+  var parentNamespace = undefined;
   {
     var hostContextDev = hostContext;
     parentNamespace = hostContextDev.namespace;
@@ -9223,10 +9155,6 @@ function didNotFindHydratableSuspenseInstance(parentType, parentProps, parentIns
     // TODO: warnForInsertedHydratedSuspense(parentInstance);
   }
 }
-
-// This is just to get the setup running.
-// TODO: real implementation.
-// console.log('Hello from Fire host config.');
 
 // Prefix measurements so that it's possible to filter them.
 // Longer prefixes are hard to read in DevTools.
@@ -9653,7 +9581,7 @@ function stopCommitLifeCyclesTimer() {
 
 var valueStack = [];
 
-var fiberStack = void 0;
+var fiberStack = undefined;
 
 {
   fiberStack = [];
@@ -9720,7 +9648,7 @@ function resetStackAfterFatalErrorInDev() {
   }
 }
 
-var warnedAboutMissingGetChildContext = void 0;
+var warnedAboutMissingGetChildContext = undefined;
 
 {
   warnedAboutMissingGetChildContext = {};
@@ -9779,7 +9707,7 @@ function getMaskedContext(workInProgress, unmaskedContext) {
 
   {
     var name = getComponentName(type) || 'Unknown';
-    checkPropTypes_1(contextTypes, context, 'context', name, getCurrentFiberStackInDev);
+    checkPropTypes(contextTypes, context, 'context', name, getCurrentFiberStackInDev);
   }
 
   // Cache unmasked context so we can avoid recreating masked context unless necessary.
@@ -9811,7 +9739,7 @@ function popTopLevelContextObject(fiber) {
 }
 
 function pushTopLevelContextObject(fiber, context, didChange) {
-  !(contextStackCursor.current === emptyContextObject) ? invariant(false, 'Unexpected context found on stack. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+  !(contextStackCursor.current === emptyContextObject) ? invariant(false, 'Unexpected context found on stack. This error is likely caused by a bug in React. Please file an issue.') : undefined;
 
   push(contextStackCursor, context, fiber);
   push(didPerformWorkStackCursor, didChange, fiber);
@@ -9835,7 +9763,7 @@ function processChildContext(fiber, type, parentContext) {
     return parentContext;
   }
 
-  var childContext = void 0;
+  var childContext = undefined;
   {
     setCurrentPhase('getChildContext');
   }
@@ -9846,11 +9774,11 @@ function processChildContext(fiber, type, parentContext) {
     setCurrentPhase(null);
   }
   for (var contextKey in childContext) {
-    !(contextKey in childContextTypes) ? invariant(false, '%s.getChildContext(): key "%s" is not defined in childContextTypes.', getComponentName(type) || 'Unknown', contextKey) : void 0;
+    !(contextKey in childContextTypes) ? invariant(false, '%s.getChildContext(): key "%s" is not defined in childContextTypes.', getComponentName(type) || 'Unknown', contextKey) : undefined;
   }
   {
     var name = getComponentName(type) || 'Unknown';
-    checkPropTypes_1(childContextTypes, childContext, 'child context', name,
+    checkPropTypes(childContextTypes, childContext, 'child context', name,
     // In practice, there is one case in which we won't get a stack. It's when
     // somebody calls unstable_renderSubtreeIntoContainer() and we process
     // context from the parent component instance. The stack will be missing
@@ -9880,7 +9808,7 @@ function pushContextProvider(workInProgress) {
 
 function invalidateContextProvider(workInProgress, type, didChange) {
   var instance = workInProgress.stateNode;
-  !instance ? invariant(false, 'Expected to have an instance by this point. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+  !instance ? invariant(false, 'Expected to have an instance by this point. This error is likely caused by a bug in React. Please file an issue.') : undefined;
 
   if (didChange) {
     // Merge parent and own context.
@@ -9905,7 +9833,7 @@ function invalidateContextProvider(workInProgress, type, didChange) {
 function findCurrentUnmaskedContext(fiber) {
   // Currently this is only used with renderSubtreeIntoContainer; not sure if it
   // makes sense elsewhere
-  !(isFiberMounted(fiber) && fiber.tag === ClassComponent) ? invariant(false, 'Expected subtree parent to be a mounted class component. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+  !(isFiberMounted(fiber) && fiber.tag === ClassComponent) ? invariant(false, 'Expected subtree parent to be a mounted class component. This error is likely caused by a bug in React. Please file an issue.') : undefined;
 
   var node = fiber;
   do {
@@ -10055,7 +9983,7 @@ var ConcurrentMode = 1;
 var StrictMode = 2;
 var ProfileMode = 4;
 
-var hasBadMapPolyfill = void 0;
+var hasBadMapPolyfill = undefined;
 
 {
   hasBadMapPolyfill = false;
@@ -10078,7 +10006,7 @@ var hasBadMapPolyfill = void 0;
 // be more than one per component.
 
 
-var debugCounter = void 0;
+var debugCounter = undefined;
 
 {
   debugCounter = 1;
@@ -10284,7 +10212,7 @@ function createHostRootFiber(isConcurrent) {
 
 function createFiberFromTypeAndProps(type, // React$ElementType
 key, pendingProps, owner, mode, expirationTime) {
-  var fiber = void 0;
+  var fiber = undefined;
 
   var fiberTag = IndeterminateComponent;
   // The resolved type is set if we know what the final type will be. I.e. it's not lazy.
@@ -10492,19 +10420,6 @@ function assignFiberPropertiesInDEV(target, source) {
   return target;
 }
 
-var ReactInternals$2 = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
-
-var _ReactInternals$Sched$1 = ReactInternals$2.SchedulerTracing;
-var __interactionsRef = _ReactInternals$Sched$1.__interactionsRef;
-var __subscriberRef = _ReactInternals$Sched$1.__subscriberRef;
-var unstable_clear = _ReactInternals$Sched$1.unstable_clear;
-var unstable_getCurrent = _ReactInternals$Sched$1.unstable_getCurrent;
-var unstable_getThreadID = _ReactInternals$Sched$1.unstable_getThreadID;
-var unstable_subscribe = _ReactInternals$Sched$1.unstable_subscribe;
-var unstable_trace = _ReactInternals$Sched$1.unstable_trace;
-var unstable_unsubscribe = _ReactInternals$Sched$1.unstable_unsubscribe;
-var unstable_wrap = _ReactInternals$Sched$1.unstable_wrap;
-
 // TODO: This should be lifted into the renderer.
 
 
@@ -10526,7 +10441,7 @@ function createFiberRoot(containerInfo, isConcurrent, hydrate) {
   // stateNode is any.
   var uninitializedFiber = createHostRootFiber(isConcurrent);
 
-  var root = void 0;
+  var root = undefined;
   if (enableSchedulerTracing) {
     root = {
       current: uninitializedFiber,
@@ -10554,7 +10469,7 @@ function createFiberRoot(containerInfo, isConcurrent, hydrate) {
       firstBatch: null,
       nextScheduledRoot: null,
 
-      interactionThreadID: unstable_getThreadID(),
+      interactionThreadID: tracing.unstable_getThreadID(),
       memoizedInteractions: new Set(),
       pendingInteractionMap: new Map()
     };
@@ -10613,7 +10528,7 @@ function createFiberRoot(containerInfo, isConcurrent, hydrate) {
 var lowPriorityWarning = function () {};
 
 {
-  var printWarning$1 = function (format) {
+  var printWarning = function (format) {
     for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
       args[_key - 1] = arguments[_key];
     }
@@ -10642,7 +10557,7 @@ var lowPriorityWarning = function () {};
         args[_key2 - 2] = arguments[_key2];
       }
 
-      printWarning$1.apply(undefined, [format].concat(args));
+      printWarning.apply(undefined, [format].concat(args));
     }
   };
 }
@@ -10816,7 +10731,7 @@ var ReactStrictModeWarnings = {
       return;
     }
 
-    var warningsForRoot = void 0;
+    var warningsForRoot = undefined;
     if (!pendingUnsafeLifecycleWarnings.has(strictRoot)) {
       warningsForRoot = {
         UNSAFE_componentWillMount: [],
@@ -11202,16 +11117,16 @@ var isArray$1 = Array.isArray;
 // We'll use it to determine whether we need to initialize legacy refs.
 var emptyRefsObject = new React.Component().refs;
 
-var didWarnAboutStateAssignmentForComponent = void 0;
-var didWarnAboutUninitializedState = void 0;
-var didWarnAboutGetSnapshotBeforeUpdateWithoutDidUpdate = void 0;
-var didWarnAboutLegacyLifecyclesAndDerivedState = void 0;
-var didWarnAboutUndefinedDerivedState = void 0;
-var warnOnUndefinedDerivedState = void 0;
-var warnOnInvalidCallback$1 = void 0;
-var didWarnAboutDirectlyAssigningPropsToState = void 0;
-var didWarnAboutContextTypeAndContextTypes = void 0;
-var didWarnAboutInvalidateContextType = void 0;
+var didWarnAboutStateAssignmentForComponent = undefined;
+var didWarnAboutUninitializedState = undefined;
+var didWarnAboutGetSnapshotBeforeUpdateWithoutDidUpdate = undefined;
+var didWarnAboutLegacyLifecyclesAndDerivedState = undefined;
+var didWarnAboutUndefinedDerivedState = undefined;
+var warnOnUndefinedDerivedState = undefined;
+var warnOnInvalidCallback$1 = undefined;
+var didWarnAboutDirectlyAssigningPropsToState = undefined;
+var didWarnAboutContextTypeAndContextTypes = undefined;
+var didWarnAboutInvalidateContextType = undefined;
 
 {
   didWarnAboutStateAssignmentForComponent = new Set();
@@ -11356,7 +11271,7 @@ function checkShouldComponentUpdate(workInProgress, ctor, oldProps, newProps, ol
     stopPhaseTimer();
 
     {
-      !(shouldUpdate !== undefined) ? warningWithoutStack$1(false, '%s.shouldComponentUpdate(): Returned undefined instead of a ' + 'boolean value. Make sure to return true or false.', getComponentName(ctor) || 'Component') : void 0;
+      !(shouldUpdate !== undefined) ? warningWithoutStack$1(false, '%s.shouldComponentUpdate(): Returned undefined instead of a ' + 'boolean value. Make sure to return true or false.', getComponentName(ctor) || 'Component') : undefined;
     }
 
     return shouldUpdate;
@@ -11384,15 +11299,15 @@ function checkClassInstance(workInProgress, ctor, newProps) {
     }
 
     var noGetInitialStateOnES6 = !instance.getInitialState || instance.getInitialState.isReactClassApproved || instance.state;
-    !noGetInitialStateOnES6 ? warningWithoutStack$1(false, 'getInitialState was defined on %s, a plain JavaScript class. ' + 'This is only supported for classes created using React.createClass. ' + 'Did you mean to define a state property instead?', name) : void 0;
+    !noGetInitialStateOnES6 ? warningWithoutStack$1(false, 'getInitialState was defined on %s, a plain JavaScript class. ' + 'This is only supported for classes created using React.createClass. ' + 'Did you mean to define a state property instead?', name) : undefined;
     var noGetDefaultPropsOnES6 = !instance.getDefaultProps || instance.getDefaultProps.isReactClassApproved;
-    !noGetDefaultPropsOnES6 ? warningWithoutStack$1(false, 'getDefaultProps was defined on %s, a plain JavaScript class. ' + 'This is only supported for classes created using React.createClass. ' + 'Use a static property to define defaultProps instead.', name) : void 0;
+    !noGetDefaultPropsOnES6 ? warningWithoutStack$1(false, 'getDefaultProps was defined on %s, a plain JavaScript class. ' + 'This is only supported for classes created using React.createClass. ' + 'Use a static property to define defaultProps instead.', name) : undefined;
     var noInstancePropTypes = !instance.propTypes;
-    !noInstancePropTypes ? warningWithoutStack$1(false, 'propTypes was defined as an instance property on %s. Use a static ' + 'property to define propTypes instead.', name) : void 0;
+    !noInstancePropTypes ? warningWithoutStack$1(false, 'propTypes was defined as an instance property on %s. Use a static ' + 'property to define propTypes instead.', name) : undefined;
     var noInstanceContextType = !instance.contextType;
-    !noInstanceContextType ? warningWithoutStack$1(false, 'contextType was defined as an instance property on %s. Use a static ' + 'property to define contextType instead.', name) : void 0;
+    !noInstanceContextType ? warningWithoutStack$1(false, 'contextType was defined as an instance property on %s. Use a static ' + 'property to define contextType instead.', name) : undefined;
     var noInstanceContextTypes = !instance.contextTypes;
-    !noInstanceContextTypes ? warningWithoutStack$1(false, 'contextTypes was defined as an instance property on %s. Use a static ' + 'property to define contextTypes instead.', name) : void 0;
+    !noInstanceContextTypes ? warningWithoutStack$1(false, 'contextTypes was defined as an instance property on %s. Use a static ' + 'property to define contextTypes instead.', name) : undefined;
 
     if (ctor.contextType && ctor.contextTypes && !didWarnAboutContextTypeAndContextTypes.has(ctor)) {
       didWarnAboutContextTypeAndContextTypes.add(ctor);
@@ -11400,22 +11315,22 @@ function checkClassInstance(workInProgress, ctor, newProps) {
     }
 
     var noComponentShouldUpdate = typeof instance.componentShouldUpdate !== 'function';
-    !noComponentShouldUpdate ? warningWithoutStack$1(false, '%s has a method called ' + 'componentShouldUpdate(). Did you mean shouldComponentUpdate()? ' + 'The name is phrased as a question because the function is ' + 'expected to return a value.', name) : void 0;
+    !noComponentShouldUpdate ? warningWithoutStack$1(false, '%s has a method called ' + 'componentShouldUpdate(). Did you mean shouldComponentUpdate()? ' + 'The name is phrased as a question because the function is ' + 'expected to return a value.', name) : undefined;
     if (ctor.prototype && ctor.prototype.isPureReactComponent && typeof instance.shouldComponentUpdate !== 'undefined') {
       warningWithoutStack$1(false, '%s has a method called shouldComponentUpdate(). ' + 'shouldComponentUpdate should not be used when extending React.PureComponent. ' + 'Please extend React.Component if shouldComponentUpdate is used.', getComponentName(ctor) || 'A pure component');
     }
     var noComponentDidUnmount = typeof instance.componentDidUnmount !== 'function';
-    !noComponentDidUnmount ? warningWithoutStack$1(false, '%s has a method called ' + 'componentDidUnmount(). But there is no such lifecycle method. ' + 'Did you mean componentWillUnmount()?', name) : void 0;
+    !noComponentDidUnmount ? warningWithoutStack$1(false, '%s has a method called ' + 'componentDidUnmount(). But there is no such lifecycle method. ' + 'Did you mean componentWillUnmount()?', name) : undefined;
     var noComponentDidReceiveProps = typeof instance.componentDidReceiveProps !== 'function';
-    !noComponentDidReceiveProps ? warningWithoutStack$1(false, '%s has a method called ' + 'componentDidReceiveProps(). But there is no such lifecycle method. ' + 'If you meant to update the state in response to changing props, ' + 'use componentWillReceiveProps(). If you meant to fetch data or ' + 'run side-effects or mutations after React has updated the UI, use componentDidUpdate().', name) : void 0;
+    !noComponentDidReceiveProps ? warningWithoutStack$1(false, '%s has a method called ' + 'componentDidReceiveProps(). But there is no such lifecycle method. ' + 'If you meant to update the state in response to changing props, ' + 'use componentWillReceiveProps(). If you meant to fetch data or ' + 'run side-effects or mutations after React has updated the UI, use componentDidUpdate().', name) : undefined;
     var noComponentWillRecieveProps = typeof instance.componentWillRecieveProps !== 'function';
-    !noComponentWillRecieveProps ? warningWithoutStack$1(false, '%s has a method called ' + 'componentWillRecieveProps(). Did you mean componentWillReceiveProps()?', name) : void 0;
+    !noComponentWillRecieveProps ? warningWithoutStack$1(false, '%s has a method called ' + 'componentWillRecieveProps(). Did you mean componentWillReceiveProps()?', name) : undefined;
     var noUnsafeComponentWillRecieveProps = typeof instance.UNSAFE_componentWillRecieveProps !== 'function';
-    !noUnsafeComponentWillRecieveProps ? warningWithoutStack$1(false, '%s has a method called ' + 'UNSAFE_componentWillRecieveProps(). Did you mean UNSAFE_componentWillReceiveProps()?', name) : void 0;
+    !noUnsafeComponentWillRecieveProps ? warningWithoutStack$1(false, '%s has a method called ' + 'UNSAFE_componentWillRecieveProps(). Did you mean UNSAFE_componentWillReceiveProps()?', name) : undefined;
     var hasMutatedProps = instance.props !== newProps;
-    !(instance.props === undefined || !hasMutatedProps) ? warningWithoutStack$1(false, '%s(...): When calling super() in `%s`, make sure to pass ' + "up the same props that your component's constructor was passed.", name, name) : void 0;
+    !(instance.props === undefined || !hasMutatedProps) ? warningWithoutStack$1(false, '%s(...): When calling super() in `%s`, make sure to pass ' + "up the same props that your component's constructor was passed.", name, name) : undefined;
     var noInstanceDefaultProps = !instance.defaultProps;
-    !noInstanceDefaultProps ? warningWithoutStack$1(false, 'Setting defaultProps as an instance property on %s is not supported and will be ignored.' + ' Instead, define defaultProps as a static property on %s.', name, name) : void 0;
+    !noInstanceDefaultProps ? warningWithoutStack$1(false, 'Setting defaultProps as an instance property on %s is not supported and will be ignored.' + ' Instead, define defaultProps as a static property on %s.', name, name) : undefined;
 
     if (typeof instance.getSnapshotBeforeUpdate === 'function' && typeof instance.componentDidUpdate !== 'function' && !didWarnAboutGetSnapshotBeforeUpdateWithoutDidUpdate.has(ctor)) {
       didWarnAboutGetSnapshotBeforeUpdateWithoutDidUpdate.add(ctor);
@@ -11423,17 +11338,17 @@ function checkClassInstance(workInProgress, ctor, newProps) {
     }
 
     var noInstanceGetDerivedStateFromProps = typeof instance.getDerivedStateFromProps !== 'function';
-    !noInstanceGetDerivedStateFromProps ? warningWithoutStack$1(false, '%s: getDerivedStateFromProps() is defined as an instance method ' + 'and will be ignored. Instead, declare it as a static method.', name) : void 0;
+    !noInstanceGetDerivedStateFromProps ? warningWithoutStack$1(false, '%s: getDerivedStateFromProps() is defined as an instance method ' + 'and will be ignored. Instead, declare it as a static method.', name) : undefined;
     var noInstanceGetDerivedStateFromCatch = typeof instance.getDerivedStateFromError !== 'function';
-    !noInstanceGetDerivedStateFromCatch ? warningWithoutStack$1(false, '%s: getDerivedStateFromError() is defined as an instance method ' + 'and will be ignored. Instead, declare it as a static method.', name) : void 0;
+    !noInstanceGetDerivedStateFromCatch ? warningWithoutStack$1(false, '%s: getDerivedStateFromError() is defined as an instance method ' + 'and will be ignored. Instead, declare it as a static method.', name) : undefined;
     var noStaticGetSnapshotBeforeUpdate = typeof ctor.getSnapshotBeforeUpdate !== 'function';
-    !noStaticGetSnapshotBeforeUpdate ? warningWithoutStack$1(false, '%s: getSnapshotBeforeUpdate() is defined as a static method ' + 'and will be ignored. Instead, declare it as an instance method.', name) : void 0;
+    !noStaticGetSnapshotBeforeUpdate ? warningWithoutStack$1(false, '%s: getSnapshotBeforeUpdate() is defined as a static method ' + 'and will be ignored. Instead, declare it as an instance method.', name) : undefined;
     var _state = instance.state;
     if (_state && (typeof _state !== 'object' || isArray$1(_state))) {
       warningWithoutStack$1(false, '%s.state: must be set to an object or null', name);
     }
     if (typeof instance.getChildContext === 'function') {
-      !(typeof ctor.childContextTypes === 'object') ? warningWithoutStack$1(false, '%s.getChildContext(): childContextTypes must be defined in order to ' + 'use getChildContext().', name) : void 0;
+      !(typeof ctor.childContextTypes === 'object') ? warningWithoutStack$1(false, '%s.getChildContext(): childContextTypes must be defined in order to ' + 'use getChildContext().', name) : undefined;
     }
   }
 }
@@ -11673,7 +11588,7 @@ function resumeMountClassInstance(workInProgress, ctor, newProps, renderExpirati
 
   var oldContext = instance.context;
   var contextType = ctor.contextType;
-  var nextContext = void 0;
+  var nextContext = undefined;
   if (typeof contextType === 'object' && contextType !== null) {
     nextContext = readContext(contextType);
   } else {
@@ -11768,7 +11683,7 @@ function updateClassInstance(current, workInProgress, ctor, newProps, renderExpi
 
   var oldContext = instance.context;
   var contextType = ctor.contextType;
-  var nextContext = void 0;
+  var nextContext = undefined;
   if (typeof contextType === 'object' && contextType !== null) {
     nextContext = readContext(contextType);
   } else {
@@ -11872,11 +11787,11 @@ function updateClassInstance(current, workInProgress, ctor, newProps, renderExpi
   return shouldUpdate;
 }
 
-var didWarnAboutMaps = void 0;
-var didWarnAboutGenerators = void 0;
-var didWarnAboutStringRefInStrictMode = void 0;
-var ownerHasKeyUseWarning = void 0;
-var ownerHasFunctionTypeWarning = void 0;
+var didWarnAboutMaps = undefined;
+var didWarnAboutGenerators = undefined;
+var didWarnAboutStringRefInStrictMode = undefined;
+var ownerHasKeyUseWarning = undefined;
+var ownerHasFunctionTypeWarning = undefined;
 var warnForMissingKey = function (child) {};
 
 {
@@ -11899,7 +11814,7 @@ var warnForMissingKey = function (child) {};
     if (!child._store || child._store.validated || child.key != null) {
       return;
     }
-    !(typeof child._store === 'object') ? invariant(false, 'React Component in warnForMissingKey should have a _store. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+    !(typeof child._store === 'object') ? invariant(false, 'React Component in warnForMissingKey should have a _store. This error is likely caused by a bug in React. Please file an issue.') : undefined;
     child._store.validated = true;
 
     var currentComponentErrorInfo = 'Each child in a list should have a unique ' + '"key" prop. See https://fb.me/react-warning-keys for ' + 'more information.' + getCurrentFiberStackInDev();
@@ -11929,13 +11844,13 @@ function coerceRef(returnFiber, current$$1, element) {
 
     if (element._owner) {
       var owner = element._owner;
-      var inst = void 0;
+      var inst = undefined;
       if (owner) {
         var ownerFiber = owner;
-        !(ownerFiber.tag === ClassComponent) ? invariant(false, 'Function components cannot have refs. Did you mean to use React.forwardRef()?') : void 0;
+        !(ownerFiber.tag === ClassComponent) ? invariant(false, 'Function components cannot have refs. Did you mean to use React.forwardRef()?') : undefined;
         inst = ownerFiber.stateNode;
       }
-      !inst ? invariant(false, 'Missing owner for string ref %s. This error is likely caused by a bug in React. Please file an issue.', mixedRef) : void 0;
+      !inst ? invariant(false, 'Missing owner for string ref %s. This error is likely caused by a bug in React. Please file an issue.', mixedRef) : undefined;
       var stringRef = '' + mixedRef;
       // Check if previous string ref matches new string ref
       if (current$$1 !== null && current$$1.ref !== null && typeof current$$1.ref === 'function' && current$$1.ref._stringRef === stringRef) {
@@ -11956,8 +11871,8 @@ function coerceRef(returnFiber, current$$1, element) {
       ref._stringRef = stringRef;
       return ref;
     } else {
-      !(typeof mixedRef === 'string') ? invariant(false, 'Expected ref to be a function, a string, an object returned by React.createRef(), or null.') : void 0;
-      !element._owner ? invariant(false, 'Element ref was specified as a string (%s) but no owner was set. This could happen for one of the following reasons:\n1. You may be adding a ref to a function component\n2. You may be adding a ref to a component that was not created inside a component\'s render method\n3. You have multiple copies of React loaded\nSee https://fb.me/react-refs-must-have-owner for more information.', mixedRef) : void 0;
+      !(typeof mixedRef === 'string') ? invariant(false, 'Expected ref to be a function, a string, an object returned by React.createRef(), or null.') : undefined;
+      !element._owner ? invariant(false, 'Element ref was specified as a string (%s) but no owner was set. This could happen for one of the following reasons:\n1. You may be adding a ref to a function component\n2. You may be adding a ref to a component that was not created inside a component\'s render method\n3. You have multiple copies of React loaded\nSee https://fb.me/react-refs-must-have-owner for more information.', mixedRef) : undefined;
     }
   }
   return mixedRef;
@@ -12470,7 +12385,7 @@ function ChildReconciler(shouldTrackSideEffects) {
     // but using the iterator instead.
 
     var iteratorFn = getIteratorFn(newChildrenIterable);
-    !(typeof iteratorFn === 'function') ? invariant(false, 'An object is not an iterable. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+    !(typeof iteratorFn === 'function') ? invariant(false, 'An object is not an iterable. This error is likely caused by a bug in React. Please file an issue.') : undefined;
 
     {
       // We don't support rendering Generators because it's a mutation.
@@ -12478,13 +12393,13 @@ function ChildReconciler(shouldTrackSideEffects) {
       if (typeof Symbol === 'function' &&
       // $FlowFixMe Flow doesn't know about toStringTag
       newChildrenIterable[Symbol.toStringTag] === 'Generator') {
-        !didWarnAboutGenerators ? warning$1(false, 'Using Generators as children is unsupported and will likely yield ' + 'unexpected results because enumerating a generator mutates it. ' + 'You may convert it to an array with `Array.from()` or the ' + '`[...spread]` operator before rendering. Keep in mind ' + 'you might need to polyfill these features for older browsers.') : void 0;
+        !didWarnAboutGenerators ? warning$1(false, 'Using Generators as children is unsupported and will likely yield ' + 'unexpected results because enumerating a generator mutates it. ' + 'You may convert it to an array with `Array.from()` or the ' + '`[...spread]` operator before rendering. Keep in mind ' + 'you might need to polyfill these features for older browsers.') : undefined;
         didWarnAboutGenerators = true;
       }
 
       // Warn about using Maps as children
       if (newChildrenIterable.entries === iteratorFn) {
-        !didWarnAboutMaps ? warning$1(false, 'Using Maps as children is unsupported and will likely yield ' + 'unexpected results. Convert it to a sequence/iterable of keyed ' + 'ReactElements instead.') : void 0;
+        !didWarnAboutMaps ? warning$1(false, 'Using Maps as children is unsupported and will likely yield ' + 'unexpected results. Convert it to a sequence/iterable of keyed ' + 'ReactElements instead.') : undefined;
         didWarnAboutMaps = true;
       }
 
@@ -12502,7 +12417,7 @@ function ChildReconciler(shouldTrackSideEffects) {
     }
 
     var newChildren = iteratorFn.call(newChildrenIterable);
-    !(newChildren != null) ? invariant(false, 'An iterable object provided no iterator.') : void 0;
+    !(newChildren != null) ? invariant(false, 'An iterable object provided no iterator.') : undefined;
 
     var resultingFirstChild = null;
     var previousNewFiber = null;
@@ -12788,7 +12703,7 @@ var reconcileChildFibers = ChildReconciler(true);
 var mountChildFibers = ChildReconciler(false);
 
 function cloneChildFibers(current$$1, workInProgress) {
-  !(current$$1 === null || workInProgress.child === current$$1.child) ? invariant(false, 'Resuming work not yet implemented.') : void 0;
+  !(current$$1 === null || workInProgress.child === current$$1.child) ? invariant(false, 'Resuming work not yet implemented.') : undefined;
 
   if (workInProgress.child === null) {
     return;
@@ -12814,7 +12729,7 @@ var contextFiberStackCursor = createCursor(NO_CONTEXT);
 var rootInstanceStackCursor = createCursor(NO_CONTEXT);
 
 function requiredContext(c) {
-  !(c !== NO_CONTEXT) ? invariant(false, 'Expected host context to exist. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+  !(c !== NO_CONTEXT) ? invariant(false, 'Expected host context to exist. This error is likely caused by a bug in React. Please file an issue.') : undefined;
   return c;
 }
 
@@ -12893,7 +12808,7 @@ var UnmountPassive = /*       */128;
 var ReactCurrentDispatcher$1 = ReactSharedInternals.ReactCurrentDispatcher;
 
 
-var didWarnAboutMismatchedHooksForComponent = void 0;
+var didWarnAboutMismatchedHooksForComponent = undefined;
 {
   didWarnAboutMismatchedHooksForComponent = new Set();
 }
@@ -13146,7 +13061,7 @@ function renderWithHooks(current, workInProgress, Component, props, refOrContext
   // renderPhaseUpdates = null;
   // numberOfReRenders = 0;
 
-  !!didRenderTooFewHooks ? invariant(false, 'Rendered fewer hooks than expected. This may be caused by an accidental early return statement.') : void 0;
+  !!didRenderTooFewHooks ? invariant(false, 'Rendered fewer hooks than expected. This may be caused by an accidental early return statement.') : undefined;
 
   return children;
 }
@@ -13228,7 +13143,7 @@ function updateWorkInProgressHook() {
     nextCurrentHook = currentHook !== null ? currentHook.next : null;
   } else {
     // Clone from the current hook.
-    !(nextCurrentHook !== null) ? invariant(false, 'Rendered more hooks than during the previous render.') : void 0;
+    !(nextCurrentHook !== null) ? invariant(false, 'Rendered more hooks than during the previous render.') : undefined;
     currentHook = nextCurrentHook;
 
     var newHook = {
@@ -13265,7 +13180,7 @@ function basicStateReducer(state, action) {
 
 function mountReducer(reducer, initialArg, init) {
   var hook = mountWorkInProgressHook();
-  var initialState = void 0;
+  var initialState = undefined;
   if (init !== undefined) {
     initialState = init(initialArg);
   } else {
@@ -13287,7 +13202,7 @@ function mountReducer(reducer, initialArg, init) {
 function updateReducer(reducer, initialArg, init) {
   var hook = updateWorkInProgressHook();
   var queue = hook.queue;
-  !(queue !== null) ? invariant(false, 'Should have a queue. This is likely a bug in React. Please file an issue.') : void 0;
+  !(queue !== null) ? invariant(false, 'Should have a queue. This is likely a bug in React. Please file an issue.') : undefined;
 
   queue.lastRenderedReducer = reducer;
 
@@ -13340,7 +13255,7 @@ function updateReducer(reducer, initialArg, init) {
   var baseState = hook.baseState;
 
   // Find the first unprocessed update.
-  var first = void 0;
+  var first = undefined;
   if (baseUpdate !== null) {
     if (last !== null) {
       // For the first update, the queue is a circular linked list where
@@ -13529,7 +13444,7 @@ function imperativeHandleEffect(create, ref) {
   } else if (ref !== null && ref !== undefined) {
     var refObject = ref;
     {
-      !refObject.hasOwnProperty('current') ? warning$1(false, 'Expected useImperativeHandle() first argument to either be a ' + 'ref callback or React.createRef() object. Instead received: %s.', 'an object with keys {' + Object.keys(refObject).join(', ') + '}') : void 0;
+      !refObject.hasOwnProperty('current') ? warning$1(false, 'Expected useImperativeHandle() first argument to either be a ' + 'ref callback or React.createRef() object. Instead received: %s.', 'an object with keys {' + Object.keys(refObject).join(', ') + '}') : undefined;
     }
     var _inst2 = create();
     refObject.current = _inst2;
@@ -13541,7 +13456,7 @@ function imperativeHandleEffect(create, ref) {
 
 function mountImperativeHandle(ref, create, deps) {
   {
-    !(typeof create === 'function') ? warning$1(false, 'Expected useImperativeHandle() second argument to be a function ' + 'that creates a handle. Instead received: %s.', create !== null ? typeof create : 'null') : void 0;
+    !(typeof create === 'function') ? warning$1(false, 'Expected useImperativeHandle() second argument to be a function ' + 'that creates a handle. Instead received: %s.', create !== null ? typeof create : 'null') : undefined;
   }
 
   // TODO: If deps are provided, should we skip comparing the ref itself?
@@ -13552,7 +13467,7 @@ function mountImperativeHandle(ref, create, deps) {
 
 function updateImperativeHandle(ref, create, deps) {
   {
-    !(typeof create === 'function') ? warning$1(false, 'Expected useImperativeHandle() second argument to be a function ' + 'that creates a handle. Instead received: %s.', create !== null ? typeof create : 'null') : void 0;
+    !(typeof create === 'function') ? warning$1(false, 'Expected useImperativeHandle() second argument to be a function ' + 'that creates a handle. Instead received: %s.', create !== null ? typeof create : 'null') : undefined;
   }
 
   // TODO: If deps are provided, should we skip comparing the ref itself?
@@ -13632,10 +13547,10 @@ var shouldWarnForUnbatchedSetState = false;
 }
 
 function dispatchAction(fiber, queue, action) {
-  !(numberOfReRenders < RE_RENDER_LIMIT) ? invariant(false, 'Too many re-renders. React limits the number of renders to prevent an infinite loop.') : void 0;
+  !(numberOfReRenders < RE_RENDER_LIMIT) ? invariant(false, 'Too many re-renders. React limits the number of renders to prevent an infinite loop.') : undefined;
 
   {
-    !(arguments.length <= 3) ? warning$1(false, "State updates from the useState() and useReducer() Hooks don't support the " + 'second callback argument. To execute a side effect after ' + 'rendering, declare it in the component body with useEffect().') : void 0;
+    !(arguments.length <= 3) ? warning$1(false, "State updates from the useState() and useReducer() Hooks don't support the " + 'second callback argument. To execute a side effect after ' + 'rendering, declare it in the component body with useEffect().') : undefined;
   }
 
   var alternate = fiber.alternate;
@@ -13700,7 +13615,7 @@ function dispatchAction(fiber, queue, action) {
       // same as the current state, we may be able to bail out entirely.
       var _lastRenderedReducer = queue.lastRenderedReducer;
       if (_lastRenderedReducer !== null) {
-        var prevDispatcher = void 0;
+        var prevDispatcher = undefined;
         {
           prevDispatcher = ReactCurrentDispatcher$1.current;
           ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnUpdateInDEV;
@@ -14173,7 +14088,7 @@ function recordCommitTime() {
   if (!enableProfilerTimer) {
     return;
   }
-  commitTime = unstable_now();
+  commitTime = scheduler.unstable_now();
 }
 
 function startProfilerTimer(fiber) {
@@ -14181,10 +14096,10 @@ function startProfilerTimer(fiber) {
     return;
   }
 
-  profilerStartTime = unstable_now();
+  profilerStartTime = scheduler.unstable_now();
 
   if (fiber.actualStartTime < 0) {
-    fiber.actualStartTime = unstable_now();
+    fiber.actualStartTime = scheduler.unstable_now();
   }
 }
 
@@ -14201,7 +14116,7 @@ function stopProfilerTimerIfRunningAndRecordDelta(fiber, overrideBaseTime) {
   }
 
   if (profilerStartTime >= 0) {
-    var elapsedTime = unstable_now() - profilerStartTime;
+    var elapsedTime = scheduler.unstable_now() - profilerStartTime;
     fiber.actualDuration += elapsedTime;
     if (overrideBaseTime) {
       fiber.selfBaseDuration = elapsedTime;
@@ -14454,7 +14369,7 @@ function skipPastDehydratedSuspenseInstance(fiber) {
     invariant(false, 'Expected skipPastDehydratedSuspenseInstance() to never be called. This error is likely caused by a bug in React. Please file an issue.');
   }
   var suspenseInstance = fiber.stateNode;
-  !suspenseInstance ? invariant(false, 'Expected to have a hydrated suspense instance. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+  !suspenseInstance ? invariant(false, 'Expected to have a hydrated suspense instance. This error is likely caused by a bug in React. Please file an issue.') : undefined;
   nextHydratableInstance = getNextHydratableInstanceAfterSuspenseInstance(suspenseInstance);
 }
 
@@ -14518,11 +14433,11 @@ var ReactCurrentOwner$3 = ReactSharedInternals.ReactCurrentOwner;
 
 var didReceiveUpdate = false;
 
-var didWarnAboutBadClass = void 0;
-var didWarnAboutContextTypeOnFunctionComponent = void 0;
-var didWarnAboutGetDerivedStateOnFunctionComponent = void 0;
-var didWarnAboutFunctionRefs = void 0;
-var didWarnAboutReassigningProps = void 0;
+var didWarnAboutBadClass = undefined;
+var didWarnAboutContextTypeOnFunctionComponent = undefined;
+var didWarnAboutGetDerivedStateOnFunctionComponent = undefined;
+var didWarnAboutFunctionRefs = undefined;
+var didWarnAboutReassigningProps = undefined;
 
 {
   didWarnAboutBadClass = {};
@@ -14578,7 +14493,7 @@ function updateForwardRef(current$$1, workInProgress, Component, nextProps, rend
       // because they're only guaranteed to be resolved here.
       var innerPropTypes = Component.propTypes;
       if (innerPropTypes) {
-        checkPropTypes_1(innerPropTypes, nextProps, // Resolved props
+        checkPropTypes(innerPropTypes, nextProps, // Resolved props
         'prop', getComponentName(Component), getCurrentFiberStackInDev);
       }
     }
@@ -14588,7 +14503,7 @@ function updateForwardRef(current$$1, workInProgress, Component, nextProps, rend
   var ref = workInProgress.ref;
 
   // The rest is a fork of updateFunctionComponent
-  var nextChildren = void 0;
+  var nextChildren = undefined;
   prepareToReadContext(workInProgress, renderExpirationTime);
   {
     ReactCurrentOwner$3.current = workInProgress;
@@ -14635,7 +14550,7 @@ function updateMemoComponent(current$$1, workInProgress, Component, nextProps, u
       if (innerPropTypes) {
         // Inner memo component props aren't currently validated in createElement.
         // We could move it there, but we'd still need this for lazy code path.
-        checkPropTypes_1(innerPropTypes, nextProps, // Resolved props
+        checkPropTypes(innerPropTypes, nextProps, // Resolved props
         'prop', getComponentName(type), getCurrentFiberStackInDev);
       }
     }
@@ -14651,7 +14566,7 @@ function updateMemoComponent(current$$1, workInProgress, Component, nextProps, u
     if (_innerPropTypes) {
       // Inner memo component props aren't currently validated in createElement.
       // We could move it there, but we'd still need this for lazy code path.
-      checkPropTypes_1(_innerPropTypes, nextProps, // Resolved props
+      checkPropTypes(_innerPropTypes, nextProps, // Resolved props
       'prop', getComponentName(_type), getCurrentFiberStackInDev);
     }
   }
@@ -14694,7 +14609,7 @@ function updateSimpleMemoComponent(current$$1, workInProgress, Component, nextPr
       }
       var outerPropTypes = outerMemoType && outerMemoType.propTypes;
       if (outerPropTypes) {
-        checkPropTypes_1(outerPropTypes, nextProps, // Resolved (SimpleMemoComponent has no defaultProps)
+        checkPropTypes(outerPropTypes, nextProps, // Resolved (SimpleMemoComponent has no defaultProps)
         'prop', getComponentName(outerMemoType), getCurrentFiberStackInDev);
       }
       // Inner propTypes will be validated in the function component path.
@@ -14749,7 +14664,7 @@ function updateFunctionComponent(current$$1, workInProgress, Component, nextProp
       // because they're only guaranteed to be resolved here.
       var innerPropTypes = Component.propTypes;
       if (innerPropTypes) {
-        checkPropTypes_1(innerPropTypes, nextProps, // Resolved props
+        checkPropTypes(innerPropTypes, nextProps, // Resolved props
         'prop', getComponentName(Component), getCurrentFiberStackInDev);
       }
     }
@@ -14758,7 +14673,7 @@ function updateFunctionComponent(current$$1, workInProgress, Component, nextProp
   var unmaskedContext = getUnmaskedContext(workInProgress, Component, true);
   var context = getMaskedContext(workInProgress, unmaskedContext);
 
-  var nextChildren = void 0;
+  var nextChildren = undefined;
   prepareToReadContext(workInProgress, renderExpirationTime);
   {
     ReactCurrentOwner$3.current = workInProgress;
@@ -14791,7 +14706,7 @@ function updateClassComponent(current$$1, workInProgress, Component, nextProps, 
       // because they're only guaranteed to be resolved here.
       var innerPropTypes = Component.propTypes;
       if (innerPropTypes) {
-        checkPropTypes_1(innerPropTypes, nextProps, // Resolved props
+        checkPropTypes(innerPropTypes, nextProps, // Resolved props
         'prop', getComponentName(Component), getCurrentFiberStackInDev);
       }
     }
@@ -14800,7 +14715,7 @@ function updateClassComponent(current$$1, workInProgress, Component, nextProps, 
   // Push context providers early to prevent context stack mismatches.
   // During mounting we don't know the child context yet as the instance doesn't exist.
   // We will invalidate the child context in finishClassComponent() right after rendering.
-  var hasContext = void 0;
+  var hasContext = undefined;
   if (isContextProvider(Component)) {
     hasContext = true;
     pushContextProvider(workInProgress);
@@ -14810,7 +14725,7 @@ function updateClassComponent(current$$1, workInProgress, Component, nextProps, 
   prepareToReadContext(workInProgress, renderExpirationTime);
 
   var instance = workInProgress.stateNode;
-  var shouldUpdate = void 0;
+  var shouldUpdate = undefined;
   if (instance === null) {
     if (current$$1 !== null) {
       // An class component without an instance only mounts if it suspended
@@ -14836,7 +14751,7 @@ function updateClassComponent(current$$1, workInProgress, Component, nextProps, 
   {
     var inst = workInProgress.stateNode;
     if (inst.props !== nextProps) {
-      !didWarnAboutReassigningProps ? warning$1(false, 'It looks like %s is reassigning its own `this.props` while rendering. ' + 'This is not supported and can lead to confusing bugs.', getComponentName(workInProgress.type) || 'a component') : void 0;
+      !didWarnAboutReassigningProps ? warning$1(false, 'It looks like %s is reassigning its own `this.props` while rendering. ' + 'This is not supported and can lead to confusing bugs.', getComponentName(workInProgress.type) || 'a component') : undefined;
       didWarnAboutReassigningProps = true;
     }
   }
@@ -14862,7 +14777,7 @@ function finishClassComponent(current$$1, workInProgress, Component, shouldUpdat
 
   // Rerender
   ReactCurrentOwner$3.current = workInProgress;
-  var nextChildren = void 0;
+  var nextChildren = undefined;
   if (didCaptureError && typeof Component.getDerivedStateFromError !== 'function') {
     // If we captured an error, but getDerivedStateFrom catch is not defined,
     // unmount all the children. componentDidCatch will schedule an update to
@@ -14923,7 +14838,7 @@ function pushHostRootContext(workInProgress) {
 function updateHostRoot(current$$1, workInProgress, renderExpirationTime) {
   pushHostRootContext(workInProgress);
   var updateQueue = workInProgress.updateQueue;
-  !(updateQueue !== null) ? invariant(false, 'If the root does not have an updateQueue, we should have already bailed out. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+  !(updateQueue !== null) ? invariant(false, 'If the root does not have an updateQueue, we should have already bailed out. This error is likely caused by a bug in React. Please file an issue.') : undefined;
   var nextProps = workInProgress.pendingProps;
   var prevState = workInProgress.memoizedState;
   var prevChildren = prevState !== null ? prevState.element : null;
@@ -15034,7 +14949,7 @@ function mountLazyComponent(_current, workInProgress, elementType, updateExpirat
   var resolvedTag = workInProgress.tag = resolveLazyComponentTag(Component);
   startWorkTimer(workInProgress);
   var resolvedProps = resolveDefaultProps(Component, props);
-  var child = void 0;
+  var child = undefined;
   switch (resolvedTag) {
     case FunctionComponent:
       {
@@ -15060,7 +14975,7 @@ function mountLazyComponent(_current, workInProgress, elementType, updateExpirat
           if (workInProgress.type !== workInProgress.elementType) {
             var outerPropTypes = Component.propTypes;
             if (outerPropTypes) {
-              checkPropTypes_1(outerPropTypes, resolvedProps, // Resolved for outer only
+              checkPropTypes(outerPropTypes, resolvedProps, // Resolved for outer only
               'prop', getComponentName(Component), getCurrentFiberStackInDev);
             }
           }
@@ -15106,7 +15021,7 @@ function mountIncompleteClassComponent(_current, workInProgress, Component, next
   // Push context providers early to prevent context stack mismatches.
   // During mounting we don't know the child context yet as the instance doesn't exist.
   // We will invalidate the child context in finishClassComponent() right after rendering.
-  var hasContext = void 0;
+  var hasContext = undefined;
   if (isContextProvider(Component)) {
     hasContext = true;
     pushContextProvider(workInProgress);
@@ -15139,7 +15054,7 @@ function mountIndeterminateComponent(_current, workInProgress, Component, render
 
   prepareToReadContext(workInProgress, renderExpirationTime);
 
-  var value = void 0;
+  var value = undefined;
 
   {
     if (Component.prototype && typeof Component.prototype.render === 'function') {
@@ -15210,7 +15125,7 @@ function mountIndeterminateComponent(_current, workInProgress, Component, render
 
 function validateFunctionComponentInDev(workInProgress, Component) {
   if (Component) {
-    !!Component.childContextTypes ? warningWithoutStack$1(false, '%s(...): childContextTypes cannot be defined on a function component.', Component.displayName || Component.name || 'Component') : void 0;
+    !!Component.childContextTypes ? warningWithoutStack$1(false, '%s(...): childContextTypes cannot be defined on a function component.', Component.displayName || Component.name || 'Component') : undefined;
   }
   if (workInProgress.ref !== null) {
     var info = '';
@@ -15257,7 +15172,7 @@ function updateSuspenseComponent(current$$1, workInProgress, renderExpirationTim
   // already suspended during this render (`alreadyCaptured` is true).
   var nextState = workInProgress.memoizedState;
 
-  var nextDidTimeout = void 0;
+  var nextDidTimeout = undefined;
   if ((workInProgress.effectTag & DidCapture) === NoEffect) {
     // This is the first attempt.
     nextState = null;
@@ -15297,12 +15212,12 @@ function updateSuspenseComponent(current$$1, workInProgress, renderExpirationTim
   // `child` points to the child fiber. In the normal case, this is the first
   // fiber of the primary children set. In the timed-out case, it's a
   // a fragment fiber containing the primary children.
-  var child = void 0;
+  var child = undefined;
   // `next` points to the next fiber React should render. In the normal case,
   // it's the same as `child`: the first fiber of the primary children set.
   // In the timed-out case, it's a fragment fiber containing the *fallback*
   // children -- we skip over the primary children entirely.
-  var next = void 0;
+  var next = undefined;
   if (current$$1 === null) {
     if (enableSuspenseServerRenderer) {
       // If we're currently hydrating, try to hydrate this boundary.
@@ -15491,7 +15406,7 @@ function updateDehydratedSuspenseComponent(current$$1, workInProgress, renderExp
 
     // Insert a deletion in the effect list.
     var returnFiber = workInProgress.return;
-    !(returnFiber !== null) ? invariant(false, 'Suspense boundaries are never on the root. This is probably a bug in React.') : void 0;
+    !(returnFiber !== null) ? invariant(false, 'Suspense boundaries are never on the root. This is probably a bug in React.') : undefined;
     var last = returnFiber.lastEffect;
     if (last !== null) {
       last.nextEffect = current$$1;
@@ -15555,7 +15470,7 @@ function updateContextProvider(current$$1, workInProgress, renderExpirationTime)
     var providerPropTypes = workInProgress.type.propTypes;
 
     if (providerPropTypes) {
-      checkPropTypes_1(providerPropTypes, newProps, 'prop', 'Context.Provider', getCurrentFiberStackInDev);
+      checkPropTypes(providerPropTypes, newProps, 'prop', 'Context.Provider', getCurrentFiberStackInDev);
     }
   }
 
@@ -15611,12 +15526,12 @@ function updateContextConsumer(current$$1, workInProgress, renderExpirationTime)
   var render = newProps.children;
 
   {
-    !(typeof render === 'function') ? warningWithoutStack$1(false, 'A context consumer was rendered with multiple children, or a child ' + "that isn't a function. A context consumer expects a single child " + 'that is a function. If you did pass a function, make sure there ' + 'is no trailing or leading whitespace around it.') : void 0;
+    !(typeof render === 'function') ? warningWithoutStack$1(false, 'A context consumer was rendered with multiple children, or a child ' + "that isn't a function. A context consumer expects a single child " + 'that is a function. If you did pass a function, make sure there ' + 'is no trailing or leading whitespace around it.') : undefined;
   }
 
   prepareToReadContext(workInProgress, renderExpirationTime);
   var newValue = readContext(context, newProps.unstable_observedBits);
-  var newChildren = void 0;
+  var newChildren = undefined;
   {
     ReactCurrentOwner$3.current = workInProgress;
     setCurrentPhase('render');
@@ -15819,7 +15734,7 @@ function beginWork(current$$1, workInProgress, renderExpirationTime) {
           if (workInProgress.type !== workInProgress.elementType) {
             var outerPropTypes = _type2.propTypes;
             if (outerPropTypes) {
-              checkPropTypes_1(outerPropTypes, _resolvedProps3, // Resolved for outer only
+              checkPropTypes(outerPropTypes, _resolvedProps3, // Resolved for outer only
               'prop', getComponentName(_type2), getCurrentFiberStackInDev);
             }
           }
@@ -15851,7 +15766,7 @@ function beginWork(current$$1, workInProgress, renderExpirationTime) {
 
 var valueCursor = createCursor(null);
 
-var rendererSigil = void 0;
+var rendererSigil = undefined;
 {
   // Use this to detect multiple renderers using the same context
   rendererSigil = {};
@@ -15894,7 +15809,7 @@ function pushProvider(providerFiber, nextValue) {
 
     context._currentValue = nextValue;
     {
-      !(context._currentRenderer === undefined || context._currentRenderer === null || context._currentRenderer === rendererSigil) ? warningWithoutStack$1(false, 'Detected multiple renderers concurrently rendering the ' + 'same context provider. This is currently unsupported.') : void 0;
+      !(context._currentRenderer === undefined || context._currentRenderer === null || context._currentRenderer === rendererSigil) ? warningWithoutStack$1(false, 'Detected multiple renderers concurrently rendering the ' + 'same context provider. This is currently unsupported.') : undefined;
       context._currentRenderer = rendererSigil;
     }
   } else {
@@ -15902,7 +15817,7 @@ function pushProvider(providerFiber, nextValue) {
 
     context._currentValue2 = nextValue;
     {
-      !(context._currentRenderer2 === undefined || context._currentRenderer2 === null || context._currentRenderer2 === rendererSigil) ? warningWithoutStack$1(false, 'Detected multiple renderers concurrently rendering the ' + 'same context provider. This is currently unsupported.') : void 0;
+      !(context._currentRenderer2 === undefined || context._currentRenderer2 === null || context._currentRenderer2 === rendererSigil) ? warningWithoutStack$1(false, 'Detected multiple renderers concurrently rendering the ' + 'same context provider. This is currently unsupported.') : undefined;
       context._currentRenderer2 = rendererSigil;
     }
   }
@@ -15929,7 +15844,7 @@ function calculateChangedBits(context, newValue, oldValue) {
     var changedBits = typeof context._calculateChangedBits === 'function' ? context._calculateChangedBits(oldValue, newValue) : maxSigned31BitInt;
 
     {
-      !((changedBits & maxSigned31BitInt) === changedBits) ? warning$1(false, 'calculateChangedBits: Expected the return value to be a ' + '31-bit integer. Instead received: %s', changedBits) : void 0;
+      !((changedBits & maxSigned31BitInt) === changedBits) ? warning$1(false, 'calculateChangedBits: Expected the return value to be a ' + '31-bit integer. Instead received: %s', changedBits) : undefined;
     }
     return changedBits | 0;
   }
@@ -15964,7 +15879,7 @@ function propagateContextChange(workInProgress, context, changedBits, renderExpi
     fiber.return = workInProgress;
   }
   while (fiber !== null) {
-    var nextFiber = void 0;
+    var nextFiber = undefined;
 
     // Visit this fiber.
     var list = fiber.contextDependencies;
@@ -16080,7 +15995,7 @@ function readContext(context, observedBits) {
   {
     // This warning would fire if you read context inside a Hook like useMemo.
     // Unlike the class check below, it's not enforced in production for perf.
-    !!isDisallowedContextReadInDEV ? warning$1(false, 'Context can only be read while React is rendering. ' + 'In classes, you can read it in the render method or getDerivedStateFromProps. ' + 'In function components, you can read it directly in the function body, but not ' + 'inside Hooks like useReducer() or useMemo().') : void 0;
+    !!isDisallowedContextReadInDEV ? warning$1(false, 'Context can only be read while React is rendering. ' + 'In classes, you can read it in the render method or getDerivedStateFromProps. ' + 'In function components, you can read it directly in the function body, but not ' + 'inside Hooks like useReducer() or useMemo().') : undefined;
   }
 
   if (lastContextWithAllBitsObserved === context) {
@@ -16088,7 +16003,7 @@ function readContext(context, observedBits) {
   } else if (observedBits === false || observedBits === 0) {
     // Do not observe any updates.
   } else {
-    var resolvedObservedBits = void 0; // Avoid deopting on observable arguments or heterogeneous types.
+    var resolvedObservedBits = undefined; // Avoid deopting on observable arguments or heterogeneous types.
     if (typeof observedBits !== 'number' || observedBits === maxSigned31BitInt) {
       // Observe all updates.
       lastContextWithAllBitsObserved = context;
@@ -16104,7 +16019,7 @@ function readContext(context, observedBits) {
     };
 
     if (lastContextDependency === null) {
-      !(currentlyRenderingFiber !== null) ? invariant(false, 'Context can only be read while React is rendering. In classes, you can read it in the render method or getDerivedStateFromProps. In function components, you can read it directly in the function body, but not inside Hooks like useReducer() or useMemo().') : void 0;
+      !(currentlyRenderingFiber !== null) ? invariant(false, 'Context can only be read while React is rendering. In classes, you can read it in the render method or getDerivedStateFromProps. In function components, you can read it directly in the function body, but not inside Hooks like useReducer() or useMemo().') : undefined;
 
       // This is the first dependency for this component. Create a new list.
       lastContextDependency = contextItem;
@@ -16207,9 +16122,9 @@ var CaptureUpdate = 3;
 // `checkHasForceUpdateAfterProcessing`.
 var hasForceUpdate = false;
 
-var didWarnUpdateInsideUpdate = void 0;
-var currentlyProcessingQueue = void 0;
-var resetCurrentlyProcessingQueue = void 0;
+var didWarnUpdateInsideUpdate = undefined;
+var currentlyProcessingQueue = undefined;
+var resetCurrentlyProcessingQueue = undefined;
 {
   didWarnUpdateInsideUpdate = false;
   currentlyProcessingQueue = null;
@@ -16280,8 +16195,8 @@ function appendUpdateToQueue(queue, update) {
 function enqueueUpdate(fiber, update) {
   // Update queues are created lazily.
   var alternate = fiber.alternate;
-  var queue1 = void 0;
-  var queue2 = void 0;
+  var queue1 = undefined;
+  var queue2 = undefined;
   if (alternate === null) {
     // There's only one fiber.
     queue1 = fiber.updateQueue;
@@ -16404,7 +16319,7 @@ function getStateFromUpdate(workInProgress, queue, update, prevState, nextProps,
     case UpdateState:
       {
         var _payload2 = update.payload;
-        var partialState = void 0;
+        var partialState = undefined;
         if (typeof _payload2 === 'function') {
           // Updater function
           {
@@ -16568,7 +16483,7 @@ function processUpdateQueue(workInProgress, queue, props, instance, renderExpira
 }
 
 function callCallback(callback, context) {
-  !(typeof callback === 'function') ? invariant(false, 'Invalid argument passed as callback. Expected a function. Instead received: %s', callback) : void 0;
+  !(typeof callback === 'function') ? invariant(false, 'Invalid argument passed as callback. Expected a function. Instead received: %s', callback) : undefined;
   callback.call(context);
 }
 
@@ -16634,10 +16549,10 @@ function markRef$1(workInProgress) {
   workInProgress.effectTag |= Ref;
 }
 
-var appendAllChildren = void 0;
-var updateHostContainer = void 0;
-var updateHostComponent$1 = void 0;
-var updateHostText$1 = void 0;
+var appendAllChildren = undefined;
+var updateHostContainer = undefined;
+var updateHostComponent$1 = undefined;
+var updateHostText$1 = undefined;
 if (supportsMutation) {
   // Mutation mode
 
@@ -17016,7 +16931,7 @@ function completeWork(current, workInProgress, renderExpirationTime) {
           }
         } else {
           if (!newProps) {
-            !(workInProgress.stateNode !== null) ? invariant(false, 'We must have new props for new mounts. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+            !(workInProgress.stateNode !== null) ? invariant(false, 'We must have new props for new mounts. This error is likely caused by a bug in React. Please file an issue.') : undefined;
             // This can happen when we abort work.
             break;
           }
@@ -17066,7 +16981,7 @@ function completeWork(current, workInProgress, renderExpirationTime) {
           updateHostText$1(current, workInProgress, oldText, newText);
         } else {
           if (typeof newText !== 'string') {
-            !(workInProgress.stateNode !== null) ? invariant(false, 'We must have new props for new mounts. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+            !(workInProgress.stateNode !== null) ? invariant(false, 'We must have new props for new mounts. This error is likely caused by a bug in React. Please file an issue.') : undefined;
             // This can happen when we abort work.
           }
           var _rootContainerInstance = getRootHostContainer();
@@ -17157,7 +17072,7 @@ function completeWork(current, workInProgress, renderExpirationTime) {
         if (enableSuspenseServerRenderer) {
           if (current === null) {
             var _wasHydrated2 = popHydrationState(workInProgress);
-            !_wasHydrated2 ? invariant(false, 'A dehydrated suspense component was completed without a hydrated node. This is probably a bug in React.') : void 0;
+            !_wasHydrated2 ? invariant(false, 'A dehydrated suspense component was completed without a hydrated node. This is probably a bug in React.') : undefined;
             skipPastDehydratedSuspenseInstance(workInProgress);
           } else if ((workInProgress.effectTag & DidCapture) === NoEffect) {
             // This boundary did not suspend so it's now hydrated.
@@ -17236,7 +17151,7 @@ function logCapturedError(capturedError) {
 
     var componentNameMessage = componentName ? 'The above error occurred in the <' + componentName + '> component:' : 'The above error occurred in one of your React components:';
 
-    var errorBoundaryMessage = void 0;
+    var errorBoundaryMessage = undefined;
     // errorBoundaryFound check is sufficient; errorBoundaryName check is to satisfy Flow.
     if (errorBoundaryFound && errorBoundaryName) {
       if (willRetry) {
@@ -17369,8 +17284,8 @@ function commitBeforeMutationLifeCycles(current$$1, finishedWork) {
             // TODO: revisit this when we implement resuming.
             {
               if (finishedWork.type === finishedWork.elementType && !didWarnAboutReassigningProps) {
-                !(instance.props === finishedWork.memoizedProps) ? warning$1(false, 'Expected %s props to match memoized props before ' + 'getSnapshotBeforeUpdate. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : void 0;
-                !(instance.state === finishedWork.memoizedState) ? warning$1(false, 'Expected %s state to match memoized state before ' + 'getSnapshotBeforeUpdate. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : void 0;
+                !(instance.props === finishedWork.memoizedProps) ? warning$1(false, 'Expected %s props to match memoized props before ' + 'getSnapshotBeforeUpdate. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : undefined;
+                !(instance.state === finishedWork.memoizedState) ? warning$1(false, 'Expected %s state to match memoized state before ' + 'getSnapshotBeforeUpdate. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : undefined;
               }
             }
             var snapshot = instance.getSnapshotBeforeUpdate(finishedWork.elementType === finishedWork.type ? prevProps : resolveDefaultProps(finishedWork.type, prevProps), prevState);
@@ -17424,7 +17339,7 @@ function commitHookEffectList(unmountTag, mountTag, finishedWork) {
         {
           var _destroy = effect.destroy;
           if (_destroy !== undefined && typeof _destroy !== 'function') {
-            var addendum = void 0;
+            var addendum = undefined;
             if (_destroy === null) {
               addendum = ' You returned null. If your effect does not require clean ' + 'up, return undefined (or nothing).';
             } else if (typeof _destroy.then === 'function') {
@@ -17466,8 +17381,8 @@ function commitLifeCycles(finishedRoot, current$$1, finishedWork, committedExpir
             // TODO: revisit this when we implement resuming.
             {
               if (finishedWork.type === finishedWork.elementType && !didWarnAboutReassigningProps) {
-                !(instance.props === finishedWork.memoizedProps) ? warning$1(false, 'Expected %s props to match memoized props before ' + 'componentDidMount. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : void 0;
-                !(instance.state === finishedWork.memoizedState) ? warning$1(false, 'Expected %s state to match memoized state before ' + 'componentDidMount. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : void 0;
+                !(instance.props === finishedWork.memoizedProps) ? warning$1(false, 'Expected %s props to match memoized props before ' + 'componentDidMount. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : undefined;
+                !(instance.state === finishedWork.memoizedState) ? warning$1(false, 'Expected %s state to match memoized state before ' + 'componentDidMount. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : undefined;
               }
             }
             instance.componentDidMount();
@@ -17481,8 +17396,8 @@ function commitLifeCycles(finishedRoot, current$$1, finishedWork, committedExpir
             // TODO: revisit this when we implement resuming.
             {
               if (finishedWork.type === finishedWork.elementType && !didWarnAboutReassigningProps) {
-                !(instance.props === finishedWork.memoizedProps) ? warning$1(false, 'Expected %s props to match memoized props before ' + 'componentDidUpdate. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : void 0;
-                !(instance.state === finishedWork.memoizedState) ? warning$1(false, 'Expected %s state to match memoized state before ' + 'componentDidUpdate. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : void 0;
+                !(instance.props === finishedWork.memoizedProps) ? warning$1(false, 'Expected %s props to match memoized props before ' + 'componentDidUpdate. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : undefined;
+                !(instance.state === finishedWork.memoizedState) ? warning$1(false, 'Expected %s state to match memoized state before ' + 'componentDidUpdate. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : undefined;
               }
             }
             instance.componentDidUpdate(prevProps, prevState, instance.__reactInternalSnapshotBeforeUpdate);
@@ -17493,8 +17408,8 @@ function commitLifeCycles(finishedRoot, current$$1, finishedWork, committedExpir
         if (updateQueue !== null) {
           {
             if (finishedWork.type === finishedWork.elementType && !didWarnAboutReassigningProps) {
-              !(instance.props === finishedWork.memoizedProps) ? warning$1(false, 'Expected %s props to match memoized props before ' + 'processing the update queue. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : void 0;
-              !(instance.state === finishedWork.memoizedState) ? warning$1(false, 'Expected %s state to match memoized state before ' + 'processing the update queue. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : void 0;
+              !(instance.props === finishedWork.memoizedProps) ? warning$1(false, 'Expected %s props to match memoized props before ' + 'processing the update queue. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : undefined;
+              !(instance.state === finishedWork.memoizedState) ? warning$1(false, 'Expected %s state to match memoized state before ' + 'processing the update queue. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance') : undefined;
             }
           }
           // We could update instance props and state here,
@@ -17622,7 +17537,7 @@ function commitAttachRef(finishedWork) {
   var ref = finishedWork.ref;
   if (ref !== null) {
     var instance = finishedWork.stateNode;
-    var instanceToUse = void 0;
+    var instanceToUse = undefined;
     switch (finishedWork.tag) {
       case HostComponent:
         instanceToUse = getPublicInstance(instance);
@@ -17876,8 +17791,8 @@ function commitPlacement(finishedWork) {
   var parentFiber = getHostParentFiber(finishedWork);
 
   // Note: these two variables *must* always be updated together.
-  var parent = void 0;
-  var isContainer = void 0;
+  var parent = undefined;
+  var isContainer = undefined;
 
   switch (parentFiber.tag) {
     case HostComponent:
@@ -17953,14 +17868,14 @@ function unmountHostComponents(current$$1) {
   var currentParentIsValid = false;
 
   // Note: these two variables *must* always be updated together.
-  var currentParent = void 0;
-  var currentParentIsContainer = void 0;
+  var currentParent = undefined;
+  var currentParentIsContainer = undefined;
 
   while (true) {
     if (!currentParentIsValid) {
       var parent = node.return;
       findParent: while (true) {
-        !(parent !== null) ? invariant(false, 'Expected to find a host parent. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+        !(parent !== null) ? invariant(false, 'Expected to find a host parent. This error is likely caused by a bug in React. Please file an issue.') : undefined;
         switch (parent.tag) {
           case HostComponent:
             currentParent = parent.stateNode;
@@ -18104,7 +18019,7 @@ function commitWork(current$$1, finishedWork) {
       }
     case HostText:
       {
-        !(finishedWork.stateNode !== null) ? invariant(false, 'This should have a text node initialized. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+        !(finishedWork.stateNode !== null) ? invariant(false, 'This should have a text node initialized. This error is likely caused by a bug in React. Please file an issue.') : undefined;
         var textInstance = finishedWork.stateNode;
         var newText = finishedWork.memoizedProps;
         // For hydration we reuse the update path but we treat the oldProps
@@ -18126,7 +18041,7 @@ function commitWork(current$$1, finishedWork) {
       {
         var newState = finishedWork.memoizedState;
 
-        var newDidTimeout = void 0;
+        var newDidTimeout = undefined;
         var primaryChildParent = finishedWork;
         if (newState === null) {
           newDidTimeout = false;
@@ -18159,7 +18074,7 @@ function commitWork(current$$1, finishedWork) {
             // Memoize using the boundary fiber to prevent redundant listeners.
             var retry = retryTimedOutBoundary.bind(null, finishedWork, thenable);
             if (enableSchedulerTracing) {
-              retry = unstable_wrap(retry);
+              retry = tracing.unstable_wrap(retry);
             }
             if (!retryCache.has(thenable)) {
               retryCache.add(thenable);
@@ -18239,7 +18154,7 @@ function createClassErrorUpdate(fiber, errorInfo, expirationTime) {
           // If componentDidCatch is the only error boundary method defined,
           // then it needs to call setState to recover from errors.
           // If no state update is scheduled then the boundary will swallow the error.
-          !(fiber.expirationTime === Sync) ? warningWithoutStack$1(false, '%s: Error boundaries should implement getDerivedStateFromError(). ' + 'In that method, return a state update to display an error message or fallback UI.', getComponentName(fiber.type) || 'Unknown') : void 0;
+          !(fiber.expirationTime === Sync) ? warningWithoutStack$1(false, '%s: Error boundaries should implement getDerivedStateFromError(). ' + 'In that method, return a state update to display an error message or fallback UI.', getComponentName(fiber.type) || 'Unknown') : undefined;
         }
       }
     };
@@ -18252,7 +18167,7 @@ function attachPingListener(root, renderExpirationTime, thenable) {
   // only if one does not already exist for the current render expiration
   // time (which acts like a "thread ID" here).
   var pingCache = root.pingCache;
-  var threadIDs = void 0;
+  var threadIDs = undefined;
   if (pingCache === null) {
     pingCache = root.pingCache = new PossiblyWeakMap();
     threadIDs = new Set();
@@ -18269,7 +18184,7 @@ function attachPingListener(root, renderExpirationTime, thenable) {
     threadIDs.add(renderExpirationTime);
     var ping = pingSuspendedRoot.bind(null, root, thenable, renderExpirationTime);
     if (enableSchedulerTracing) {
-      ping = unstable_wrap(ping);
+      ping = tracing.unstable_wrap(ping);
     }
     thenable.then(ping, ping);
   }
@@ -18384,7 +18299,7 @@ function throwException(root, returnFiber, sourceFiber, value, renderExpirationT
 
         attachPingListener(root, renderExpirationTime, thenable);
 
-        var absoluteTimeoutMs = void 0;
+        var absoluteTimeoutMs = undefined;
         if (earliestTimeoutMs === -1) {
           // If no explicit threshold is given, default to an arbitrarily large
           // value. The actual size doesn't matter because the threshold for the
@@ -18425,7 +18340,7 @@ function throwException(root, returnFiber, sourceFiber, value, renderExpirationT
         if (retryCache === null) {
           retryCache = _workInProgress.memoizedState = new PossiblyWeakSet();
           var _current = _workInProgress.alternate;
-          !_current ? invariant(false, 'A dehydrated suspense boundary must commit before trying to render. This is probably a bug in React.') : void 0;
+          !_current ? invariant(false, 'A dehydrated suspense boundary must commit before trying to render. This is probably a bug in React.') : undefined;
           _current.memoizedState = retryCache;
         }
         // Memoize using the boundary fiber to prevent redundant listeners.
@@ -18433,7 +18348,7 @@ function throwException(root, returnFiber, sourceFiber, value, renderExpirationT
           retryCache.add(thenable);
           var retry = retryTimedOutBoundary.bind(null, _workInProgress, thenable);
           if (enableSchedulerTracing) {
-            retry = unstable_wrap(retry);
+            retry = tracing.unstable_wrap(retry);
           }
           thenable.then(retry, retry);
         }
@@ -18508,7 +18423,7 @@ function unwindWork(workInProgress, renderExpirationTime) {
         popHostContainer(workInProgress);
         popTopLevelContextObject(workInProgress);
         var _effectTag = workInProgress.effectTag;
-        !((_effectTag & DidCapture) === NoEffect) ? invariant(false, 'The root failed to unmount after an error. This is likely a bug in React. Please file an issue.') : void 0;
+        !((_effectTag & DidCapture) === NoEffect) ? invariant(false, 'The root failed to unmount after an error. This is likely a bug in React. Please file an issue.') : undefined;
         workInProgress.effectTag = _effectTag & ~ShouldCapture | DidCapture;
         return workInProgress;
       }
@@ -18588,15 +18503,15 @@ var ReactCurrentDispatcher = ReactSharedInternals.ReactCurrentDispatcher;
 var ReactCurrentOwner$2 = ReactSharedInternals.ReactCurrentOwner;
 
 
-var didWarnAboutStateTransition = void 0;
-var didWarnSetStateChildContext = void 0;
-var warnAboutUpdateOnUnmounted = void 0;
-var warnAboutInvalidUpdates = void 0;
+var didWarnAboutStateTransition = undefined;
+var didWarnSetStateChildContext = undefined;
+var warnAboutUpdateOnUnmounted = undefined;
+var warnAboutInvalidUpdates = undefined;
 
 if (enableSchedulerTracing) {
   // Provide explicit error message when production+profiling bundle of e.g. react-dom
   // is used with production (non-profiling) bundle of scheduler/tracing
-  !(__interactionsRef != null && __interactionsRef.current != null) ? invariant(false, 'It is not supported to run the profiling version of a renderer (for example, `react-dom/profiling`) without also replacing the `scheduler/tracing` module with `scheduler/tracing-profiling`. Your bundler might have a setting for aliasing both modules. Learn more at http://fb.me/react-profiling') : void 0;
+  !(tracing.__interactionsRef != null && tracing.__interactionsRef.current != null) ? invariant(false, 'It is not supported to run the profiling version of a renderer (for example, `react-dom/profiling`) without also replacing the `scheduler/tracing` module with `scheduler/tracing-profiling`. Your bundler might have a setting for aliasing both modules. Learn more at http://fb.me/react-profiling') : undefined;
 }
 
 {
@@ -18661,12 +18576,12 @@ var legacyErrorBoundariesThatAlreadyFailed = null;
 // Used for performance tracking.
 var interruptedBy = null;
 
-var stashedWorkInProgressProperties = void 0;
-var replayUnitOfWork = void 0;
-var mayReplayFailedUnitOfWork = void 0;
-var isReplayingFailedUnitOfWork = void 0;
-var originalReplayError = void 0;
-var rethrowOriginalError = void 0;
+var stashedWorkInProgressProperties = undefined;
+var replayUnitOfWork = undefined;
+var mayReplayFailedUnitOfWork = undefined;
+var isReplayingFailedUnitOfWork = undefined;
+var originalReplayError = undefined;
+var rethrowOriginalError = undefined;
 if (true && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
   stashedWorkInProgressProperties = null;
   mayReplayFailedUnitOfWork = true;
@@ -18908,7 +18823,7 @@ function commitPassiveEffects(root, firstEffect) {
 
     if (effect.effectTag & Passive) {
       var didError = false;
-      var error = void 0;
+      var error = undefined;
       {
         invokeGuardedCallback(null, commitPassiveHookEffects, null, effect);
         if (hasCaughtError()) {
@@ -18967,9 +18882,9 @@ function commitRoot(root, finishedWork) {
   isCommitting$1 = true;
   startCommitTimer();
 
-  !(root.current !== finishedWork) ? invariant(false, 'Cannot commit the same tree as before. This is probably a bug related to the return field. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+  !(root.current !== finishedWork) ? invariant(false, 'Cannot commit the same tree as before. This is probably a bug related to the return field. This error is likely caused by a bug in React. Please file an issue.') : undefined;
   var committedExpirationTime = root.pendingCommitExpirationTime;
-  !(committedExpirationTime !== NoWork) ? invariant(false, 'Cannot commit an incomplete root. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+  !(committedExpirationTime !== NoWork) ? invariant(false, 'Cannot commit an incomplete root. This error is likely caused by a bug in React. Please file an issue.') : undefined;
   root.pendingCommitExpirationTime = NoWork;
 
   // Update the pending priority levels to account for the work that we are
@@ -18984,14 +18899,14 @@ function commitRoot(root, finishedWork) {
   if (enableSchedulerTracing) {
     // Restore any pending interactions at this point,
     // So that cascading work triggered during the render phase will be accounted for.
-    prevInteractions = __interactionsRef.current;
-    __interactionsRef.current = root.memoizedInteractions;
+    prevInteractions = tracing.__interactionsRef.current;
+    tracing.__interactionsRef.current = root.memoizedInteractions;
   }
 
   // Reset this to null before calling lifecycles
   ReactCurrentOwner$2.current = null;
 
-  var firstEffect = void 0;
+  var firstEffect = undefined;
   if (finishedWork.effectTag > PerformedWork) {
     // A fiber's effect list consists only of its children, not itself. So if
     // the root has an effect, we need to add it to the end of the list. The
@@ -19015,7 +18930,7 @@ function commitRoot(root, finishedWork) {
   startCommitSnapshotEffectsTimer();
   while (nextEffect !== null) {
     var didError = false;
-    var error = void 0;
+    var error = undefined;
     {
       invokeGuardedCallback(null, commitBeforeMutationLifecycles, null);
       if (hasCaughtError()) {
@@ -19024,7 +18939,7 @@ function commitRoot(root, finishedWork) {
       }
     }
     if (didError) {
-      !(nextEffect !== null) ? invariant(false, 'Should have next effect. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+      !(nextEffect !== null) ? invariant(false, 'Should have next effect. This error is likely caused by a bug in React. Please file an issue.') : undefined;
       captureCommitPhaseError(nextEffect, error);
       // Clean-up
       if (nextEffect !== null) {
@@ -19047,7 +18962,7 @@ function commitRoot(root, finishedWork) {
   startCommitHostEffectsTimer();
   while (nextEffect !== null) {
     var _didError = false;
-    var _error = void 0;
+    var _error = undefined;
     {
       invokeGuardedCallback(null, commitAllHostEffects, null);
       if (hasCaughtError()) {
@@ -19056,7 +18971,7 @@ function commitRoot(root, finishedWork) {
       }
     }
     if (_didError) {
-      !(nextEffect !== null) ? invariant(false, 'Should have next effect. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+      !(nextEffect !== null) ? invariant(false, 'Should have next effect. This error is likely caused by a bug in React. Please file an issue.') : undefined;
       captureCommitPhaseError(nextEffect, _error);
       // Clean-up
       if (nextEffect !== null) {
@@ -19082,7 +18997,7 @@ function commitRoot(root, finishedWork) {
   startCommitLifeCyclesTimer();
   while (nextEffect !== null) {
     var _didError2 = false;
-    var _error2 = void 0;
+    var _error2 = undefined;
     {
       invokeGuardedCallback(null, commitAllLifeCycles, null, root, committedExpirationTime);
       if (hasCaughtError()) {
@@ -19091,7 +19006,7 @@ function commitRoot(root, finishedWork) {
       }
     }
     if (_didError2) {
-      !(nextEffect !== null) ? invariant(false, 'Should have next effect. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+      !(nextEffect !== null) ? invariant(false, 'Should have next effect. This error is likely caused by a bug in React. Please file an issue.') : undefined;
       captureCommitPhaseError(nextEffect, _error2);
       if (nextEffect !== null) {
         nextEffect = nextEffect.nextEffect;
@@ -19109,9 +19024,9 @@ function commitRoot(root, finishedWork) {
       // TODO: Avoid this extra callback by mutating the tracing ref directly,
       // like we do at the beginning of commitRoot. I've opted not to do that
       // here because that code is still in flux.
-      callback = unstable_wrap(callback);
+      callback = tracing.unstable_wrap(callback);
     }
-    passiveEffectCallbackHandle = unstable_runWithPriority(unstable_NormalPriority, function () {
+    passiveEffectCallbackHandle = scheduler.unstable_runWithPriority(scheduler.unstable_NormalPriority, function () {
       return schedulePassiveEffects(callback);
     });
     passiveEffectCallback = callback;
@@ -19137,12 +19052,12 @@ function commitRoot(root, finishedWork) {
   onCommit(root, earliestRemainingTimeAfterCommit);
 
   if (enableSchedulerTracing) {
-    __interactionsRef.current = prevInteractions;
+    tracing.__interactionsRef.current = prevInteractions;
 
-    var subscriber = void 0;
+    var subscriber = undefined;
 
     try {
-      subscriber = __subscriberRef.current;
+      subscriber = tracing.__subscriberRef.current;
       if (subscriber !== null && root.memoizedInteractions.size > 0) {
         var threadID = computeThreadID(committedExpirationTime, root.interactionThreadID);
         subscriber.onWorkStopped(root.memoizedInteractions, threadID);
@@ -19442,7 +19357,7 @@ function performUnitOfWork(workInProgress) {
     stashedWorkInProgressProperties = assignFiberPropertiesInDEV(stashedWorkInProgressProperties, workInProgress);
   }
 
-  var next = void 0;
+  var next = undefined;
   if (enableProfilerTimer) {
     if (workInProgress.mode & ProfileMode) {
       startProfilerTimer(workInProgress);
@@ -19499,7 +19414,7 @@ function workLoop(isYieldy) {
 }
 
 function renderRoot(root, isYieldy) {
-  !!isWorking ? invariant(false, 'renderRoot was called recursively. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+  !!isWorking ? invariant(false, 'renderRoot was called recursively. This error is likely caused by a bug in React. Please file an issue.') : undefined;
 
   flushPassiveEffects();
 
@@ -19538,7 +19453,7 @@ function renderRoot(root, isYieldy) {
       root.memoizedInteractions = interactions;
 
       if (interactions.size > 0) {
-        var subscriber = __subscriberRef.current;
+        var subscriber = tracing.__subscriberRef.current;
         if (subscriber !== null) {
           var threadID = computeThreadID(expirationTime, root.interactionThreadID);
           try {
@@ -19561,8 +19476,8 @@ function renderRoot(root, isYieldy) {
   if (enableSchedulerTracing) {
     // We're about to start new traced work.
     // Restore pending interactions so cascading work triggered during the render phase will be accounted for.
-    prevInteractions = __interactionsRef.current;
-    __interactionsRef.current = root.memoizedInteractions;
+    prevInteractions = tracing.__interactionsRef.current;
+    tracing.__interactionsRef.current = root.memoizedInteractions;
   }
 
   var didFatal = false;
@@ -19578,7 +19493,7 @@ function renderRoot(root, isYieldy) {
 
       // Reset in case completion throws.
       // This is only used in DEV and when replaying is on.
-      var mayReplay = void 0;
+      var mayReplay = undefined;
       if (true && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
         mayReplay = mayReplayFailedUnitOfWork;
         mayReplayFailedUnitOfWork = true;
@@ -19611,7 +19526,7 @@ function renderRoot(root, isYieldy) {
         // TODO: we already know this isn't true in some cases.
         // At least this shows a nicer error message until we figure out the cause.
         // https://github.com/facebook/react/issues/12449#issuecomment-386727431
-        !(nextUnitOfWork !== null) ? invariant(false, 'Failed to replay rendering after an error. This is likely caused by a bug in React. Please file an issue with a reproducing case to help us find it.') : void 0;
+        !(nextUnitOfWork !== null) ? invariant(false, 'Failed to replay rendering after an error. This is likely caused by a bug in React. Please file an issue with a reproducing case to help us find it.') : undefined;
 
         var sourceFiber = nextUnitOfWork;
         var returnFiber = sourceFiber.return;
@@ -19636,7 +19551,7 @@ function renderRoot(root, isYieldy) {
 
   if (enableSchedulerTracing) {
     // Traced work is done for now; restore the previous interactions.
-    __interactionsRef.current = prevInteractions;
+    tracing.__interactionsRef.current = prevInteractions;
   }
 
   // We're done performing work. Time to clean up.
@@ -19678,7 +19593,7 @@ function renderRoot(root, isYieldy) {
   var didCompleteRoot = true;
   stopWorkLoopTimer(interruptedBy, didCompleteRoot);
   var rootWorkInProgress = root.current.alternate;
-  !(rootWorkInProgress !== null) ? invariant(false, 'Finished root should have a work-in-progress. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+  !(rootWorkInProgress !== null) ? invariant(false, 'Finished root should have a work-in-progress. This error is likely caused by a bug in React. Please file an issue.') : undefined;
 
   // `nextRoot` points to the in-progress root. A non-null value indicates
   // that we're in the middle of an async render. Set it to null to indicate
@@ -19807,9 +19722,9 @@ function computeUniqueAsyncExpiration() {
 }
 
 function computeExpirationForFiber(currentTime, fiber) {
-  var priorityLevel = unstable_getCurrentPriorityLevel();
+  var priorityLevel = scheduler.unstable_getCurrentPriorityLevel();
 
-  var expirationTime = void 0;
+  var expirationTime = undefined;
   if ((fiber.mode & ConcurrentMode) === NoContext) {
     // Outside of concurrent mode, updates are always synchronous.
     expirationTime = Sync;
@@ -19818,18 +19733,18 @@ function computeExpirationForFiber(currentTime, fiber) {
     expirationTime = nextRenderExpirationTime;
   } else {
     switch (priorityLevel) {
-      case unstable_ImmediatePriority:
+      case scheduler.unstable_ImmediatePriority:
         expirationTime = Sync;
         break;
-      case unstable_UserBlockingPriority:
+      case scheduler.unstable_UserBlockingPriority:
         expirationTime = computeInteractiveExpiration(currentTime);
         break;
-      case unstable_NormalPriority:
+      case scheduler.unstable_NormalPriority:
         // This is a normal, concurrent update
         expirationTime = computeAsyncExpiration(currentTime);
         break;
-      case unstable_LowPriority:
-      case unstable_IdlePriority:
+      case scheduler.unstable_LowPriority:
+      case scheduler.unstable_IdlePriority:
         expirationTime = Never;
         break;
       default:
@@ -19847,7 +19762,7 @@ function computeExpirationForFiber(currentTime, fiber) {
   // allows us to synchronously flush all interactive updates
   // when needed.
   // TODO: Move this to renderer?
-  if (priorityLevel === unstable_UserBlockingPriority && (lowestPriorityPendingInteractiveExpirationTime === NoWork || expirationTime < lowestPriorityPendingInteractiveExpirationTime)) {
+  if (priorityLevel === scheduler.unstable_UserBlockingPriority && (lowestPriorityPendingInteractiveExpirationTime === NoWork || expirationTime < lowestPriorityPendingInteractiveExpirationTime)) {
     lowestPriorityPendingInteractiveExpirationTime = expirationTime;
   }
 
@@ -19897,7 +19812,7 @@ function retryTimedOutBoundary(boundaryFiber, thenable) {
   // The boundary fiber (a Suspense component) previously timed out and was
   // rendered in its fallback state. One of the promises that suspended it has
   // resolved, which means at least part of the tree was likely unblocked. Try
-  var retryCache = void 0;
+  var retryCache = undefined;
   if (enableSuspenseServerRenderer) {
     switch (boundaryFiber.tag) {
       case SuspenseComponent:
@@ -19974,7 +19889,7 @@ function scheduleWorkToRoot(fiber, expirationTime) {
 
   if (enableSchedulerTracing) {
     if (root !== null) {
-      var interactions = __interactionsRef.current;
+      var interactions = tracing.__interactionsRef.current;
       if (interactions.size > 0) {
         var pendingInteractionMap = root.pendingInteractionMap;
         var pendingInteractions = pendingInteractionMap.get(expirationTime);
@@ -19996,7 +19911,7 @@ function scheduleWorkToRoot(fiber, expirationTime) {
           });
         }
 
-        var subscriber = __subscriberRef.current;
+        var subscriber = tracing.__subscriberRef.current;
         if (subscriber !== null) {
           var threadID = computeThreadID(expirationTime, root.interactionThreadID);
           subscriber.onWorkScheduled(interactions, threadID);
@@ -20057,7 +19972,7 @@ function scheduleWork(fiber, expirationTime) {
 }
 
 function syncUpdates(fn, a, b, c, d) {
-  return unstable_runWithPriority(unstable_ImmediatePriority, function () {
+  return scheduler.unstable_runWithPriority(scheduler.unstable_ImmediatePriority, function () {
     return fn(a, b, c, d);
   });
 }
@@ -20070,7 +19985,7 @@ var firstScheduledRoot = null;
 var lastScheduledRoot = null;
 
 var callbackExpirationTime = NoWork;
-var callbackID = void 0;
+var callbackID = undefined;
 var isRendering = false;
 var nextFlushedRoot = null;
 var nextFlushedExpirationTime = NoWork;
@@ -20083,7 +19998,7 @@ var isUnbatchingUpdates = false;
 
 var completedBatches = null;
 
-var originalStartTimeMs = unstable_now();
+var originalStartTimeMs = scheduler.unstable_now();
 var currentRendererTime = msToExpirationTime(originalStartTimeMs);
 var currentSchedulerTime = currentRendererTime;
 
@@ -20093,7 +20008,7 @@ var nestedUpdateCount = 0;
 var lastCommittedRootDuringThisBatch = null;
 
 function recomputeCurrentRendererTime() {
-  var currentTimeMs = unstable_now() - originalStartTimeMs;
+  var currentTimeMs = scheduler.unstable_now() - originalStartTimeMs;
   currentRendererTime = msToExpirationTime(currentTimeMs);
 }
 
@@ -20107,7 +20022,7 @@ function scheduleCallbackWithExpirationTime(root, expirationTime) {
       if (callbackID !== null) {
         // Existing callback has insufficient timeout. Cancel and schedule a
         // new one.
-        unstable_cancelCallback(callbackID);
+        scheduler.unstable_cancelCallback(callbackID);
       }
     }
     // The request callback timer is already running. Don't start a new one.
@@ -20116,10 +20031,10 @@ function scheduleCallbackWithExpirationTime(root, expirationTime) {
   }
 
   callbackExpirationTime = expirationTime;
-  var currentMs = unstable_now() - originalStartTimeMs;
+  var currentMs = scheduler.unstable_now() - originalStartTimeMs;
   var expirationTimeMs = expirationTimeToMs(expirationTime);
   var timeout = expirationTimeMs - currentMs;
-  callbackID = unstable_scheduleCallback(performAsyncWork, { timeout: timeout });
+  callbackID = scheduler.unstable_scheduleCallback(performAsyncWork, { timeout: timeout });
 }
 
 // For every call to renderRoot, one of onFatal, onComplete, onSuspend, and
@@ -20277,7 +20192,7 @@ function findHighestPriorityRoot() {
         // TODO: This check is redudant, but Flow is confused by the branch
         // below where we set lastScheduledRoot to null, even though we break
         // from the loop right after.
-        !(previousScheduledRoot !== null && lastScheduledRoot !== null) ? invariant(false, 'Should have a previous and last root. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+        !(previousScheduledRoot !== null && lastScheduledRoot !== null) ? invariant(false, 'Should have a previous and last root. This error is likely caused by a bug in React. Please file an issue.') : undefined;
         if (root === root.nextScheduledRoot) {
           // This is the only root in the list.
           root.nextScheduledRoot = null;
@@ -20332,7 +20247,7 @@ function shouldYieldToRenderer() {
   if (didYield) {
     return true;
   }
-  if (unstable_shouldYield()) {
+  if (scheduler.unstable_shouldYield()) {
     didYield = true;
     return true;
   }
@@ -20413,7 +20328,7 @@ function performWork(minExpirationTime, isYieldy) {
 }
 
 function flushRoot(root, expirationTime) {
-  !!isRendering ? invariant(false, 'work.commit(): Cannot commit while already rendering. This likely means you attempted to commit from inside a lifecycle method.') : void 0;
+  !!isRendering ? invariant(false, 'work.commit(): Cannot commit while already rendering. This likely means you attempted to commit from inside a lifecycle method.') : undefined;
   // Perform work on root as if the given expiration time is the current time.
   // This has the effect of synchronously flushing all work up to and
   // including the given time.
@@ -20453,7 +20368,7 @@ function finishRendering() {
 }
 
 function performWorkOnRoot(root, expirationTime, isYieldy) {
-  !!isRendering ? invariant(false, 'performWorkOnRoot was called recursively. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+  !!isRendering ? invariant(false, 'performWorkOnRoot was called recursively. This error is likely caused by a bug in React. Please file an issue.') : undefined;
 
   isRendering = true;
 
@@ -20553,13 +20468,13 @@ function completeRoot(root, finishedWork, expirationTime) {
     lastCommittedRootDuringThisBatch = root;
     nestedUpdateCount = 0;
   }
-  unstable_runWithPriority(unstable_ImmediatePriority, function () {
+  scheduler.unstable_runWithPriority(scheduler.unstable_ImmediatePriority, function () {
     commitRoot(root, finishedWork);
   });
 }
 
 function onUncaughtError(error) {
-  !(nextFlushedRoot !== null) ? invariant(false, 'Should be working on a root. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+  !(nextFlushedRoot !== null) ? invariant(false, 'Should be working on a root. This error is likely caused by a bug in React. Please file an issue.') : undefined;
   // Unschedule this root so we don't work on it again until there's
   // another update.
   nextFlushedRoot.expirationTime = NoWork;
@@ -20601,7 +20516,7 @@ function unbatchedUpdates(fn, a) {
 // TODO: Batching should be implemented at the renderer level, not within
 // the reconciler.
 function flushSync(fn, a) {
-  !!isRendering ? invariant(false, 'flushSync was called from inside a lifecycle method. It cannot be called when React is already rendering.') : void 0;
+  !!isRendering ? invariant(false, 'flushSync was called from inside a lifecycle method. It cannot be called when React is already rendering.') : undefined;
   var previousIsBatchingUpdates = isBatchingUpdates;
   isBatchingUpdates = true;
   try {
@@ -20625,7 +20540,7 @@ function interactiveUpdates$1(fn, a, b) {
   var previousIsBatchingUpdates = isBatchingUpdates;
   isBatchingUpdates = true;
   try {
-    return unstable_runWithPriority(unstable_UserBlockingPriority, function () {
+    return scheduler.unstable_runWithPriority(scheduler.unstable_UserBlockingPriority, function () {
       return fn(a, b);
     });
   } finally {
@@ -20661,8 +20576,8 @@ function flushControlled(fn) {
 // Might add PROFILE later.
 
 
-var didWarnAboutNestedUpdates = void 0;
-var didWarnAboutFindNodeInStrictMode = void 0;
+var didWarnAboutNestedUpdates = undefined;
+var didWarnAboutFindNodeInStrictMode = undefined;
 
 {
   didWarnAboutNestedUpdates = false;
@@ -20702,7 +20617,7 @@ function scheduleRootUpdate(current$$1, element, expirationTime, callback) {
 
   callback = callback === undefined ? null : callback;
   if (callback !== null) {
-    !(typeof callback === 'function') ? warningWithoutStack$1(false, 'render(...): Expected the last optional `callback` argument to be a ' + 'function. Instead received: %s.', callback) : void 0;
+    !(typeof callback === 'function') ? warningWithoutStack$1(false, 'render(...): Expected the last optional `callback` argument to be a ' + 'function. Instead received: %s.', callback) : undefined;
     update.callback = callback;
   }
 
@@ -20893,18 +20808,13 @@ implementation) {
 
 var ReactVersion = '16.8.6';
 
-// This file is copy paste from ReactDOM with adjusted paths
-// and a different host config import (react-reconciler/inline.fire).
-// TODO: real implementation.
-// console.log('Hello from Fire entry point.');
-
 // TODO: This type is shared between the reconciler and ReactDOM, but will
 // eventually be lifted out to the renderer.
 
 var ReactCurrentOwner = ReactSharedInternals.ReactCurrentOwner;
 
-var topLevelUpdateWarnings = void 0;
-var warnOnInvalidCallback = void 0;
+var topLevelUpdateWarnings = undefined;
+var warnOnInvalidCallback = undefined;
 var didWarnAboutUnstableCreatePortal = false;
 
 {
@@ -20920,7 +20830,7 @@ var didWarnAboutUnstableCreatePortal = false;
     if (container._reactRootContainer && container.nodeType !== COMMENT_NODE) {
       var hostInstance = findHostInstanceWithNoPortals(container._reactRootContainer._internalRoot.current);
       if (hostInstance) {
-        !(hostInstance.parentNode === container) ? warningWithoutStack$1(false, 'render(...): It looks like the React-rendered content of this ' + 'container was removed without using React. This is not ' + 'supported and will cause errors. Instead, call ' + 'ReactDOM.unmountComponentAtNode to empty a container.') : void 0;
+        !(hostInstance.parentNode === container) ? warningWithoutStack$1(false, 'render(...): It looks like the React-rendered content of this ' + 'container was removed without using React. This is not ' + 'supported and will cause errors. Instead, call ' + 'ReactDOM.unmountComponentAtNode to empty a container.') : undefined;
       }
     }
 
@@ -20928,13 +20838,13 @@ var didWarnAboutUnstableCreatePortal = false;
     var rootEl = getReactRootElementInContainer(container);
     var hasNonRootReactChild = !!(rootEl && getInstanceFromNode$1(rootEl));
 
-    !(!hasNonRootReactChild || isRootRenderedBySomeReact) ? warningWithoutStack$1(false, 'render(...): Replacing React-rendered children with a new root ' + 'component. If you intended to update the children of this node, ' + 'you should instead have the existing children update their state ' + 'and render the new components instead of calling ReactDOM.render.') : void 0;
+    !(!hasNonRootReactChild || isRootRenderedBySomeReact) ? warningWithoutStack$1(false, 'render(...): Replacing React-rendered children with a new root ' + 'component. If you intended to update the children of this node, ' + 'you should instead have the existing children update their state ' + 'and render the new components instead of calling ReactDOM.render.') : undefined;
 
-    !(container.nodeType !== ELEMENT_NODE || !container.tagName || container.tagName.toUpperCase() !== 'BODY') ? warningWithoutStack$1(false, 'render(): Rendering components directly into document.body is ' + 'discouraged, since its children are often manipulated by third-party ' + 'scripts and browser extensions. This may lead to subtle ' + 'reconciliation issues. Try rendering into a container element created ' + 'for your app.') : void 0;
+    !(container.nodeType !== ELEMENT_NODE || !container.tagName || container.tagName.toUpperCase() !== 'BODY') ? warningWithoutStack$1(false, 'render(): Rendering components directly into document.body is ' + 'discouraged, since its children are often manipulated by third-party ' + 'scripts and browser extensions. This may lead to subtle ' + 'reconciliation issues. Try rendering into a container element created ' + 'for your app.') : undefined;
   };
 
   warnOnInvalidCallback = function (callback, callerName) {
-    !(callback === null || typeof callback === 'function') ? warningWithoutStack$1(false, '%s(...): Expected the last optional `callback` argument to be a ' + 'function. Instead received: %s.', callerName, callback) : void 0;
+    !(callback === null || typeof callback === 'function') ? warningWithoutStack$1(false, '%s(...): Expected the last optional `callback` argument to be a ' + 'function. Instead received: %s.', callerName, callback) : undefined;
   };
 }
 
@@ -20952,7 +20862,7 @@ function ReactBatch(root) {
   this._defer = true;
 }
 ReactBatch.prototype.render = function (children) {
-  !this._defer ? invariant(false, 'batch.render: Cannot render a batch that already committed.') : void 0;
+  !this._defer ? invariant(false, 'batch.render: Cannot render a batch that already committed.') : undefined;
   this._hasChildren = true;
   this._children = children;
   var internalRoot = this._root._internalRoot;
@@ -20975,7 +20885,7 @@ ReactBatch.prototype.then = function (onComplete) {
 ReactBatch.prototype.commit = function () {
   var internalRoot = this._root._internalRoot;
   var firstBatch = internalRoot.firstBatch;
-  !(this._defer && firstBatch !== null) ? invariant(false, 'batch.commit: Cannot commit a batch multiple times.') : void 0;
+  !(this._defer && firstBatch !== null) ? invariant(false, 'batch.commit: Cannot commit a batch multiple times.') : undefined;
 
   if (!this._hasChildren) {
     // This batch is empty. Return.
@@ -21007,7 +20917,7 @@ ReactBatch.prototype.commit = function () {
       previous = batch;
       batch = batch._next;
     }
-    !(previous !== null) ? invariant(false, 'batch.commit: Cannot commit a batch multiple times.') : void 0;
+    !(previous !== null) ? invariant(false, 'batch.commit: Cannot commit a batch multiple times.') : undefined;
     previous._next = batch._next;
 
     // Add it to the front.
@@ -21075,7 +20985,7 @@ ReactWork.prototype._onCommit = function () {
   // TODO: Error handling.
   for (var i = 0; i < callbacks.length; i++) {
     var _callback2 = callbacks[i];
-    !(typeof _callback2 === 'function') ? invariant(false, 'Invalid argument passed as callback. Expected a function. Instead received: %s', _callback2) : void 0;
+    !(typeof _callback2 === 'function') ? invariant(false, 'Invalid argument passed as callback. Expected a function. Instead received: %s', _callback2) : undefined;
     _callback2();
   }
 };
@@ -21186,7 +21096,7 @@ function legacyCreateRootFromDOMContainer(container, forceHydrate) {
   // First clear any existing content.
   if (!shouldHydrate) {
     var warned = false;
-    var rootSibling = void 0;
+    var rootSibling = undefined;
     while (rootSibling = container.lastChild) {
       {
         if (!warned && rootSibling.nodeType === ELEMENT_NODE && rootSibling.hasAttribute(ROOT_ATTRIBUTE_NAME)) {
@@ -21255,7 +21165,7 @@ function legacyRenderSubtreeIntoContainer(parentComponent, children, container, 
 function createPortal$$1(children, container) {
   var key = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
 
-  !isValidContainer(container) ? invariant(false, 'Target container is not a DOM element.') : void 0;
+  !isValidContainer(container) ? invariant(false, 'Target container is not a DOM element.') : undefined;
   // TODO: pass ReactDOM portal implementation as third argument
   return createPortal$1(children, container, null, key);
 }
@@ -21268,7 +21178,7 @@ var ReactDOM = {
       var owner = ReactCurrentOwner.current;
       if (owner !== null && owner.stateNode !== null) {
         var warnedAboutRefsInRender = owner.stateNode._warnedAboutRefsInRender;
-        !warnedAboutRefsInRender ? warningWithoutStack$1(false, '%s is accessing findDOMNode inside its render(). ' + 'render() should be a pure function of props and state. It should ' + 'never access something that requires stale data from the previous ' + 'render, such as refs. Move this logic to componentDidMount and ' + 'componentDidUpdate instead.', getComponentName(owner.type) || 'A component') : void 0;
+        !warnedAboutRefsInRender ? warningWithoutStack$1(false, '%s is accessing findDOMNode inside its render(). ' + 'render() should be a pure function of props and state. It should ' + 'never access something that requires stale data from the previous ' + 'render, such as refs. Move this logic to componentDidMount and ' + 'componentDidUpdate instead.', getComponentName(owner.type) || 'A component') : undefined;
         owner.stateNode._warnedAboutRefsInRender = true;
       }
     }
@@ -21284,37 +21194,37 @@ var ReactDOM = {
     return findHostInstance(componentOrElement);
   },
   hydrate: function (element, container, callback) {
-    !isValidContainer(container) ? invariant(false, 'Target container is not a DOM element.') : void 0;
+    !isValidContainer(container) ? invariant(false, 'Target container is not a DOM element.') : undefined;
     {
-      !!container._reactHasBeenPassedToCreateRootDEV ? warningWithoutStack$1(false, 'You are calling ReactDOM.hydrate() on a container that was previously ' + 'passed to ReactDOM.%s(). This is not supported. ' + 'Did you mean to call createRoot(container, {hydrate: true}).render(element)?', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : void 0;
+      !!container._reactHasBeenPassedToCreateRootDEV ? warningWithoutStack$1(false, 'You are calling ReactDOM.hydrate() on a container that was previously ' + 'passed to ReactDOM.%s(). This is not supported. ' + 'Did you mean to call createRoot(container, {hydrate: true}).render(element)?', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : undefined;
     }
     // TODO: throw or warn if we couldn't hydrate?
     return legacyRenderSubtreeIntoContainer(null, element, container, true, callback);
   },
   render: function (element, container, callback) {
-    !isValidContainer(container) ? invariant(false, 'Target container is not a DOM element.') : void 0;
+    !isValidContainer(container) ? invariant(false, 'Target container is not a DOM element.') : undefined;
     {
-      !!container._reactHasBeenPassedToCreateRootDEV ? warningWithoutStack$1(false, 'You are calling ReactDOM.render() on a container that was previously ' + 'passed to ReactDOM.%s(). This is not supported. ' + 'Did you mean to call root.render(element)?', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : void 0;
+      !!container._reactHasBeenPassedToCreateRootDEV ? warningWithoutStack$1(false, 'You are calling ReactDOM.render() on a container that was previously ' + 'passed to ReactDOM.%s(). This is not supported. ' + 'Did you mean to call root.render(element)?', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : undefined;
     }
     return legacyRenderSubtreeIntoContainer(null, element, container, false, callback);
   },
   unstable_renderSubtreeIntoContainer: function (parentComponent, element, containerNode, callback) {
-    !isValidContainer(containerNode) ? invariant(false, 'Target container is not a DOM element.') : void 0;
-    !(parentComponent != null && has(parentComponent)) ? invariant(false, 'parentComponent must be a valid React Component') : void 0;
+    !isValidContainer(containerNode) ? invariant(false, 'Target container is not a DOM element.') : undefined;
+    !(parentComponent != null && has(parentComponent)) ? invariant(false, 'parentComponent must be a valid React Component') : undefined;
     return legacyRenderSubtreeIntoContainer(parentComponent, element, containerNode, false, callback);
   },
   unmountComponentAtNode: function (container) {
-    !isValidContainer(container) ? invariant(false, 'unmountComponentAtNode(...): Target container is not a DOM element.') : void 0;
+    !isValidContainer(container) ? invariant(false, 'unmountComponentAtNode(...): Target container is not a DOM element.') : undefined;
 
     {
-      !!container._reactHasBeenPassedToCreateRootDEV ? warningWithoutStack$1(false, 'You are calling ReactDOM.unmountComponentAtNode() on a container that was previously ' + 'passed to ReactDOM.%s(). This is not supported. Did you mean to call root.unmount()?', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : void 0;
+      !!container._reactHasBeenPassedToCreateRootDEV ? warningWithoutStack$1(false, 'You are calling ReactDOM.unmountComponentAtNode() on a container that was previously ' + 'passed to ReactDOM.%s(). This is not supported. Did you mean to call root.unmount()?', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : undefined;
     }
 
     if (container._reactRootContainer) {
       {
         var rootEl = getReactRootElementInContainer(container);
         var renderedByDifferentReact = rootEl && !getInstanceFromNode$1(rootEl);
-        !!renderedByDifferentReact ? warningWithoutStack$1(false, "unmountComponentAtNode(): The node you're attempting to unmount " + 'was rendered by another copy of React.') : void 0;
+        !!renderedByDifferentReact ? warningWithoutStack$1(false, "unmountComponentAtNode(): The node you're attempting to unmount " + 'was rendered by another copy of React.') : undefined;
       }
 
       // Unmount should not be batched.
@@ -21334,7 +21244,7 @@ var ReactDOM = {
         // Check if the container itself is a React root node.
         var isContainerReactRoot = container.nodeType === ELEMENT_NODE && isValidContainer(container.parentNode) && !!container.parentNode._reactRootContainer;
 
-        !!hasNonRootReactChild ? warningWithoutStack$1(false, "unmountComponentAtNode(): The node you're attempting to unmount " + 'was rendered by React and is not a top-level container. %s', isContainerReactRoot ? 'You may have accidentally passed in a React root node instead ' + 'of its container.' : 'Instead, have the parent component update its state and ' + 'rerender in order to remove this component.') : void 0;
+        !!hasNonRootReactChild ? warningWithoutStack$1(false, "unmountComponentAtNode(): The node you're attempting to unmount " + 'was rendered by React and is not a top-level container. %s', isContainerReactRoot ? 'You may have accidentally passed in a React root node instead ' + 'of its container.' : 'Instead, have the parent component update its state and ' + 'rerender in order to remove this component.') : undefined;
       }
 
       return false;
@@ -21371,9 +21281,9 @@ var ReactDOM = {
 
 function createRoot(container, options) {
   var functionName = enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot';
-  !isValidContainer(container) ? invariant(false, '%s(...): Target container is not a DOM element.', functionName) : void 0;
+  !isValidContainer(container) ? invariant(false, '%s(...): Target container is not a DOM element.', functionName) : undefined;
   {
-    !!container._reactRootContainer ? warningWithoutStack$1(false, 'You are calling ReactDOM.%s() on a container that was previously ' + 'passed to ReactDOM.render(). This is not supported.', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : void 0;
+    !!container._reactRootContainer ? warningWithoutStack$1(false, 'You are calling ReactDOM.%s() on a container that was previously ' + 'passed to ReactDOM.render(). This is not supported.', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : undefined;
     container._reactHasBeenPassedToCreateRootDEV = true;
   }
   var hydrate = options != null && options.hydrate === true;
@@ -21406,17 +21316,4 @@ var foundDevTools = injectIntoDevTools({
 }
 
 
-
-var ReactFire = Object.freeze({
-	default: ReactDOM
-});
-
-var ReactFire$1 = ( ReactFire && ReactDOM ) || ReactFire;
-
-// TODO: decide on the top-level export form.
-// This is hacky but makes it work with both Rollup and Jest.
-var unstableFire = ReactFire$1.default || ReactFire$1;
-
-return unstableFire;
-
-})));
+export default ReactDOM;
