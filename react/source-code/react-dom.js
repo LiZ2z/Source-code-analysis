@@ -15,12 +15,16 @@ var tracing = require('scheduler/tracing');
  * will remain to ensure logic does not differ in production.
  */
 
-var validateFormat = function (format) {
-    if (format === undefined) {
-        throw new Error('invariant requires an error message argument');
-    }
+var validateFormat = function () {};
+
+{
+    validateFormat = function (format) {
+        if (format === undefined) {
+            throw new Error('invariant requires an error message argument');
+        }
+    };
 }
-// invariant(false, 'Target container is not a DOM element.') 
+
 function invariant(condition, format, a, b, c, d, e, f) {
     validateFormat(format);
 
@@ -21063,17 +21067,7 @@ ReactRoot.prototype.createBatch = function () {
  * @internal
  */
 function isValidContainer(node) {
-
-  return Boolean(
-      node 
-      && (
-          node.nodeType === ELEMENT_NODE // 1
-          || node.nodeType === DOCUMENT_NODE // 9
-           || node.nodeType === DOCUMENT_FRAGMENT_NODE  // 11
-           || node.nodeType === COMMENT_NODE  // 8
-            && node.nodeValue === ' react-mount-point-unstable '
-            )
-            );
+  return !!(node && (node.nodeType === ELEMENT_NODE || node.nodeType === DOCUMENT_NODE || node.nodeType === DOCUMENT_FRAGMENT_NODE || node.nodeType === COMMENT_NODE && node.nodeValue === ' react-mount-point-unstable '));
 }
 
 function getReactRootElementInContainer(container) {
@@ -21199,16 +21193,26 @@ var ReactDOM = {
     }
     return findHostInstance(componentOrElement);
   },
-
+  hydrate: function (element, container, callback) {
+    !isValidContainer(container) ? invariant(false, 'Target container is not a DOM element.') : undefined;
+    {
+      !!container._reactHasBeenPassedToCreateRootDEV ? warningWithoutStack$1(false, 'You are calling ReactDOM.hydrate() on a container that was previously ' + 'passed to ReactDOM.%s(). This is not supported. ' + 'Did you mean to call createRoot(container, {hydrate: true}).render(element)?', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : undefined;
+    }
+    // TODO: throw or warn if we couldn't hydrate?
+    return legacyRenderSubtreeIntoContainer(null, element, container, true, callback);
+  },
   render: function (element, container, callback) {
     !isValidContainer(container) ? invariant(false, 'Target container is not a DOM element.') : undefined;
-    
     {
       !!container._reactHasBeenPassedToCreateRootDEV ? warningWithoutStack$1(false, 'You are calling ReactDOM.render() on a container that was previously ' + 'passed to ReactDOM.%s(). This is not supported. ' + 'Did you mean to call root.render(element)?', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : undefined;
     }
     return legacyRenderSubtreeIntoContainer(null, element, container, false, callback);
   },
-
+  unstable_renderSubtreeIntoContainer: function (parentComponent, element, containerNode, callback) {
+    !isValidContainer(containerNode) ? invariant(false, 'Target container is not a DOM element.') : undefined;
+    !(parentComponent != null && has(parentComponent)) ? invariant(false, 'parentComponent must be a valid React Component') : undefined;
+    return legacyRenderSubtreeIntoContainer(parentComponent, element, containerNode, false, callback);
+  },
   unmountComponentAtNode: function (container) {
     !isValidContainer(container) ? invariant(false, 'unmountComponentAtNode(...): Target container is not a DOM element.') : undefined;
 
@@ -21245,8 +21249,34 @@ var ReactDOM = {
 
       return false;
     }
-  }
+  },
 
+
+  // Temporary alias since we already shipped React 16 RC with it.
+  // TODO: remove in React 17.
+  unstable_createPortal: function () {
+    if (!didWarnAboutUnstableCreatePortal) {
+      didWarnAboutUnstableCreatePortal = true;
+      lowPriorityWarning$1(false, 'The ReactDOM.unstable_createPortal() alias has been deprecated, ' + 'and will be removed in React 17+. Update your code to use ' + 'ReactDOM.createPortal() instead. It has the exact same API, ' + 'but without the "unstable_" prefix.');
+    }
+    return createPortal$$1.apply(undefined, arguments);
+  },
+
+
+  unstable_batchedUpdates: batchedUpdates$1,
+
+  unstable_interactiveUpdates: interactiveUpdates$1,
+
+  flushSync: flushSync,
+
+  unstable_createRoot: createRoot,
+  unstable_flushControlled: flushControlled,
+
+  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
+    // Keep in sync with ReactDOMUnstableNativeDependencies.js
+    // and ReactTestUtils.js. This is an array for better minification.
+    Events: [getInstanceFromNode$1, getNodeFromInstance$1, getFiberCurrentPropsFromNode$1, injection.injectEventPluginsByName, eventNameDispatchConfigs, accumulateTwoPhaseDispatches, accumulateDirectDispatches, enqueueStateRestore, restoreStateIfNeeded, dispatchEvent, runEventsInBatch]
+  }
 };
 
 function createRoot(container, options) {

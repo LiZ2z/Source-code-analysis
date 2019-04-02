@@ -1,22 +1,22 @@
 import React, { Component } from './react';
 
 class App extends Component {
+    state = {
+        num: 1
+    }
+    componentDidMount(){
+        setInterval(()=>{
+            this.setState({
+                num: this.state.num+1
+            })
+        },2000)
+    }
   render() {
     return (
       <div className="App">
-        <header className="App-header">
-          <p>
-            Edit <code>src/App.js</code> and save to reload.
-          </p>
-          <a
-            className="App-link"
-            href="https://reactjs.org"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Learn React
-          </a>
-        </header>
+        <h1>
+         {this.state.num}
+        </h1>
       </div>
     );
   }
