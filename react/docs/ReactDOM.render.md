@@ -28,6 +28,18 @@
             2. `computeExpirationForFiber`
             
             3. `updateContainerAtExpirationTime`
+                1. `scheduleRootUpdate`
+                    1. `createUpdate`
+                    2. `flushPassiveEffects`
+                    3. `enqueueUpdate`
+                        1. `createUpdateQueue`
+                        2. `appendUpdateToQueue`
+                    4. `scheduleWork`
+                        1. `scheduleWorkToRoot`
+                            1. `recordScheduleUpdate`
+                        2. `markPendingPriorityLevel`
+                            1. `findNextExpirationTimeToWorkOn`
+                    
 
     3. `getPublicRootInstance(root._internalRoot)`
 

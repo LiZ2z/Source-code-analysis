@@ -9324,7 +9324,7 @@ function recordEffect() {
         effectCountInCurrentCommit++;
     }
 }
-
+// @caller scheduleWorkToRoot
 function recordScheduleUpdate() {
     if (enableUserTimingAPI) {
         if (isCommitting) {
@@ -10203,7 +10203,6 @@ function createHostRootFiber(isConcurrent) {
         // Without some nodes in the tree having empty base times.
         mode |= ProfileMode;
     }
-
     return createFiber(HostRoot, null, null, mode);
 }
 
@@ -10811,7 +10810,8 @@ var ReactFiberInstrumentation_1 = ReactFiberInstrumentation;
 // TODO: Offscreen updates should never suspend. However, a promise that
 // suspended inside an offscreen subtree should be able to ping at the priority
 // of the outer render.
-
+// 屏幕外更新永远不应挂起。但是，挂起在屏幕外子树中的承诺应该能够以外部呈现的优先级执行ping操作。
+// @caller scheduleWork
 function markPendingPriorityLevel(root, expirationTime) {
     // If there's a gap between completing a failed root and retrying it,
     // additional updates may be scheduled. Clear `didError`, in case the update
@@ -11008,7 +11008,7 @@ function didExpireAtExpirationTime(root, currentTime) {
         root.nextExpirationTimeToWorkOn = currentTime;
     }
 }
-
+// @caller markPendingPriorityLevel
 function findNextExpirationTimeToWorkOn(completedExpirationTime, root) {
     var earliestSuspendedTime = root.earliestSuspendedTime;
     var latestSuspendedTime = root.latestSuspendedTime;
@@ -16164,12 +16164,15 @@ function cloneUpdateQueue(currentQueue) {
     };
     return queue;
 }
-
+// @caller scheduleRootUpdate
+/**
+ * @param expirationTime oneOf maxSigned31BitInt<Sync>
+ */
 function createUpdate(expirationTime) {
     return {
         expirationTime: expirationTime,
 
-        tag: UpdateState,
+        tag: UpdateState, // 0
         payload: null,
         callback: null,
 
@@ -16188,7 +16191,7 @@ function appendUpdateToQueue(queue, update) {
         queue.lastUpdate = update;
     }
 }
-
+// @caller scheduleRootUpdate
 function enqueueUpdate(fiber, update) {
     // Update queues are created lazily.
     var alternate = fiber.alternate;
@@ -19724,6 +19727,8 @@ function computeExpirationForFiber(currentTime, fiber) {
     var priorityLevel = scheduler.unstable_getCurrentPriorityLevel();
 
     var expirationTime = undefined;
+    //              & 0b0001              0b0000
+    // 也就是只要mode不是 0b0001 （ConcurrentMode） 都会进入 
     if ((fiber.mode & ConcurrentMode) === NoContext) {
         // Outside of concurrent mode, updates are always synchronous.
         // 除了 concurrent mode， 其他的updates都是同步的
@@ -19854,14 +19859,13 @@ function retryTimedOutBoundary(boundaryFiber, thenable) {
     }
 }
 
+// @caller scheduleWork
 function scheduleWorkToRoot(fiber, expirationTime) {
     recordScheduleUpdate();
 
-    {
-        if (fiber.tag === ClassComponent) {
-            var instance = fiber.stateNode;
-            warnAboutInvalidUpdates(instance);
-        }
+    if (fiber.tag === ClassComponent) {
+        var instance = fiber.stateNode;
+        warnAboutInvalidUpdates(instance);
     }
 
     // Update the source fiber's expiration time
@@ -19938,9 +19942,12 @@ function warnIfNotCurrentlyBatchingInDev(fiber) {
         }
     }
 }
+// @caller scheduleRootUpdate
 
 function scheduleWork(fiber, expirationTime) {
+
     var root = scheduleWorkToRoot(fiber, expirationTime);
+
     if (root === null) {
         {
             switch (fiber.tag) {
@@ -19963,7 +19970,9 @@ function scheduleWork(fiber, expirationTime) {
         interruptedBy = fiber;
         resetStack();
     }
+
     markPendingPriorityLevel(root, expirationTime);
+
     if (
         // If we're in the render phase, we don't need to schedule this root
         // for an update, because we'll do it before we exit...
@@ -20133,6 +20142,7 @@ function requestCurrentTime() {
 
 
 
+
     if (isRendering) {
         // We're already rendering. Return the most recently read time.
         // 我们已经在渲染了。返回最近读取时间。
@@ -20163,6 +20173,7 @@ function requestCurrentTime() {
 // requestWork is called by the scheduler whenever a root receives an update.
 // It's up to the renderer to call renderRoot at some point in the future.
 function requestWork(root, expirationTime) {
+
     addRootToSchedule(root, expirationTime);
     if (isRendering) {
         // Prevent reentrancy. Remaining work will be scheduled at the end of
@@ -20323,6 +20334,7 @@ function performWork(minExpirationTime, isYieldy) {
     // Keep working on roots until there's no more work, or until there's a higher
     // priority event.
     findHighestPriorityRoot();
+    debugger;
 
     if (isYieldy) {
         recomputeCurrentRendererTime();
@@ -20624,6 +20636,8 @@ var didWarnAboutFindNodeInStrictMode = undefined;
     didWarnAboutFindNodeInStrictMode = {};
 }
 
+// caller updateContainerAtExpirationTime
+
 function getContextForSubtree(parentComponent) {
     if (!parentComponent) {
         return emptyContextObject;
@@ -20642,6 +20656,13 @@ function getContextForSubtree(parentComponent) {
     return parentContext;
 }
 
+/**
+ * @caller updateContainerAtExpirationTime
+ * @param current$$1 oneOfType RootFiber
+ * @param element oneOfType <App/>
+ * @param expirationTime oneOf maxSigned31BitInt<Sync>
+ * @param callback oneOf work._onCommit
+ */
 function scheduleRootUpdate(current$$1, element, expirationTime, callback) {
     {
         if (phase === 'render' && current !== null && !didWarnAboutNestedUpdates) {
@@ -20649,7 +20670,6 @@ function scheduleRootUpdate(current$$1, element, expirationTime, callback) {
             warningWithoutStack$1(false, 'Render methods should be a pure function of props and state; ' + 'triggering nested component updates from render is not allowed. ' + 'If necessary, trigger nested updates in componentDidUpdate.\n\n' + 'Check the render method of %s.', getComponentName(current.type) || 'Unknown');
         }
     }
-
     var update = createUpdate(expirationTime);
     // Caution: React DevTools currently depends on this property
     // being called "element".
@@ -20660,14 +20680,20 @@ function scheduleRootUpdate(current$$1, element, expirationTime, callback) {
         !(typeof callback === 'function') ? warningWithoutStack$1(false, 'render(...): Expected the last optional `callback` argument to be a ' + 'function. Instead received: %s.', callback) : undefined;
         update.callback = callback;
     }
-
     flushPassiveEffects();
     enqueueUpdate(current$$1, update);
-    scheduleWork(current$$1, expirationTime);
 
+    scheduleWork(current$$1, expirationTime);
     return expirationTime;
 }
 // @caller updateContainer
+/**
+ * @param element oneOfType <App/>
+ * @param container oneOfType <HostFiberRoot>
+ * @param parentComponent oneOfType null
+ * @param expirationTime oneOfType maxSigned31BitInt<Sync>
+ * @param callback oneOf work._onCommit
+ */
 function updateContainerAtExpirationTime(element, container, parentComponent, expirationTime, callback) {
     // TODO: If this is a nested container, this won't be the root.
     var current$$1 = container.current;
@@ -20683,9 +20709,8 @@ function updateContainerAtExpirationTime(element, container, parentComponent, ex
             }
         }
     }
-    debugger
 
-    var context = getContextForSubtree(parentComponent);
+    var context = getContextForSubtree(parentComponent); // {}
     if (container.context === null) {
         container.context = context;
     } else {
@@ -20752,7 +20777,10 @@ function createContainer(containerInfo, isConcurrent, hydrate) {
 }
 // @caller ReactRoot new ReactRoot().render
 /**
- * 
+ * @param element <App/>
+ * @param container HostFiberRoot
+ * @param parentComponent null
+ * @param callback work._onCommit
  */
 function updateContainer(element, container, parentComponent, callback) {
     var current$$1 = container.current; // FiberNode
@@ -21010,6 +21038,16 @@ ReactBatch.prototype._onComplete = function () {
     }
 };
 // @caller ReactRoot new ReactRoot().render 就在下面
+/**
+ * 通过 work._didCommit 管理状态
+ * 通过 work.then() 注册回调函数
+ * 通过 work._onCommit 触发回调并修改状态
+ * work内部有一个状态，didCommit 代表是否触发了 _onCommit 事件
+ * 如果没有触发_onCommit 事件， 则通过work.then注册的事件都将被保存在 work._callbacks 这个数组中
+ * 当调用 _onCommit 函数时，执行所有work._callbacks中的回调函数
+ * 如果已触发_onCommit函数，则后续通过 work.then 注册的函数将立即执行
+ * _onCommit 函数只能执行一次
+ */
 function ReactWork() {
     this._callbacks = null;
     this._didCommit = false;
