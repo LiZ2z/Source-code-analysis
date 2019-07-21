@@ -10195,12 +10195,20 @@ function createWorkInProgress(current, pendingProps, expirationTime) {
 }
 
 function createHostRootFiber(isConcurrent) {
+    //                         1             |  2            0
+    //                        0b0001         |0b0010         0b0000
+    // 0b0001 | 0b0010 === 0b0011
+    //  1|2 === 3
     var mode = isConcurrent ? ConcurrentMode | StrictMode : NoContext;
 
     if (enableProfilerTimer && isDevToolsPresent) {
         // Always collect profile timings when DevTools are present.
         // This enables DevTools to start capturing timing at any point–
         // Without some nodes in the tree having empty base times.
+        //        4
+        //        0b0100
+        // 0b0100 | 0b0011
+        // 0b0100 | 0b0000
         mode |= ProfileMode;
     }
     return createFiber(HostRoot, null, null, mode);
@@ -10432,78 +10440,42 @@ function assignFiberPropertiesInDEV(target, source) {
 // (We don't have to use an inline :any cast when enableSchedulerTracing is disabled.)
 
 // @caller createContainer
-function createFiberRoot(containerInfo, isConcurrent, hydrate) {
-    // Cyclic construction. This cheats the type system right now because
-    // stateNode is any.
+function createFiberRoot(container, isConcurrent, hydrate) {
     var uninitializedFiber = createHostRootFiber(isConcurrent);
 
-    var root = undefined;
-    if (enableSchedulerTracing) {
-        root = {
-            current: uninitializedFiber,
-            containerInfo: containerInfo,
-            pendingChildren: null,
+    var root = {
+        current: uninitializedFiber,
+        containerInfo: container,
+        pendingChildren: null,
 
-            earliestPendingTime: NoWork,
-            latestPendingTime: NoWork,
-            earliestSuspendedTime: NoWork,
-            latestSuspendedTime: NoWork,
-            latestPingedTime: NoWork,
+        earliestPendingTime: NoWork,
+        latestPendingTime: NoWork,
+        earliestSuspendedTime: NoWork,
+        latestSuspendedTime: NoWork,
+        latestPingedTime: NoWork,
 
-            pingCache: null,
+        pingCache: null,
 
-            didError: false,
+        didError: false,
 
-            pendingCommitExpirationTime: NoWork,
-            finishedWork: null,
-            timeoutHandle: noTimeout,
-            context: null,
-            pendingContext: null,
-            hydrate: hydrate,
-            nextExpirationTimeToWorkOn: NoWork,
-            expirationTime: NoWork,
-            firstBatch: null,
-            nextScheduledRoot: null,
-            // interaction交互 Thread线程 id
-            interactionThreadID: tracing.unstable_getThreadID(),
-            memoizedInteractions: new Set(),
-            pendingInteractionMap: new Map()
-        };
-    } else {
-        root = {
-            current: uninitializedFiber,
-            containerInfo: containerInfo,
-            pendingChildren: null,
-
-            pingCache: null,
-
-            earliestPendingTime: NoWork,
-            latestPendingTime: NoWork,
-            earliestSuspendedTime: NoWork,
-            latestSuspendedTime: NoWork,
-            latestPingedTime: NoWork,
-
-            didError: false,
-
-            pendingCommitExpirationTime: NoWork,
-            finishedWork: null,
-            timeoutHandle: noTimeout,
-            context: null,
-            pendingContext: null,
-            hydrate: hydrate,
-            nextExpirationTimeToWorkOn: NoWork,
-            expirationTime: NoWork,
-            firstBatch: null,
-            nextScheduledRoot: null
-        };
-    }
+        pendingCommitExpirationTime: NoWork,
+        finishedWork: null,
+        timeoutHandle: noTimeout,
+        context: null,
+        pendingContext: null,
+        hydrate: hydrate,
+        nextExpirationTimeToWorkOn: NoWork,
+        expirationTime: NoWork,
+        firstBatch: null,
+        nextScheduledRoot: null,
+        // interaction => 交互    Thread => 线程   id
+        interactionThreadID: tracing.unstable_getThreadID(),
+        memoizedInteractions: new Set(),
+        pendingInteractionMap: new Map()
+    };
 
     uninitializedFiber.stateNode = root;
 
-    // The reason for the way the Flow types are structured in this file,
-    // Is to avoid needing :any casts everywhere interaction tracing fields are used.
-    // Unfortunately that requires an :any cast for non-interaction tracing capable builds.
-    // $FlowFixMe Remove this :any cast and replace it with something better.
     return root;
 }
 
@@ -19723,18 +19695,25 @@ function computeUniqueAsyncExpiration() {
 
 // @caller updateContainer
 
+/**
+ * 为fiber任务计算过期时间
+ * 
+ * @param {*} currentTime 
+ * @param {*} fiber 
+ */
 function computeExpirationForFiber(currentTime, fiber) {
     var priorityLevel = scheduler.unstable_getCurrentPriorityLevel();
 
     var expirationTime = undefined;
     //              & 0b0001              0b0000
-    // 也就是只要mode不是 0b0001 （ConcurrentMode） 都会进入 
+    // 也就是只要fiber的mode不是 0b0001 （ConcurrentMode 并发模式） 都会同步执行
     if ((fiber.mode & ConcurrentMode) === NoContext) {
         // Outside of concurrent mode, updates are always synchronous.
         // 除了 concurrent mode， 其他的updates都是同步的
-        expirationTime = Sync;
+        expirationTime = Sync; // maxSigned31BitInt 永不工期
     } else if (isWorking && !isCommitting$1) {
         // During render phase, updates expire during as the current render.
+        // 在渲染阶段，更新将在当前渲染期间过期
         expirationTime = nextRenderExpirationTime;
     } else {
         switch (priorityLevel) {
@@ -19758,7 +19737,7 @@ function computeExpirationForFiber(currentTime, fiber) {
 
         // If we're in the middle of rendering a tree, do not update at the same
         // expiration time that is already rendering.
-        // 如果正在渲染DOM树，不要这个相同的过期时间内 进行 update
+        // 如果正在渲染DOM树，不要在这个相同的过期时间内 进行 update
         if (nextRoot !== null && expirationTime === nextRenderExpirationTime) {
             expirationTime -= 1;
         }
@@ -19773,7 +19752,7 @@ function computeExpirationForFiber(currentTime, fiber) {
     if (
         priorityLevel === scheduler.unstable_UserBlockingPriority &&
         (
-            lowestPriorityPendingInteractiveExpirationTime === NoWork || 
+            lowestPriorityPendingInteractiveExpirationTime === NoWork ||
             expirationTime < lowestPriorityPendingInteractiveExpirationTime
         )
     ) {
@@ -20628,13 +20607,10 @@ function flushControlled(fn) {
 // Might add PROFILE later.
 
 
-var didWarnAboutNestedUpdates = undefined;
-var didWarnAboutFindNodeInStrictMode = undefined;
+var didWarnAboutNestedUpdates = false;
+var didWarnAboutFindNodeInStrictMode = {};
 
-{
-    didWarnAboutNestedUpdates = false;
-    didWarnAboutFindNodeInStrictMode = {};
-}
+
 
 // caller updateContainerAtExpirationTime
 
@@ -20664,11 +20640,9 @@ function getContextForSubtree(parentComponent) {
  * @param callback oneOf work._onCommit
  */
 function scheduleRootUpdate(current$$1, element, expirationTime, callback) {
-    {
-        if (phase === 'render' && current !== null && !didWarnAboutNestedUpdates) {
-            didWarnAboutNestedUpdates = true;
-            warningWithoutStack$1(false, 'Render methods should be a pure function of props and state; ' + 'triggering nested component updates from render is not allowed. ' + 'If necessary, trigger nested updates in componentDidUpdate.\n\n' + 'Check the render method of %s.', getComponentName(current.type) || 'Unknown');
-        }
+    if (phase === 'render' && current !== null && !didWarnAboutNestedUpdates) {
+        didWarnAboutNestedUpdates = true;
+        warningWithoutStack$1(false, 'Render methods should be a pure function of props and state; ' + 'triggering nested component updates from render is not allowed. ' + 'If necessary, trigger nested updates in componentDidUpdate.\n\n' + 'Check the render method of %s.', getComponentName(current.type) || 'Unknown');
     }
     var update = createUpdate(expirationTime);
     // Caution: React DevTools currently depends on this property
@@ -20698,18 +20672,17 @@ function updateContainerAtExpirationTime(element, container, parentComponent, ex
     // TODO: If this is a nested container, this won't be the root.
     var current$$1 = container.current;
 
-    {// fiber debugtool 对于普通开发者无用 https://github.com/facebook/react/pull/8033
-        if (ReactFiberInstrumentation_1.debugTool) {
-            if (current$$1.alternate === null) {
-                ReactFiberInstrumentation_1.debugTool.onMountContainer(container);
-            } else if (element === null) {
-                ReactFiberInstrumentation_1.debugTool.onUnmountContainer(container);
-            } else {
-                ReactFiberInstrumentation_1.debugTool.onUpdateContainer(container);
-            }
-        }
-    }
-
+    // fiber debugtool 对于普通开发者无用 https://github.com/facebook/react/pull/8033
+    // if (ReactFiberInstrumentation_1.debugTool) {
+    //     if (current$$1.alternate === null) {
+    //         ReactFiberInstrumentation_1.debugTool.onMountContainer(container);
+    //     } else if (element === null) {
+    //         ReactFiberInstrumentation_1.debugTool.onUnmountContainer(container);
+    //     } else {
+    //         ReactFiberInstrumentation_1.debugTool.onUpdateContainer(container);
+    //     }
+    // }
+    // 应该就是获取父fiber上的任务
     var context = getContextForSubtree(parentComponent); // {}
     if (container.context === null) {
         container.context = context;
@@ -20772,8 +20745,8 @@ function findHostInstanceWithWarning(component, methodName) {
  * current属性的值是一个 fiber
  * containerInfo的值就是container
  */
-function createContainer(containerInfo, isConcurrent, hydrate) {
-    return createFiberRoot(containerInfo, isConcurrent, hydrate);
+function createContainer(container, isConcurrent, hydrate) {
+    return createFiberRoot(container, isConcurrent, hydrate);
 }
 // @caller ReactRoot new ReactRoot().render
 /**
@@ -20840,30 +20813,6 @@ var overrideProps = null;
     };
 }
 
-function injectIntoDevTools(devToolsConfig) {
-    var findFiberByHostInstance = devToolsConfig.findFiberByHostInstance;
-    var ReactCurrentDispatcher = ReactSharedInternals.ReactCurrentDispatcher;
-
-
-    return injectInternals(_assign({}, devToolsConfig, {
-        overrideProps: overrideProps,
-        currentDispatcherRef: ReactCurrentDispatcher,
-        findHostInstanceByFiber: function (fiber) {
-            var hostFiber = findCurrentHostFiber(fiber);
-            if (hostFiber === null) {
-                return null;
-            }
-            return hostFiber.stateNode;
-        },
-        findFiberByHostInstance: function (instance) {
-            if (!findFiberByHostInstance) {
-                // Might not be implemented by the renderer.
-                return null;
-            }
-            return findFiberByHostInstance(instance);
-        }
-    }));
-}
 
 // This file intentionally does *not* have the Flow annotation.
 // Don't add it. See `./inline-typed.js` for an explanation.
@@ -21098,9 +21047,7 @@ ReactRoot.prototype.render = function (children, callback) {
     var root = this._internalRoot;
     var work = new ReactWork();
     callback = callback === undefined ? null : callback;
-    {
-        warnOnInvalidCallback(callback, 'render');
-    }
+    warnOnInvalidCallback(callback, 'render');
     if (callback !== null) {
         work.then(callback);
     }
@@ -21197,14 +21144,9 @@ function getReactRootElementInContainer(container) {
     }
 }
 
-function shouldHydrateDueToLegacyHeuristic(container) {
-    var rootElement = getReactRootElementInContainer(container);
-    return !!(rootElement && rootElement.nodeType === ELEMENT_NODE && rootElement.hasAttribute(ROOT_ATTRIBUTE_NAME));
-}
 
 setBatchingImplementation(batchedUpdates$1, interactiveUpdates$1, flushInteractiveUpdates$1);
 
-var warnedAboutHydrateAPI = false;
 
 // @caller legacyRenderSubtreeIntoContainer
 /**
@@ -21212,35 +21154,38 @@ var warnedAboutHydrateAPI = false;
  * 返回 reactRoot
  */
 function legacyCreateRootFromDOMContainer(container, forceHydrate) {
-    var shouldHydrate = forceHydrate || shouldHydrateDueToLegacyHeuristic(container);
+    var shouldHydrate = false;
+    // var shouldHydrate = forceHydrate || shouldHydrateDueToLegacyHeuristic(container);
     // shouldHydrate 第一次mount时是false
     // First clear any existing content.
-    if (!shouldHydrate) {
-        var warned = false;
-        var rootSibling = undefined;
-        while (rootSibling = container.lastChild) {
-            {
-                if (!warned && rootSibling.nodeType === ELEMENT_NODE && rootSibling.hasAttribute(ROOT_ATTRIBUTE_NAME)) {
-                    warned = true;
-                    warningWithoutStack$1(false, 'render(): Target node has markup rendered by React, but there ' + 'are unrelated nodes as well. This is most commonly caused by ' + 'white-space inserted around server-rendered markup.');
-                }
+    // if (!shouldHydrate) {
+    var warned = false;
+    var rootSibling = undefined;
+    while (rootSibling = container.lastChild) {
+        {
+            if (!warned && rootSibling.nodeType === ELEMENT_NODE && rootSibling.hasAttribute(ROOT_ATTRIBUTE_NAME)) {
+                warned = true;
+                warningWithoutStack$1(false, 'render(): Target node has markup rendered by React, but there ' + 'are unrelated nodes as well. This is most commonly caused by ' + 'white-space inserted around server-rendered markup.');
             }
-            container.removeChild(rootSibling);
         }
+        container.removeChild(rootSibling);
     }
-    {
-        if (shouldHydrate && !forceHydrate && !warnedAboutHydrateAPI) {
-            warnedAboutHydrateAPI = true;
-            lowPriorityWarning$1(false, 'render(): Calling ReactDOM.render() to hydrate server-rendered markup ' + 'will stop working in React v17. Replace the ReactDOM.render() call ' + 'with ReactDOM.hydrate() if you want React to attach to the server HTML.');
-        }
-    }
+    // }
+    // {
+    //     if (shouldHydrate && !forceHydrate && !warnedAboutHydrateAPI) {
+    //         warnedAboutHydrateAPI = true;
+    //         lowPriorityWarning$1(false, 'render(): Calling ReactDOM.render() to hydrate server-rendered markup ' + 'will stop working in React v17. Replace the ReactDOM.render() call ' + 'with ReactDOM.hydrate() if you want React to attach to the server HTML.');
+    //     }
+    // }
     // Legacy roots are not async by default.
     // 同步的
     var isConcurrent = false;
     return new ReactRoot(container, isConcurrent, shouldHydrate);
 }
 
-//legacy 遗产？
+// legacy 遗产？ 以后可能会修改的api
+// 如果我们发现很多应用中必要的模式我们找不到一个完美的API，我们会提供一个临时欠佳的 API，只要以后可以移除它并且方便后续的优化。
+// forceHydrate ReactDOM.hydrate() 用于服务端渲染，暂时不管
 /**
  * 将虚拟节点渲染到 真实的 dom节点中
  */
@@ -21248,11 +21193,10 @@ function legacyRenderSubtreeIntoContainer(parentComponent, children, container, 
     // 对container 元素做一些检测，例如不能是 document.body 、不能已经作为container被使用过 
     topLevelUpdateWarnings(container);
 
-    // TODO: Without `any` type, Flow says "Property cannot be accessed on any
     // member of intersection type." Whyyyyyy.
     var root = container._reactRootContainer;
     if (!root) {
-        // Initial mount
+        // ReactDOM.render()执行这里
         root = container._reactRootContainer = legacyCreateRootFromDOMContainer(container, forceHydrate);
         if (typeof callback === 'function') {
             var originalCallback = callback;
@@ -21266,10 +21210,12 @@ function legacyRenderSubtreeIntoContainer(parentComponent, children, container, 
             if (parentComponent != null) {
                 root.legacy_renderSubtreeIntoContainer(parentComponent, children, callback);
             } else {
+                // ReactDOM.render() 走这里
                 root.render(children, callback);
             }
         });
     } else {
+        // ReactDOM.unmountComponentAtNode()执行这一步
         if (typeof callback === 'function') {
             var _originalCallback = callback;
             callback = function () {
@@ -21313,12 +21259,12 @@ var ReactDOM = {
         if (componentOrElement.nodeType === ELEMENT_NODE) {
             return componentOrElement;
         }
-        {
-            return findHostInstanceWithWarning(componentOrElement, 'findDOMNode');
-        }
-        return findHostInstance(componentOrElement);
+        return findHostInstanceWithWarning(componentOrElement, 'findDOMNode');
     },
 
+    /**
+     * ReactDOM.render()最终调用的是 new ReactRoot(container).render(children)
+     */
     render: function (element, container, callback) {
         !isValidContainer(container) ? invariant(false, 'Target container is not a DOM element.') : undefined;
 
@@ -21385,25 +21331,6 @@ if (enableStableConcurrentModeAPIs) {
     ReactDOM.unstable_createRoot = undefined;
 }
 
-var foundDevTools = injectIntoDevTools({
-    findFiberByHostInstance: getClosestInstanceFromNode,
-    bundleType: 1,
-    version: ReactVersion,
-    rendererPackageName: 'react-dom'
-});
-
-{
-    if (!foundDevTools && canUseDOM && window.top === window.self) {
-        // If we're in Chrome or Firefox, provide a download link if not installed.
-        if (navigator.userAgent.indexOf('Chrome') > -1 && navigator.userAgent.indexOf('Edge') === -1 || navigator.userAgent.indexOf('Firefox') > -1) {
-            var protocol = window.location.protocol;
-            // Don't warn in exotic cases like chrome-extension://.
-            if (/^(https?|file):$/.test(protocol)) {
-                console.info('%cDownload the React DevTools ' + 'for a better development experience: ' + 'https://fb.me/react-devtools' + (protocol === 'file:' ? '\nYou might need to use a local HTTP server (instead of file://): ' + 'https://fb.me/react-devtools-faq' : ''), 'font-weight:bold');
-            }
-        }
-    }
-}
 
 
 export default ReactDOM;

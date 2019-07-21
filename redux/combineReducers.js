@@ -65,6 +65,7 @@ function getUnexpectedStateShapeWarningMessage(
 function assertReducerShape(reducers) {
   Object.keys(reducers).forEach(key => {
     const reducer = reducers[key]
+
     const initialState = reducer(undefined, { type: ActionTypes.INIT })
 
     if (typeof initialState === 'undefined') {
@@ -140,6 +141,8 @@ export default function combineReducers(reducers) {
 
   let shapeAssertionError
   try {
+    console.log(112312123)
+
     assertReducerShape(finalReducers)
   } catch (e) {
     shapeAssertionError = e
