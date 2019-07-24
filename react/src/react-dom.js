@@ -3125,7 +3125,10 @@ var warnAboutDeprecatedLifecycles = false;
 // Gather advanced timing metrics for Profiler subtrees.
 var enableProfilerTimer = true;
 
-// Trace which interactions trigger each commit.
+/**
+ * Trace which interactions trigger each commit.
+ * 跟踪每次commit时的interactions trigger, 始终为 true
+ */
 var enableSchedulerTracing = true;
 
 // Only used in www builds.
@@ -16166,6 +16169,7 @@ function appendUpdateToQueue(queue, update) {
 // @caller scheduleRootUpdate
 function enqueueUpdate(fiber, update) {
     // Update queues are created lazily.
+    // 更新队列是延迟创建的。
     var alternate = fiber.alternate;
     var queue1 = undefined;
     var queue2 = undefined;
@@ -16218,11 +16222,9 @@ function enqueueUpdate(fiber, update) {
         }
     }
 
-    {
-        if (fiber.tag === ClassComponent && (currentlyProcessingQueue === queue1 || queue2 !== null && currentlyProcessingQueue === queue2) && !didWarnUpdateInsideUpdate) {
-            warningWithoutStack$1(false, 'An update (setState, replaceState, or forceUpdate) was scheduled ' + 'from inside an update function. Update functions should be pure, ' + 'with zero side-effects. Consider using componentDidUpdate or a ' + 'callback.');
-            didWarnUpdateInsideUpdate = true;
-        }
+    if (fiber.tag === ClassComponent && (currentlyProcessingQueue === queue1 || queue2 !== null && currentlyProcessingQueue === queue2) && !didWarnUpdateInsideUpdate) {
+        warningWithoutStack$1(false, 'An update (setState, replaceState, or forceUpdate) was scheduled ' + 'from inside an update function. Update functions should be pure, ' + 'with zero side-effects. Consider using componentDidUpdate or a ' + 'callback.');
+        didWarnUpdateInsideUpdate = true;
     }
 }
 
@@ -19879,6 +19881,7 @@ function scheduleWorkToRoot(fiber, expirationTime) {
         }
     }
 
+    // 始终为true
     if (enableSchedulerTracing) {
         if (root !== null) {
             var interactions = tracing.__interactionsRef.current;
@@ -19928,18 +19931,16 @@ function scheduleWork(fiber, expirationTime) {
     var root = scheduleWorkToRoot(fiber, expirationTime);
 
     if (root === null) {
-        {
-            switch (fiber.tag) {
-                case ClassComponent:
-                    warnAboutUpdateOnUnmounted(fiber, true);
-                    break;
-                case FunctionComponent:
-                case ForwardRef:
-                case MemoComponent:
-                case SimpleMemoComponent:
-                    warnAboutUpdateOnUnmounted(fiber, false);
-                    break;
-            }
+        switch (fiber.tag) {
+            case ClassComponent:
+                warnAboutUpdateOnUnmounted(fiber, true);
+                break;
+            case FunctionComponent:
+            case ForwardRef:
+            case MemoComponent:
+            case SimpleMemoComponent:
+                warnAboutUpdateOnUnmounted(fiber, false);
+                break;
         }
         return;
     }
@@ -21268,9 +21269,7 @@ var ReactDOM = {
     render: function (element, container, callback) {
         !isValidContainer(container) ? invariant(false, 'Target container is not a DOM element.') : undefined;
 
-        {
-            !!container._reactHasBeenPassedToCreateRootDEV ? warningWithoutStack$1(false, 'You are calling ReactDOM.render() on a container that was previously ' + 'passed to ReactDOM.%s(). This is not supported. ' + 'Did you mean to call root.render(element)?', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : undefined;
-        }
+        !!container._reactHasBeenPassedToCreateRootDEV ? warningWithoutStack$1(false, 'You are calling ReactDOM.render() on a container that was previously ' + 'passed to ReactDOM.%s(). This is not supported. ' + 'Did you mean to call root.render(element)?', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : undefined;
         // 将虚拟节点渲染到 真实的 dom节点中
         return legacyRenderSubtreeIntoContainer(null, element, container, false, callback);
     },
