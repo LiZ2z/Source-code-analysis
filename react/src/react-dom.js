@@ -2,7 +2,7 @@ var React = require('react');
 var _assign = require('object-assign');
 var checkPropTypes = require('prop-types/checkPropTypes');
 var scheduler = require('./scheduler');
-var tracing = require('scheduler/tracing');
+var tracing = require('./scheduler-tacing');
 
 /**
  * Use invariant() to assert state which your program assumes to be true.
@@ -45,7 +45,6 @@ function invariant(condition, format, a, b, c, d, e, f) {
 // Relying on the `invariant()` implementation lets us
 // preserve the format and params in the www builds.
 
-!React ? invariant(false, 'ReactDOM was loaded before React. Make sure you load the React package before loading ReactDOM.') : undefined;
 
 var invokeGuardedCallbackImpl = function (name, func, context, a, b, c, d, e, f) {
     var funcArgs = Array.prototype.slice.call(arguments, 3);
@@ -56,148 +55,146 @@ var invokeGuardedCallbackImpl = function (name, func, context, a, b, c, d, e, f)
     }
 };
 
-{
-    // In DEV mode, we swap out invokeGuardedCallback for a special version
-    // that plays more nicely with the browser's DevTools. The idea is to preserve
-    // "Pause on exceptions" behavior. Because React wraps all user-provided
-    // functions in invokeGuardedCallback, and the production version of
-    // invokeGuardedCallback uses a try-catch, all user exceptions are treated
-    // like caught exceptions, and the DevTools won't pause unless the developer
-    // takes the extra step of enabling pause on caught exceptions. This is
-    // unintuitive, though, because even though React has caught the error, from
-    // the developer's perspective, the error is uncaught.
-    //
-    // To preserve the expected "Pause on exceptions" behavior, we don't use a
-    // try-catch in DEV. Instead, we synchronously dispatch a fake event to a fake
-    // DOM node, and call the user-provided callback from inside an event handler
-    // for that fake event. If the callback throws, the error is "captured" using
-    // a global event handler. But because the error happens in a different
-    // event loop context, it does not interrupt the normal program flow.
-    // Effectively, this gives us try-catch behavior without actually using
-    // try-catch. Neat!
+// In DEV mode, we swap out invokeGuardedCallback for a special version
+// that plays more nicely with the browser's DevTools. The idea is to preserve
+// "Pause on exceptions" behavior. Because React wraps all user-provided
+// functions in invokeGuardedCallback, and the production version of
+// invokeGuardedCallback uses a try-catch, all user exceptions are treated
+// like caught exceptions, and the DevTools won't pause unless the developer
+// takes the extra step of enabling pause on caught exceptions. This is
+// unintuitive, though, because even though React has caught the error, from
+// the developer's perspective, the error is uncaught.
+//
+// To preserve the expected "Pause on exceptions" behavior, we don't use a
+// try-catch in DEV. Instead, we synchronously dispatch a fake event to a fake
+// DOM node, and call the user-provided callback from inside an event handler
+// for that fake event. If the callback throws, the error is "captured" using
+// a global event handler. But because the error happens in a different
+// event loop context, it does not interrupt the normal program flow.
+// Effectively, this gives us try-catch behavior without actually using
+// try-catch. Neat!
 
-    // Check that the browser supports the APIs we need to implement our special
-    // DEV version of invokeGuardedCallback
-    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof document !== 'undefined' && typeof document.createEvent === 'function') {
-        var fakeNode = document.createElement('react');
+// Check that the browser supports the APIs we need to implement our special
+// DEV version of invokeGuardedCallback
+if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof document !== 'undefined' && typeof document.createEvent === 'function') {
+    var fakeNode = document.createElement('react');
 
-        var invokeGuardedCallbackDev = function (name, func, context, a, b, c, d, e, f) {
-            // If document doesn't exist we know for sure we will crash in this method
-            // when we call document.createEvent(). However this can cause confusing
-            // errors: https://github.com/facebookincubator/create-react-app/issues/3482
-            // So we preemptively throw with a better message instead.
-            !(typeof document !== 'undefined') ? invariant(false, 'The `document` global was defined when React was initialized, but is not defined anymore. This can happen in a test environment if a component schedules an update from an asynchronous callback, but the test has already finished running. To solve this, you can either unmount the component at the end of your test (and ensure that any asynchronous operations get canceled in `componentWillUnmount`), or you can change the test itself to be asynchronous.') : undefined;
-            var evt = document.createEvent('Event');
+    var invokeGuardedCallbackDev = function (name, func, context, a, b, c, d, e, f) {
+        // If document doesn't exist we know for sure we will crash in this method
+        // when we call document.createEvent(). However this can cause confusing
+        // errors: https://github.com/facebookincubator/create-react-app/issues/3482
+        // So we preemptively throw with a better message instead.
+        !(typeof document !== 'undefined') ? invariant(false, 'The `document` global was defined when React was initialized, but is not defined anymore. This can happen in a test environment if a component schedules an update from an asynchronous callback, but the test has already finished running. To solve this, you can either unmount the component at the end of your test (and ensure that any asynchronous operations get canceled in `componentWillUnmount`), or you can change the test itself to be asynchronous.') : undefined;
+        var evt = document.createEvent('Event');
 
-            // Keeps track of whether the user-provided callback threw an error. We
-            // set this to true at the beginning, then set it to false right after
-            // calling the function. If the function errors, `didError` will never be
-            // set to false. This strategy works even if the browser is flaky and
-            // fails to call our global error handler, because it doesn't rely on
-            // the error event at all.
-            var didError = true;
+        // Keeps track of whether the user-provided callback threw an error. We
+        // set this to true at the beginning, then set it to false right after
+        // calling the function. If the function errors, `didError` will never be
+        // set to false. This strategy works even if the browser is flaky and
+        // fails to call our global error handler, because it doesn't rely on
+        // the error event at all.
+        var didError = true;
 
-            // Keeps track of the value of window.event so that we can reset it
-            // during the callback to let user code access window.event in the
-            // browsers that support it.
-            var windowEvent = window.event;
+        // Keeps track of the value of window.event so that we can reset it
+        // during the callback to let user code access window.event in the
+        // browsers that support it.
+        var windowEvent = window.event;
 
-            // Keeps track of the descriptor of window.event to restore it after event
-            // dispatching: https://github.com/facebook/react/issues/13688
-            var windowEventDescriptor = Object.getOwnPropertyDescriptor(window, 'event');
+        // Keeps track of the descriptor of window.event to restore it after event
+        // dispatching: https://github.com/facebook/react/issues/13688
+        var windowEventDescriptor = Object.getOwnPropertyDescriptor(window, 'event');
 
-            // Create an event handler for our fake event. We will synchronously
-            // dispatch our fake event using `dispatchEvent`. Inside the handler, we
-            // call the user-provided callback.
-            var funcArgs = Array.prototype.slice.call(arguments, 3);
+        // Create an event handler for our fake event. We will synchronously
+        // dispatch our fake event using `dispatchEvent`. Inside the handler, we
+        // call the user-provided callback.
+        var funcArgs = Array.prototype.slice.call(arguments, 3);
 
-            function callCallback() {
-                // We immediately remove the callback from event listeners so that
-                // nested `invokeGuardedCallback` calls do not clash. Otherwise, a
-                // nested call would trigger the fake event handlers of any call higher
-                // in the stack.
-                fakeNode.removeEventListener(evtType, callCallback, false);
+        function callCallback() {
+            // We immediately remove the callback from event listeners so that
+            // nested `invokeGuardedCallback` calls do not clash. Otherwise, a
+            // nested call would trigger the fake event handlers of any call higher
+            // in the stack.
+            fakeNode.removeEventListener(evtType, callCallback, false);
 
-                // We check for window.hasOwnProperty('event') to prevent the
-                // window.event assignment in both IE <= 10 as they throw an error
-                // "Member not found" in strict mode, and in Firefox which does not
-                // support window.event.
-                if (typeof window.event !== 'undefined' && window.hasOwnProperty('event')) {
-                    window.event = windowEvent;
-                }
-
-                func.apply(context, funcArgs);
-                didError = false;
+            // We check for window.hasOwnProperty('event') to prevent the
+            // window.event assignment in both IE <= 10 as they throw an error
+            // "Member not found" in strict mode, and in Firefox which does not
+            // support window.event.
+            if (typeof window.event !== 'undefined' && window.hasOwnProperty('event')) {
+                window.event = windowEvent;
             }
 
-            // Create a global error event handler. We use this to capture the value
-            // that was thrown. It's possible that this error handler will fire more
-            // than once; for example, if non-React code also calls `dispatchEvent`
-            // and a handler for that event throws. We should be resilient to most of
-            // those cases. Even if our error event handler fires more than once, the
-            // last error event is always used. If the callback actually does error,
-            // we know that the last error event is the correct one, because it's not
-            // possible for anything else to have happened in between our callback
-            // erroring and the code that follows the `dispatchEvent` call below. If
-            // the callback doesn't error, but the error event was fired, we know to
-            // ignore it because `didError` will be false, as described above.
-            var error = undefined;
-            // Use this to track whether the error event is ever called.
-            var didSetError = false;
-            var isCrossOriginError = false;
+            func.apply(context, funcArgs);
+            didError = false;
+        }
 
-            function handleWindowError(event) {
-                error = event.error;
-                didSetError = true;
-                if (error === null && event.colno === 0 && event.lineno === 0) {
-                    isCrossOriginError = true;
-                }
-                if (event.defaultPrevented) {
-                    // Some other error handler has prevented default.
-                    // Browsers silence the error report if this happens.
-                    // We'll remember this to later decide whether to log it or not.
-                    if (error != null && typeof error === 'object') {
-                        try {
-                            error._suppressLogging = true;
-                        } catch (inner) {
-                            // Ignore.
-                        }
+        // Create a global error event handler. We use this to capture the value
+        // that was thrown. It's possible that this error handler will fire more
+        // than once; for example, if non-React code also calls `dispatchEvent`
+        // and a handler for that event throws. We should be resilient to most of
+        // those cases. Even if our error event handler fires more than once, the
+        // last error event is always used. If the callback actually does error,
+        // we know that the last error event is the correct one, because it's not
+        // possible for anything else to have happened in between our callback
+        // erroring and the code that follows the `dispatchEvent` call below. If
+        // the callback doesn't error, but the error event was fired, we know to
+        // ignore it because `didError` will be false, as described above.
+        var error = undefined;
+        // Use this to track whether the error event is ever called.
+        var didSetError = false;
+        var isCrossOriginError = false;
+
+        function handleWindowError(event) {
+            error = event.error;
+            didSetError = true;
+            if (error === null && event.colno === 0 && event.lineno === 0) {
+                isCrossOriginError = true;
+            }
+            if (event.defaultPrevented) {
+                // Some other error handler has prevented default.
+                // Browsers silence the error report if this happens.
+                // We'll remember this to later decide whether to log it or not.
+                if (error != null && typeof error === 'object') {
+                    try {
+                        error._suppressLogging = true;
+                    } catch (inner) {
+                        // Ignore.
                     }
                 }
             }
+        }
 
-            // Create a fake event type.
-            var evtType = 'react-' + (name ? name : 'invokeguardedcallback');
+        // Create a fake event type.
+        var evtType = 'react-' + (name ? name : 'invokeguardedcallback');
 
-            // Attach our event handlers
-            window.addEventListener('error', handleWindowError);
-            fakeNode.addEventListener(evtType, callCallback, false);
+        // Attach our event handlers
+        window.addEventListener('error', handleWindowError);
+        fakeNode.addEventListener(evtType, callCallback, false);
 
-            // Synchronously dispatch our fake event. If the user-provided function
-            // errors, it will trigger our global error handler.
-            evt.initEvent(evtType, false, false);
-            fakeNode.dispatchEvent(evt);
+        // Synchronously dispatch our fake event. If the user-provided function
+        // errors, it will trigger our global error handler.
+        evt.initEvent(evtType, false, false);
+        fakeNode.dispatchEvent(evt);
 
-            if (windowEventDescriptor) {
-                Object.defineProperty(window, 'event', windowEventDescriptor);
+        if (windowEventDescriptor) {
+            Object.defineProperty(window, 'event', windowEventDescriptor);
+        }
+
+        if (didError) {
+            if (!didSetError) {
+                // The callback errored, but the error event never fired.
+                error = new Error('An error was thrown inside one of your components, but React ' + "doesn't know what it was. This is likely due to browser " + 'flakiness. React does its best to preserve the "Pause on ' + 'exceptions" behavior of the DevTools, which requires some ' + "DEV-mode only tricks. It's possible that these don't work in " + 'your browser. Try triggering the error in production mode, ' + 'or switching to a modern browser. If you suspect that this is ' + 'actually an issue with React, please file an issue.');
+            } else if (isCrossOriginError) {
+                error = new Error("A cross-origin error was thrown. React doesn't have access to " + 'the actual error object in development. ' + 'See https://fb.me/react-crossorigin-error for more information.');
             }
+            this.onError(error);
+        }
 
-            if (didError) {
-                if (!didSetError) {
-                    // The callback errored, but the error event never fired.
-                    error = new Error('An error was thrown inside one of your components, but React ' + "doesn't know what it was. This is likely due to browser " + 'flakiness. React does its best to preserve the "Pause on ' + 'exceptions" behavior of the DevTools, which requires some ' + "DEV-mode only tricks. It's possible that these don't work in " + 'your browser. Try triggering the error in production mode, ' + 'or switching to a modern browser. If you suspect that this is ' + 'actually an issue with React, please file an issue.');
-                } else if (isCrossOriginError) {
-                    error = new Error("A cross-origin error was thrown. React doesn't have access to " + 'the actual error object in development. ' + 'See https://fb.me/react-crossorigin-error for more information.');
-                }
-                this.onError(error);
-            }
+        // Remove our event listeners
+        window.removeEventListener('error', handleWindowError);
+    };
 
-            // Remove our event listeners
-            window.removeEventListener('error', handleWindowError);
-        };
-
-        invokeGuardedCallbackImpl = invokeGuardedCallbackDev;
-    }
+    invokeGuardedCallbackImpl = invokeGuardedCallbackDev;
 }
 
 var invokeGuardedCallbackImpl$1 = invokeGuardedCallbackImpl;
@@ -9329,13 +9326,11 @@ function recordEffect() {
 }
 // @caller scheduleWorkToRoot
 function recordScheduleUpdate() {
-    if (enableUserTimingAPI) {
-        if (isCommitting) {
-            hasScheduledUpdateInCurrentCommit = true;
-        }
-        if (currentPhase !== null && currentPhase !== 'componentWillMount' && currentPhase !== 'componentWillReceiveProps') {
-            hasScheduledUpdateInCurrentPhase = true;
-        }
+    if (isCommitting) {
+        hasScheduledUpdateInCurrentCommit = true;
+    }
+    if (currentPhase !== null && currentPhase !== 'componentWillMount' && currentPhase !== 'componentWillReceiveProps') {
+        hasScheduledUpdateInCurrentPhase = true;
     }
 }
 
@@ -13509,14 +13504,13 @@ function updateMemo(nextCreate, deps) {
 // is called outside of a batchedUpdates/TestUtils.act(...) call.
 var shouldWarnForUnbatchedSetState = false;
 
-{
-    // jest isn't a 'global', it's just exposed to tests via a wrapped function
-    // further, this isn't a test file, so flow doesn't recognize the symbol. So...
-    // $FlowExpectedError - because requirements don't give a damn about your type sigs.
-    if ('undefined' !== typeof jest) {
-        shouldWarnForUnbatchedSetState = true;
-    }
+// jest isn't a 'global', it's just exposed to tests via a wrapped function
+// further, this isn't a test file, so flow doesn't recognize the symbol. So...
+// $FlowExpectedError - because requirements don't give a damn about your type sigs.
+if ('undefined' !== typeof jest) {
+    shouldWarnForUnbatchedSetState = true;
 }
+
 
 function dispatchAction(fiber, queue, action) {
     !(numberOfReRenders < RE_RENDER_LIMIT) ? invariant(false, 'Too many re-renders. React limits the number of renders to prevent an infinite loop.') : undefined;
@@ -18004,13 +17998,8 @@ function commitWork(current$$1, finishedWork) {
                 return;
             }
         case HostRoot:
-            {
-                return;
-            }
         case Profiler:
-            {
-                return;
-            }
+            return;
         case SuspenseComponent:
             {
                 var newState = finishedWork.memoizedState;
@@ -19881,36 +19870,33 @@ function scheduleWorkToRoot(fiber, expirationTime) {
         }
     }
 
-    // 始终为true
-    if (enableSchedulerTracing) {
-        if (root !== null) {
-            var interactions = tracing.__interactionsRef.current;
-            if (interactions.size > 0) {
-                var pendingInteractionMap = root.pendingInteractionMap;
-                var pendingInteractions = pendingInteractionMap.get(expirationTime);
-                if (pendingInteractions != null) {
-                    interactions.forEach(function (interaction) {
-                        if (!pendingInteractions.has(interaction)) {
-                            // Update the pending async work count for previously unscheduled interaction.
-                            interaction.__count++;
-                        }
-
-                        pendingInteractions.add(interaction);
-                    });
-                } else {
-                    pendingInteractionMap.set(expirationTime, new Set(interactions));
-
-                    // Update the pending async work count for the current interactions.
-                    interactions.forEach(function (interaction) {
+    if (root !== null) {
+        var interactions = tracing.__interactionsRef.current;
+        if (interactions.size > 0) {
+            var pendingInteractionMap = root.pendingInteractionMap;
+            var pendingInteractions = pendingInteractionMap.get(expirationTime);
+            if (pendingInteractions != null) {
+                interactions.forEach(function (interaction) {
+                    if (!pendingInteractions.has(interaction)) {
+                        // Update the pending async work count for previously unscheduled interaction.
                         interaction.__count++;
-                    });
-                }
+                    }
 
-                var subscriber = tracing.__subscriberRef.current;
-                if (subscriber !== null) {
-                    var threadID = computeThreadID(expirationTime, root.interactionThreadID);
-                    subscriber.onWorkScheduled(interactions, threadID);
-                }
+                    pendingInteractions.add(interaction);
+                });
+            } else {
+                pendingInteractionMap.set(expirationTime, new Set(interactions));
+
+                // Update the pending async work count for the current interactions.
+                interactions.forEach(function (interaction) {
+                    interaction.__count++;
+                });
+            }
+
+            var subscriber = tracing.__subscriberRef.current;
+            if (subscriber !== null) {
+                var threadID = computeThreadID(expirationTime, root.interactionThreadID);
+                subscriber.onWorkScheduled(interactions, threadID);
             }
         }
     }
@@ -19918,10 +19904,8 @@ function scheduleWorkToRoot(fiber, expirationTime) {
 }
 
 function warnIfNotCurrentlyBatchingInDev(fiber) {
-    {
-        if (isRendering === false && isBatchingUpdates === false) {
-            warningWithoutStack$1(false, 'An update to %s inside a test was not wrapped in act(...).\n\n' + 'When testing, code that causes React state updates should be wrapped into act(...):\n\n' + 'act(() => {\n' + '  /* fire events that update state */\n' + '});\n' + '/* assert on the output */\n\n' + "This ensures that you're testing the behavior the user would see in the browser." + ' Learn more at https://fb.me/react-wrap-tests-with-act' + '%s', getComponentName(fiber.type), getStackByFiberInDevAndProd(fiber));
-        }
+    if (isRendering === false && isBatchingUpdates === false) {
+        warningWithoutStack$1(false, 'An update to %s inside a test was not wrapped in act(...).\n\n' + 'When testing, code that causes React state updates should be wrapped into act(...):\n\n' + 'act(() => {\n' + '  /* fire events that update state */\n' + '});\n' + '/* assert on the output */\n\n' + "This ensures that you're testing the behavior the user would see in the browser." + ' Learn more at https://fb.me/react-wrap-tests-with-act' + '%s', getComponentName(fiber.type), getStackByFiberInDevAndProd(fiber));
     }
 }
 // @caller scheduleRootUpdate
@@ -20152,12 +20136,15 @@ function requestCurrentTime() {
 
 // requestWork is called by the scheduler whenever a root receives an update.
 // It's up to the renderer to call renderRoot at some point in the future.
+// 只要root收到更新，调度程序就会调用requestWork。
+// 在将来的某个时间点，由渲染器调用renderRoot。
 function requestWork(root, expirationTime) {
 
     addRootToSchedule(root, expirationTime);
     if (isRendering) {
         // Prevent reentrancy. Remaining work will be scheduled at the end of
         // the currently rendering batch.
+        // 防止重入。剩余的工作将安排在当前渲染批处理结束时。
         return;
     }
 
@@ -20396,13 +20383,18 @@ function finishRendering() {
     }
 }
 
+/**
+ * 渲染，进入渲染阶段
+ */
 function performWorkOnRoot(root, expirationTime, isYieldy) {
+    // 以递归方式调用了Performance WorkOnRoot。此错误可能是由REACT中的错误引起的。请提出问题。
     !!isRendering ? invariant(false, 'performWorkOnRoot was called recursively. This error is likely caused by a bug in React. Please file an issue.') : undefined;
 
     isRendering = true;
 
     // Check if this is async work or sync/expired work.
     if (!isYieldy) {
+        // 同步渲染
         // Flush work without yielding.
         // TODO: Non-yieldy work does not necessarily imply expired work. A renderer
         // may want to perform some work without yielding, but also without
@@ -20410,9 +20402,11 @@ function performWorkOnRoot(root, expirationTime, isYieldy) {
 
         var finishedWork = root.finishedWork;
         if (finishedWork !== null) {
+            // root 上的工作已经全部完成，可以 commit
             // This root is already complete. We can commit it.
             completeRoot(root, finishedWork, expirationTime);
         } else {
+            // 开始渲染
             root.finishedWork = null;
             // If this root previously suspended, clear its existing timeout, since
             // we're about to try rendering again.
