@@ -15543,6 +15543,10 @@ function bailoutOnAlreadyFinishedWork(current$$1, workInProgress, renderExpirati
     }
 }
 
+/**
+ * ! important 
+ * 真正的开始 渲染工作
+ */
 function beginWork(current$$1, workInProgress, renderExpirationTime) {
     var updateExpirationTime = workInProgress.expirationTime;
 
@@ -15553,6 +15557,8 @@ function beginWork(current$$1, workInProgress, renderExpirationTime) {
         if (oldProps !== newProps || hasContextChanged()) {
             // If props or context changed, mark the fiber as having performed work.
             // This may be unset if the props are determined to be equal later (memo).
+            // 如果props或者context改变了，将这个fiber标记为有 （已完成的工作） 待执行的工作
+            // 如果后面 props 确认相等了，这个工作可以取消
             didReceiveUpdate = true;
         } else if (updateExpirationTime < renderExpirationTime) {
             didReceiveUpdate = false;
@@ -15568,65 +15574,57 @@ function beginWork(current$$1, workInProgress, renderExpirationTime) {
                     pushHostContext(workInProgress);
                     break;
                 case ClassComponent:
-                    {
-                        var Component = workInProgress.type;
-                        if (isContextProvider(Component)) {
-                            pushContextProvider(workInProgress);
-                        }
-                        break;
+                    var Component = workInProgress.type;
+                    if (isContextProvider(Component)) {
+                        pushContextProvider(workInProgress);
                     }
+                    break;
                 case HostPortal:
                     pushHostContainer(workInProgress, workInProgress.stateNode.containerInfo);
                     break;
                 case ContextProvider:
-                    {
-                        var newValue = workInProgress.memoizedProps.value;
-                        pushProvider(workInProgress, newValue);
-                        break;
-                    }
+                    var newValue = workInProgress.memoizedProps.value;
+                    pushProvider(workInProgress, newValue);
+                    break;
                 case Profiler:
                     if (enableProfilerTimer) {
                         workInProgress.effectTag |= Update;
                     }
                     break;
                 case SuspenseComponent:
-                    {
-                        var state = workInProgress.memoizedState;
-                        var didTimeout = state !== null;
-                        if (didTimeout) {
-                            // If this boundary is currently timed out, we need to decide
-                            // whether to retry the primary children, or to skip over it and
-                            // go straight to the fallback. Check the priority of the primary
-                            var primaryChildFragment = workInProgress.child;
-                            var primaryChildExpirationTime = primaryChildFragment.childExpirationTime;
-                            if (primaryChildExpirationTime !== NoWork && primaryChildExpirationTime >= renderExpirationTime) {
-                                // The primary children have pending work. Use the normal path
-                                // to attempt to render the primary children again.
-                                return updateSuspenseComponent(current$$1, workInProgress, renderExpirationTime);
+                    var state = workInProgress.memoizedState;
+                    var didTimeout = state !== null;
+                    if (didTimeout) {
+                        // If this boundary is currently timed out, we need to decide
+                        // whether to retry the primary children, or to skip over it and
+                        // go straight to the fallback. Check the priority of the primary
+                        var primaryChildFragment = workInProgress.child;
+                        var primaryChildExpirationTime = primaryChildFragment.childExpirationTime;
+                        if (primaryChildExpirationTime !== NoWork && primaryChildExpirationTime >= renderExpirationTime) {
+                            // The primary children have pending work. Use the normal path
+                            // to attempt to render the primary children again.
+                            return updateSuspenseComponent(current$$1, workInProgress, renderExpirationTime);
+                        } else {
+                            // The primary children do not have pending work with sufficient
+                            // priority. Bailout.
+                            var child = bailoutOnAlreadyFinishedWork(current$$1, workInProgress, renderExpirationTime);
+                            if (child !== null) {
+                                // The fallback children have pending work. Skip over the
+                                // primary children and work on the fallback.
+                                return child.sibling;
                             } else {
-                                // The primary children do not have pending work with sufficient
-                                // priority. Bailout.
-                                var child = bailoutOnAlreadyFinishedWork(current$$1, workInProgress, renderExpirationTime);
-                                if (child !== null) {
-                                    // The fallback children have pending work. Skip over the
-                                    // primary children and work on the fallback.
-                                    return child.sibling;
-                                } else {
-                                    return null;
-                                }
+                                return null;
                             }
                         }
-                        break;
                     }
+                    break;
                 case DehydratedSuspenseComponent:
-                    {
-                        if (enableSuspenseServerRenderer) {
-                            // We know that this component will suspend again because if it has
-                            // been unsuspended it has committed as a regular Suspense component.
-                            // If it needs to be retried, it should have work scheduled on it.
-                            workInProgress.effectTag |= DidCapture;
-                            break;
-                        }
+                    if (enableSuspenseServerRenderer) {
+                        // We know that this component will suspend again because if it has
+                        // been unsuspended it has committed as a regular Suspense component.
+                        // If it needs to be retried, it should have work scheduled on it.
+                        workInProgress.effectTag |= DidCapture;
+                        break;
                     }
             }
             return bailoutOnAlreadyFinishedWork(current$$1, workInProgress, renderExpirationTime);
@@ -15756,15 +15754,11 @@ function resetContextDependences() {
 }
 
 function enterDisallowedContextReadInDEV() {
-    {
-        isDisallowedContextReadInDEV = true;
-    }
+    isDisallowedContextReadInDEV = true;
 }
 
 function exitDisallowedContextReadInDEV() {
-    {
-        isDisallowedContextReadInDEV = false;
-    }
+    isDisallowedContextReadInDEV = false;
 }
 
 function pushProvider(providerFiber, nextValue) {
@@ -15774,18 +15768,14 @@ function pushProvider(providerFiber, nextValue) {
         push(valueCursor, context._currentValue, providerFiber);
 
         context._currentValue = nextValue;
-        {
-            !(context._currentRenderer === undefined || context._currentRenderer === null || context._currentRenderer === rendererSigil) ? warningWithoutStack$1(false, 'Detected multiple renderers concurrently rendering the ' + 'same context provider. This is currently unsupported.') : undefined;
-            context._currentRenderer = rendererSigil;
-        }
+        !(context._currentRenderer === undefined || context._currentRenderer === null || context._currentRenderer === rendererSigil) ? warningWithoutStack$1(false, 'Detected multiple renderers concurrently rendering the ' + 'same context provider. This is currently unsupported.') : undefined;
+        context._currentRenderer = rendererSigil;
     } else {
         push(valueCursor, context._currentValue2, providerFiber);
 
         context._currentValue2 = nextValue;
-        {
-            !(context._currentRenderer2 === undefined || context._currentRenderer2 === null || context._currentRenderer2 === rendererSigil) ? warningWithoutStack$1(false, 'Detected multiple renderers concurrently rendering the ' + 'same context provider. This is currently unsupported.') : undefined;
-            context._currentRenderer2 = rendererSigil;
-        }
+        !(context._currentRenderer2 === undefined || context._currentRenderer2 === null || context._currentRenderer2 === rendererSigil) ? warningWithoutStack$1(false, 'Detected multiple renderers concurrently rendering the ' + 'same context provider. This is currently unsupported.') : undefined;
+        context._currentRenderer2 = rendererSigil;
     }
 }
 
@@ -18629,10 +18619,10 @@ function resetStack() {
         }
     }
 
-    {
-        ReactStrictModeWarnings.discardPendingWarnings();
-        checkThatStackIsEmpty();
-    }
+
+    ReactStrictModeWarnings.discardPendingWarnings();
+    checkThatStackIsEmpty();
+
 
     nextRoot = null;
     nextRenderExpirationTime = NoWork;
@@ -18643,9 +18633,9 @@ function resetStack() {
 
 function commitAllHostEffects() {
     while (nextEffect !== null) {
-        {
-            setCurrentFiber(nextEffect);
-        }
+
+        setCurrentFiber(nextEffect);
+
         recordEffect();
 
         var effectTag = nextEffect.effectTag;
@@ -18726,10 +18716,8 @@ function commitBeforeMutationLifecycles() {
 
         nextEffect = nextEffect.nextEffect;
     }
+    resetCurrentFiber();
 
-    {
-        resetCurrentFiber();
-    }
 }
 
 function commitAllLifeCycles(finishedRoot, committedExpirationTime) {
@@ -18742,9 +18730,7 @@ function commitAllLifeCycles(finishedRoot, committedExpirationTime) {
         }
     }
     while (nextEffect !== null) {
-        {
-            setCurrentFiber(nextEffect);
-        }
+        setCurrentFiber(nextEffect);
         var effectTag = nextEffect.effectTag;
 
         if (effectTag & (Update | Callback)) {
@@ -18764,9 +18750,7 @@ function commitAllLifeCycles(finishedRoot, committedExpirationTime) {
 
         nextEffect = nextEffect.nextEffect;
     }
-    {
-        resetCurrentFiber();
-    }
+    resetCurrentFiber();
 }
 
 function commitPassiveEffects(root, firstEffect) {
@@ -18780,19 +18764,15 @@ function commitPassiveEffects(root, firstEffect) {
 
     var effect = firstEffect;
     do {
-        {
-            setCurrentFiber(effect);
-        }
+        setCurrentFiber(effect);
 
         if (effect.effectTag & Passive) {
             var didError = false;
             var error = undefined;
-            {
-                invokeGuardedCallback(null, commitPassiveHookEffects, null, effect);
-                if (hasCaughtError()) {
-                    didError = true;
-                    error = clearCaughtError();
-                }
+            invokeGuardedCallback(null, commitPassiveHookEffects, null, effect);
+            if (hasCaughtError()) {
+                didError = true;
+                error = clearCaughtError();
             }
             if (didError) {
                 captureCommitPhaseError(effect, error);
@@ -18800,9 +18780,8 @@ function commitPassiveEffects(root, firstEffect) {
         }
         effect = effect.nextEffect;
     } while (effect !== null);
-    {
-        resetCurrentFiber();
-    }
+
+    resetCurrentFiber();
 
     isRendering = previousIsRendering;
 
@@ -19312,31 +19291,31 @@ function performUnitOfWork(workInProgress) {
 
     // See if beginning this work spawns more work.
     startWorkTimer(workInProgress);
-    {
-        setCurrentFiber(workInProgress);
-    }
+
+    setCurrentFiber(workInProgress);
+
 
     if (true && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
         stashedWorkInProgressProperties = assignFiberPropertiesInDEV(stashedWorkInProgressProperties, workInProgress);
     }
 
     var next = undefined;
-    if (enableProfilerTimer) {
-        if (workInProgress.mode & ProfileMode) {
-            startProfilerTimer(workInProgress);
-        }
-
-        next = beginWork(current$$1, workInProgress, nextRenderExpirationTime);
-        workInProgress.memoizedProps = workInProgress.pendingProps;
-
-        if (workInProgress.mode & ProfileMode) {
-            // Record the render duration assuming we didn't bailout (or error).
-            stopProfilerTimerIfRunningAndRecordDelta(workInProgress, true);
-        }
-    } else {
-        next = beginWork(current$$1, workInProgress, nextRenderExpirationTime);
-        workInProgress.memoizedProps = workInProgress.pendingProps;
+    // if (enableProfilerTimer) {
+    if (workInProgress.mode & ProfileMode) {
+        startProfilerTimer(workInProgress);
     }
+
+    next = beginWork(current$$1, workInProgress, nextRenderExpirationTime);
+    workInProgress.memoizedProps = workInProgress.pendingProps;
+
+    if (workInProgress.mode & ProfileMode) {
+        // Record the render duration assuming we didn't bailout (or error).
+        stopProfilerTimerIfRunningAndRecordDelta(workInProgress, true);
+    }
+    // } else {
+    //     next = beginWork(current$$1, workInProgress, nextRenderExpirationTime);
+    //     workInProgress.memoizedProps = workInProgress.pendingProps;
+    // }
 
     {
         resetCurrentFiber();
@@ -19376,6 +19355,10 @@ function workLoop(isYieldy) {
     }
 }
 
+/**
+ * ! important
+ * 渲染节点
+ */
 function renderRoot(root, isYieldy) {
     !!isWorking ? invariant(false, 'renderRoot was called recursively. This error is likely caused by a bug in React. Please file an issue.') : undefined;
 
@@ -19389,6 +19372,7 @@ function renderRoot(root, isYieldy) {
 
     // Check if we're starting from a fresh stack, or if we're resuming from
     // previously yielded work.
+    // 检查我们是从一个新的堆栈开始，还是从以前产生的工作中恢复。
     if (expirationTime !== nextRenderExpirationTime || root !== nextRoot || nextUnitOfWork === null) {
         // Reset the stack and start working from the root.
         resetStack();
@@ -19397,38 +19381,36 @@ function renderRoot(root, isYieldy) {
         nextUnitOfWork = createWorkInProgress(nextRoot.current, null, nextRenderExpirationTime);
         root.pendingCommitExpirationTime = NoWork;
 
-        if (enableSchedulerTracing) {
-            // Determine which interactions this batch of work currently includes,
-            // So that we can accurately attribute time spent working on it,
-            var interactions = new Set();
-            root.pendingInteractionMap.forEach(function (scheduledInteractions, scheduledExpirationTime) {
-                if (scheduledExpirationTime >= expirationTime) {
-                    scheduledInteractions.forEach(function (interaction) {
-                        return interactions.add(interaction);
-                    });
-                }
-            });
+        // Determine which interactions this batch of work currently includes,
+        // So that we can accurately attribute time spent working on it,
+        var interactions = new Set();
+        root.pendingInteractionMap.forEach(function (scheduledInteractions, scheduledExpirationTime) {
+            if (scheduledExpirationTime >= expirationTime) {
+                scheduledInteractions.forEach(function (interaction) {
+                    return interactions.add(interaction);
+                });
+            }
+        });
 
-            // Store the current set of interactions on the FiberRoot for a few reasons:
-            // We can re-use it in hot functions like renderRoot() without having to recalculate it.
-            // We will also use it in commitWork() to pass to any Profiler onRender() hooks.
-            // This also provides DevTools with a way to access it when the onCommitRoot() hook is called.
-            root.memoizedInteractions = interactions;
+        // Store the current set of interactions on the FiberRoot for a few reasons:
+        // We can re-use it in hot functions like renderRoot() without having to recalculate it.
+        // We will also use it in commitWork() to pass to any Profiler onRender() hooks.
+        // This also provides DevTools with a way to access it when the onCommitRoot() hook is called.
+        root.memoizedInteractions = interactions;
 
-            if (interactions.size > 0) {
-                var subscriber = tracing.__subscriberRef.current;
-                if (subscriber !== null) {
-                    var threadID = computeThreadID(expirationTime, root.interactionThreadID);
-                    try {
-                        subscriber.onWorkStarted(interactions, threadID);
-                    } catch (error) {
-                        // Work thrown by an interaction tracing subscriber should be rethrown,
-                        // But only once it's safe (to avoid leaving the scheduler in an invalid state).
-                        // Store the error for now and we'll re-throw in finishRendering().
-                        if (!hasUnhandledError) {
-                            hasUnhandledError = true;
-                            unhandledError = error;
-                        }
+        if (interactions.size > 0) {
+            var subscriber = tracing.__subscriberRef.current;
+            if (subscriber !== null) {
+                var threadID = computeThreadID(expirationTime, root.interactionThreadID);
+                try {
+                    subscriber.onWorkStarted(interactions, threadID);
+                } catch (error) {
+                    // Work thrown by an interaction tracing subscriber should be rethrown,
+                    // But only once it's safe (to avoid leaving the scheduler in an invalid state).
+                    // Store the error for now and we'll re-throw in finishRendering().
+                    if (!hasUnhandledError) {
+                        hasUnhandledError = true;
+                        unhandledError = error;
                     }
                 }
             }
@@ -19473,11 +19455,9 @@ function renderRoot(root, isYieldy) {
                     stopProfilerTimerIfRunningAndRecordDelta(nextUnitOfWork, true);
                 }
 
-                {
-                    // Reset global debug state
-                    // We assume this is defined in DEV
-                    resetCurrentlyProcessingQueue();
-                }
+                // Reset global debug state
+                // We assume this is defined in DEV
+                resetCurrentlyProcessingQueue();
 
                 if (true && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
                     if (mayReplay) {
