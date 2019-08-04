@@ -12295,18 +12295,17 @@ function createWorkInProgress(current, pendingProps, expirationTime) {
 function createHostRootFiber(isConcurrent) {
     //                         1             |  2            0
     //                        0b0001         |0b0010         0b0000
-    // 0b0001 | 0b0010 === 0b0011
-    //  1|2 === 3
+    //  1|2 => 3            0b0001 | 0b0010 =>  0b0011
     var mode = isConcurrent ? ConcurrentMode | StrictMode : NoContext;
 
     if (enableProfilerTimer && isDevToolsPresent) {
         // Always collect profile timings when DevTools are present.
         // This enables DevTools to start capturing timing at any point–
         // Without some nodes in the tree having empty base times.
-        //        4
-        //        0b0100
-        // 0b0100 | 0b0011
-        // 0b0100 | 0b0000
+        //
+        // ProfileMode => 4 => 0b0100
+        // 0b0100 | 0b0011 => 0b0111  6
+        // 0b0100 | 0b0000 => 0b0100  5
         mode |= ProfileMode;
     }
     return createFiber(HostRoot, null, null, mode);
@@ -12573,38 +12572,24 @@ function assignFiberPropertiesInDEV(target, source) {
     return target;
 }
 
-// TODO: This should be lifted into the renderer.
-
-// The following attributes are only used by interaction tracing builds.
-// They enable interactions to be associated with their async work,
-// And expose interaction metadata to the React DevTools Profiler plugin.
-// Note that these attributes are only defined when the enableSchedulerTracing flag is enabled.
-
-// Exported FiberRoot type includes all properties,
-// To avoid requiring potentially error-prone :any casts throughout the project.
-// Profiling properties are only safe to access in profiling builds (when enableSchedulerTracing is true).
-// The types are defined separately within this file to ensure they stay in sync.
-// (We don't have to use an inline :any cast when enableSchedulerTracing is disabled.)
-
 // @caller createContainer
 function createFiberRoot(container, isConcurrent, hydrate) {
     var uninitializedFiber = createHostRootFiber(isConcurrent);
 
     var root = {
+        // fiber
         current: uninitializedFiber,
+
+        // 存储dom节点的引用
         containerInfo: container,
         pendingChildren: null,
-
         earliestPendingTime: NoWork,
         latestPendingTime: NoWork,
         earliestSuspendedTime: NoWork,
         latestSuspendedTime: NoWork,
         latestPingedTime: NoWork,
-
         pingCache: null,
-
         didError: false,
-
         pendingCommitExpirationTime: NoWork,
         finishedWork: null,
         timeoutHandle: noTimeout,
@@ -24964,37 +24949,33 @@ function onCommit(root, expirationTime) {
 }
 // @caller　updateContainer
 function requestCurrentTime() {
+    
+// 翻译：requestCurrentTime函数由scheduler(调度表)调用，用来计算过期时间
+    // 翻译：过期时间是通过将当前时间 (the start time)相加来计算的。如果在同一个事件中调用了
+    // 两次updates, 即使第一次调度的实际时间比第二次调度的实际时间早，我们也应将他们的
+    // 开始时间视为同时进行。
+    // 翻译：因为 过期时间 决定了这次updates如何被批处理，所以我们想要所有由同一个事件
+    // 触发的updates都能有相同的过期时间。
+    // 翻译：我们跟踪两个不同的时间：当前的 "renderer" time 和当前的"scheduler" time。
+    //  "renderer" time  可以随时更新；它的存在只是为了最大限度地降低调用性能。
+    // 但是，只有在没有挂起的工作(正在处理的 ？)，或者我们确信自己不在某个事件的中间时，
+    //  "scheduler" time 才能被更新。
+    // 
+    //
     // requestCurrentTime is called by the scheduler to compute an expiration
     // time.
-
-    // 翻译：requestCurrentTime函数由scheduler(调度表)调用，用来计算过期时间
-
     // Expiration times are computed by adding to the current time (the start
     // time). However, if two updates are scheduled within the same event, we
     // should treat their start times as simultaneous, even if the actual clock
     // time has advanced between the first and second call.
-
-    // 翻译：过期时间是通过将当前时间 (the start time)相加来计算的。如果在同一个事件中调用了
-    // 两次updates, 即使第一次调度的实际时间比第二次调度的实际时间早，我们也应将他们的
-    // 开始时间视为同时进行。
-
     // In other words, because expiration times determine how updates are batched,
     // we want all updates of like priority that occur within the same event to
     // receive the same expiration time. Otherwise we get tearing.
-
-    // 翻译：因为 过期时间 决定了这次updates如何被批处理，所以我们想要所有由同一个事件
-    // 触发的updates都能有相同的过期时间。
-
     // We keep track of two separate times: the current "renderer" time and the
     // current "scheduler" time. The renderer time can be updated whenever; it
     // only exists to minimize the calls performance.now.
     // But the scheduler time can only be updated if there's no pending work, or
     // if we know for certain that we're not in the middle of an event.
-
-    // 翻译：我们跟踪两个不同的时间：当前的 "renderer" time 和当前的"scheduler" time。
-    //  "renderer" time  可以随时更新；它的存在只是为了最大限度地降低调用性能。
-    // 但是，只有在没有挂起的工作(正在处理的 ？)，或者我们确信自己不在某个事件的中间时，
-    //  "scheduler" time 才能被更新。
 
     if (isRendering) {
         // We're already rendering. Return the most recently read time.
@@ -25716,10 +25697,10 @@ function createContainer(container, isConcurrent, hydrate) {
  * @param callback work._onCommit
  */
 function updateContainer(element, container, parentComponent, callback) {
-    var current$$1 = container.current; // FiberNode
+    var fiber = container.current; // FiberNode
 
     var currentTime = requestCurrentTime();
-    var expirationTime = computeExpirationForFiber(currentTime, current$$1);
+    var expirationTime = computeExpirationForFiber(currentTime, fiber);
     return updateContainerAtExpirationTime(
         element,
         container,
