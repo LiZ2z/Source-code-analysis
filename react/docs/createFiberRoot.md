@@ -7,10 +7,6 @@
 创建并返回一个 root 对象。该对象将赋值给 reactRoot 实例的`_internalRoot` 属性。
 
 ```javascript
-//                                  false         false
-function createContainer(container, isConcurrent, hydrate) {
-    return createFiberRoot(container, isConcurrent, hydrate);
-}
 function createFiberRoot(container, isConcurrent, hydrate) {
     var uninitializedFiber = createHostRootFiber(isConcurrent);
 

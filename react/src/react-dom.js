@@ -24857,11 +24857,11 @@ var lastCommittedRootDuringThisBatch = null;
 
 //caller requestCurrentTime
 /**
- * 即当前的过期时间
+ * 重新计算当前rendererTime
  */
 function recomputeCurrentRendererTime() {
     // scheduler.unstable_now    performance.now()
-    // originalStartTimeMs原点时间   当前代码执行时的 performance.now()
+    // originalStartTimeMs原点时间   当前代码被解释执行时的 performance.now()
     var currentTimeMs = scheduler.unstable_now() - originalStartTimeMs;
     currentRendererTime = msToExpirationTime(currentTimeMs);
 }
