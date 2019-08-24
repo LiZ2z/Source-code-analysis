@@ -79,4 +79,4 @@ function legacyRenderSubtreeIntoContainer(
 }
 ```
 
-[** 阅读笔记 2 **](./阅读笔记-2.md)
+[**阅读笔记 2**](../note-2/README.md)

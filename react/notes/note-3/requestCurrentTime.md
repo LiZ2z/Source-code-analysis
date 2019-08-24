@@ -1,10 +1,8 @@
-## 先看总结
+[createfiberroot]: ../阅读笔记-2/createFiberRoot.md
 
-。。。
+# `requestCurrentTime`
 
-## 前文
-
-读懂这里需要了解这些全局作用域内的变量
+这些是这个分支可能用到的全局作用域内的变量
 
 ```javascript
 var firstScheduledRoot = null;
@@ -34,36 +32,27 @@ var nestedUpdateCount = 0;
 var lastCommittedRootDuringThisBatch = null;
 ```
 
-## 正文
-
-#### `requestCurrentTime`
-
 `requestCurrentTime` 函数由 *scheduler(调度表)*调用，用来计算*过期时间*。
 
 _过期时间是通过将当前时间 (the start time)相加来计算的。如果在同一个事件中调用了两次 updates, 即使第一次调度的实际时间比第二次调度的实际时间早，我们也应将他们的开始时间视为同时进行_。因为 过期时间 决定了这次 updates 如何被批处理，所以我们想要所有由同一个事件触发的 updates 都能有相同的过期时间。
 
-我们跟踪两个不同的时间：当前的 **"renderer" time** 和当前的 **"scheduler" time**。**"renderer" time 可以随时更新；它的存在只是为了最大限度地降低调用性能。但是，只有在没有挂起的工作(正在处理的 ？)，或者我们确信自己不在某个事件的中间时，"scheduler" time 才能被更新。**
+我们跟踪两个不同的时间：当前的 **"renderer" time** 和当前的 **"scheduler" time**。_"renderer" time 可以随时更新；它的存在只是为了最大限度地降低调用性能。但是，只有在没有需要处理的工作时，或者我们确信自己不在某个事件的中间时，"scheduler" time 才能被更新。_
+
+`requestCurrentTime`的 current time 指的是`currentSchedulerTime`。
+
+该函数的大致流程为：
+
+1. 如果 react 正处于 rendering 阶段，直接返回`currentSchedulerTime`。
+2. 否则，通过`findHighestPriorityRoot()`检查是否有待处理的工作，并将其赋值给全局的变量`nextFlushedExpirationTime`。
+3. 之后对`nextFlushedExpirationTime`进行判断，是否存在待完成的工作（`nextFlushedExpirationTime`值不等于`NoWork` or `Never`）。
+4. 如果不存在待完成的工作。则重新计算 `currentRendererTime`，并将其赋值给`currentSchedulerTime`，返回`currentSchedulerTime`。
+   5。如果存在待完成的工作，直接返回`currentSchedulerTime`。
 
 ```javascript
 function requestCurrentTime() {
-    // requestCurrentTime is called by the scheduler to compute an expiration
-    // time.
-    // Expiration times are computed by adding to the current time (the start
-    // time). However, if two updates are scheduled within the same event, we
-    // should treat their start times as simultaneous, even if the actual clock
-    // time has advanced between the first and second call.
-    // In other words, because expiration times determine how updates are batched,
-    // we want all updates of like priority that occur within the same event to
-    // receive the same expiration time. Otherwise we get tearing.
-    // We keep track of two separate times: the current "renderer" time and the
-    // current "scheduler" time. The renderer time can be updated whenever; it
-    // only exists to minimize the calls performance.now.
-    // But the scheduler time can only be updated if there's no pending work, or
-    // if we know for certain that we're not in the middle of an event.
-
     if (isRendering) {
         // We're already rendering. Return the most recently read time.
-        // 我们已经在渲染了。返回最近读取时间。
+        // 已经在渲染了。返回最近读取时间。
         return currentSchedulerTime;
     }
     // Check if there's pending work.
@@ -87,15 +76,19 @@ function requestCurrentTime() {
     // within the same event to receive different expiration times, leading to
     // tearing. Return the last read time. During the next idle callback, the
     // time will be updated.
+    // 如果存在待完成的工作。此时我们可能正处在某个浏览器事件中。如果我们去重新计算current renderer time，
+    // 可能导致在同一个事件引起的多次更新中收到的过期时间却不同，所以我们直接返回最后一次 计算的
+    // currentSchedulerTime
+
     return currentSchedulerTime;
 }
 ```
 
 #### `findHighestPriorityRoot`
 
-// TODO: 这个 list 使用了干嘛的？
+// TODO: 这个 list 是用来干嘛的？
 
-React 运行时会创建一个 Scheduled 的 list，这个 list 并不是一个数组，而是一系列相互引用的对象——root（root 通过[**createFiberRoot**](./createFiberRoot.md) 函数创建）。root 格式大致如下：
+React 运行时会创建一个 Scheduled 的 list，这个 list 并不是一个数组，而是一系列相互引用的对象——root（root 通过[**createFiberRoot**][createfiberroot] 函数创建）。root 格式大致如下：
 
 ```javascript
 const root = {
@@ -108,17 +101,18 @@ const root = {
 
 root 之间通过`root.nextScheduledRoot`属性依次链接并形成一个闭环（可以想象自行车链），组成了一个 list。虽然是个闭环，但这个 list 有一个起点 root，有一个终点 root，分别存储在“全局”变量`firstScheduledRoot`和`lastScheduledRoot`中。
 
-如上所示，root 有一个`expirationTime`（过期时间）属性，该属性存储的不是真正的时间，而是一些数值表示，其可能的取值有：
+同时，如上所示，root 有一个`expirationTime`（过期时间）属性，该属性存储的不是真正的时间，而是一些数值表示，其可能的取值有：
 
 ```javascript
-var NoWork = 0;
-var Never = 1;
-var Sync = maxSigned31BitInt; // 1073741823
+// `expirationTime`（过期时间）
+var NoWork = 0; // 没有工作要做
+var Never = 1; // 过期时间为 never，永不过期，也就是有工作要做
+var Sync = maxSigned31BitInt; // 有工作要做，而且是权限最高的工作
 ```
 
 React 将根据每个 root 的`root.expirationTime` 大小来决定 root 优先级，优先级高的 root 上的工作将被优先处理。
 
-该函数就是通过`root.nextScheduledRoot`属性来遍历 list，根据`root.expirationTime`来找到 list 中优先级最高的 root，并将其赋值给“全局变量”`nextFlushedRoot`。同时，将这个 root 的`expirationTime`属性赋值给“全局变量”`nextFlushedExpirationTime`。
+该函数就是通过`root.nextScheduledRoot`属性来遍历 list，根据`root.expirationTime`来找到 list 中优先级最高的 root，并将其赋值给“modules”`nextFlushedRoot`。同时，将这个 root 的`expirationTime`属性赋值给“modules”`nextFlushedExpirationTime`。
 
 另外，在遍历的时候，如果发现`root.expirationTime === NoWork; // 0`，即当前 root 上已经没有工作要做了，就会将其从这个 list 中移除。
 

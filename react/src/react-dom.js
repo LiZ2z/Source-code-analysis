@@ -2980,50 +2980,40 @@ var current = null;
 var phase = null;
 
 function getCurrentFiberOwnerNameInDevOrNull() {
-    {
-        if (current === null) {
-            return null;
-        }
-        var owner = current._debugOwner;
-        if (owner !== null && typeof owner !== 'undefined') {
-            return getComponentName(owner.type);
-        }
+    if (current === null) {
+        return null;
+    }
+    var owner = current._debugOwner;
+    if (owner !== null && typeof owner !== 'undefined') {
+        return getComponentName(owner.type);
     }
     return null;
 }
 
 function getCurrentFiberStackInDev() {
-    {
-        if (current === null) {
-            return '';
-        }
-        // Safe because if current fiber exists, we are reconciling,
-        // and it is guaranteed to be the work-in-progress version.
-        return getStackByFiberInDevAndProd(current);
+    if (current === null) {
+        return '';
     }
+    // Safe because if current fiber exists, we are reconciling,
+    // and it is guaranteed to be the work-in-progress version.
+    return getStackByFiberInDevAndProd(current);
     return '';
 }
 
 function resetCurrentFiber() {
-    {
-        ReactDebugCurrentFrame.getCurrentStack = null;
-        current = null;
-        phase = null;
-    }
+    ReactDebugCurrentFrame.getCurrentStack = null;
+    current = null;
+    phase = null;
 }
 
 function setCurrentFiber(fiber) {
-    {
-        ReactDebugCurrentFrame.getCurrentStack = getCurrentFiberStackInDev;
-        current = fiber;
-        phase = null;
-    }
+    ReactDebugCurrentFrame.getCurrentStack = getCurrentFiberStackInDev;
+    current = fiber;
+    phase = null;
 }
 
 function setCurrentPhase(lifeCyclePhase) {
-    {
-        phase = lifeCyclePhase;
-    }
+    phase = lifeCyclePhase;
 }
 
 /**
@@ -3033,34 +3023,29 @@ function setCurrentPhase(lifeCyclePhase) {
  * same logic and follow the same code paths.
  */
 
-var warning = warningWithoutStack;
+var warning = function(condition, format) {
+    if (condition) {
+        return;
+    }
+    var ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
+    var stack = ReactDebugCurrentFrame.getStackAddendum();
+    // eslint-disable-next-line react-internal/warning-and-invariant-args
 
-{
-    warning = function(condition, format) {
-        if (condition) {
-            return;
-        }
-        var ReactDebugCurrentFrame =
-            ReactSharedInternals.ReactDebugCurrentFrame;
-        var stack = ReactDebugCurrentFrame.getStackAddendum();
-        // eslint-disable-next-line react-internal/warning-and-invariant-args
+    for (
+        var _len = arguments.length,
+            args = Array(_len > 2 ? _len - 2 : 0),
+            _key = 2;
+        _key < _len;
+        _key++
+    ) {
+        args[_key - 2] = arguments[_key];
+    }
 
-        for (
-            var _len = arguments.length,
-                args = Array(_len > 2 ? _len - 2 : 0),
-                _key = 2;
-            _key < _len;
-            _key++
-        ) {
-            args[_key - 2] = arguments[_key];
-        }
-
-        warningWithoutStack.apply(
-            undefined,
-            [false, format + '%s'].concat(args, [stack])
-        );
-    };
-}
+    warningWithoutStack.apply(
+        undefined,
+        [false, format + '%s'].concat(args, [stack])
+    );
+};
 
 var warning$1 = warning;
 
@@ -3756,15 +3741,12 @@ function getToStringValue(value) {
     }
 }
 
-var ReactDebugCurrentFrame$1 = null;
 
 var ReactControlledValuePropTypes = {
     checkPropTypes: null
 };
 
 {
-    ReactDebugCurrentFrame$1 = ReactSharedInternals.ReactDebugCurrentFrame;
-
     var hasReadOnlyValue = {
         button: true,
         checkbox: true,
@@ -3821,7 +3803,7 @@ var ReactControlledValuePropTypes = {
             props,
             'prop',
             tagName,
-            ReactDebugCurrentFrame$1.getStackAddendum
+            ReactDebugCurrentFrame.getStackAddendum
         );
     };
 }
@@ -7953,10 +7935,6 @@ var voidElementTags = _assign(
 // or add stack by default to invariants where possible.
 var HTML$1 = '__html';
 
-var ReactDebugCurrentFrame$2 = null;
-{
-    ReactDebugCurrentFrame$2 = ReactSharedInternals.ReactDebugCurrentFrame;
-}
 
 function assertValidProps(tag, props) {
     if (!props) {
@@ -7969,7 +7947,7 @@ function assertValidProps(tag, props) {
                   false,
                   '%s is a void element tag and must neither have `children` nor use `dangerouslySetInnerHTML`.%s',
                   tag,
-                  ReactDebugCurrentFrame$2.getStackAddendum()
+                  ReactDebugCurrentFrame.getStackAddendum()
               )
             : undefined;
     }
@@ -8009,7 +7987,7 @@ function assertValidProps(tag, props) {
         ? invariant(
               false,
               "The `style` prop expects a mapping from style properties to values, not a string. For example, style={{marginRight: spacing + 'em'}} when using JSX.%s",
-              ReactDebugCurrentFrame$2.getStackAddendum()
+              ReactDebugCurrentFrame.getStackAddendum()
           )
         : undefined;
 }
@@ -23200,7 +23178,7 @@ var nextRenderDidError = false;
 // The next fiber with an effect that we're currently committing.
 var nextEffect = null;
 
-var isCommitting$1 = false;
+var isCommitting = false;
 var rootWithPendingPassiveEffects = null;
 var passiveEffectCallbackHandle = null;
 var passiveEffectCallback = null;
@@ -23512,7 +23490,7 @@ function flushPassiveEffects() {
 
 function commitRoot(root, finishedWork) {
     isWorking = true;
-    isCommitting$1 = true;
+    isCommitting = true;
     startCommitTimer();
 
     !(root.current !== finishedWork)
@@ -23702,7 +23680,7 @@ function commitRoot(root, finishedWork) {
         passiveEffectCallback = callback;
     }
 
-    isCommitting$1 = false;
+    isCommitting = false;
     isWorking = false;
     stopCommitLifeCyclesTimer();
     stopCommitTimer();
@@ -24525,7 +24503,7 @@ function computeExpirationForFiber(currentTime, fiber) {
         // Outside of concurrent mode, updates are always synchronous.
         // 除了 concurrent mode， 其他的updates都是同步的
         expirationTime = Sync; // maxSigned31BitInt 永不工期
-    } else if (isWorking && !isCommitting$1) {
+    } else if (isWorking && !isCommitting) {
         // During render phase, updates expire during as the current render.
         // 在渲染阶段，更新将在当前渲染期间过期
         expirationTime = nextRenderExpirationTime;
@@ -24799,7 +24777,7 @@ function scheduleWork(fiber, expirationTime) {
         // If we're in the render phase, we don't need to schedule this root
         // for an update, because we'll do it before we exit...
         !isWorking ||
-        isCommitting$1 ||
+        isCommitting ||
         // ...unless this is a different root than the one we're rendering.
         nextRoot !== root
     ) {
@@ -24949,8 +24927,7 @@ function onCommit(root, expirationTime) {
 }
 // @caller　updateContainer
 function requestCurrentTime() {
-    
-// 翻译：requestCurrentTime函数由scheduler(调度表)调用，用来计算过期时间
+    // 翻译：requestCurrentTime函数由scheduler(调度表)调用，用来计算过期时间
     // 翻译：过期时间是通过将当前时间 (the start time)相加来计算的。如果在同一个事件中调用了
     // 两次updates, 即使第一次调度的实际时间比第二次调度的实际时间早，我们也应将他们的
     // 开始时间视为同时进行。
@@ -24958,9 +24935,9 @@ function requestCurrentTime() {
     // 触发的updates都能有相同的过期时间。
     // 翻译：我们跟踪两个不同的时间：当前的 "renderer" time 和当前的"scheduler" time。
     //  "renderer" time  可以随时更新；它的存在只是为了最大限度地降低调用性能。
-    // 但是，只有在没有挂起的工作(正在处理的 ？)，或者我们确信自己不在某个事件的中间时，
+    // 但是，只有在没有需要处理的工作时，或者我们确信自己不在某个事件的中间时，
     //  "scheduler" time 才能被更新。
-    // 
+    //
     //
     // requestCurrentTime is called by the scheduler to compute an expiration
     // time.

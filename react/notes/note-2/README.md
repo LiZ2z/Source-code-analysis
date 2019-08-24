@@ -1,10 +1,6 @@
-### 子分支
-
-[** createFiberRoot ** ](./createFiberRoot.md)
-
-[** reactWork **](./reactWork.md)
-
-[** 阅读笔记 3 **](./阅读笔记-3.md)
+[createfiberroot]: ./createFiberRoot.md
+[reactwork]: ../modules/reactWork.md
+[note3]: ../note-3/README.md
 
 ### 正文
 
@@ -137,13 +133,13 @@ function createContainer(container, isConcurrent, hydrate) {
 }
 ```
 
-`createFiberRoot`见：[** createFiberRoot ** ](./createFiberRoot.md)
+`createFiberRoot`见：[ **createFiberRoot** ][createfiberroot]
 
 #### `root.render()`
 
 待创建完 react Root 实例后，后续的主线任务将调用实例的`render`(见上方)方法，进行 dom 渲染。在`root.render`中，首先创建了一个 reactWork 实例。
 
-见：[** reactWork **](./reactWork.md)
+见：[ **reactWork** ][reactwork]
 
 ```javascript
 ReactRoot.prototype.render = function(children, callback) {
@@ -161,4 +157,4 @@ ReactRoot.prototype.render = function(children, callback) {
 
 之后调用`updateContainer(children, root, null, work._onCommit)`
 
-见：[** 阅读笔记 3 **](./阅读笔记-3.md)
+见：[ **阅读笔记 3** ][note3]

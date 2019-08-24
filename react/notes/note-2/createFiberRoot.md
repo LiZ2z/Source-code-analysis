@@ -1,8 +1,6 @@
-### 子分支
+[fiber]: ../modules/createFiber.md
 
-[** 创建 Fiber 看这里** ](./createFiber.md)
-
-### 正文
+# `createFiberRoot`
 
 创建并返回一个 root 对象。该对象将赋值给 reactRoot 实例的`_internalRoot` 属性。
 
@@ -71,4 +69,4 @@ function createHostRootFiber(isConcurrent) {
 }
 ```
 
-[** 创建 Fiber 看这里** ](./createFiber.md)
+[ **创建 Fiber 看这里** ][fiber]
