@@ -11951,23 +11951,6 @@ var onCommitFiberRoot = null;
 var onCommitFiberUnmount = null;
 var hasLoggedError = false;
 
-function catchErrors(fn) {
-    return function(arg) {
-        try {
-            return fn(arg);
-        } catch (err) {
-            if (true && !hasLoggedError) {
-                hasLoggedError = true;
-                warningWithoutStack(
-                    false,
-                    'React DevTools encountered an error: %s',
-                    err
-                );
-            }
-        }
-    };
-}
-
 var isDevToolsPresent = typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ !== 'undefined';
 
 function onCommitRoot(root) {
@@ -20164,17 +20147,11 @@ var CaptureUpdate = 3;
 // It should only be read right after calling `processUpdateQueue`, via
 // `checkHasForceUpdateAfterProcessing`.
 var hasForceUpdate = false;
-
-var didWarnUpdateInsideUpdate = undefined;
-var currentlyProcessingQueue = undefined;
-var resetCurrentlyProcessingQueue = undefined;
-{
-    didWarnUpdateInsideUpdate = false;
+var didWarnUpdateInsideUpdate = false;
+var currentlyProcessingQueue = null;
+var resetCurrentlyProcessingQueue = function() {
     currentlyProcessingQueue = null;
-    resetCurrentlyProcessingQueue = function() {
-        currentlyProcessingQueue = null;
-    };
-}
+};
 
 function createUpdateQueue(baseState) {
     var queue = {
