@@ -179,7 +179,7 @@ function appendUpdateToQueue(queue, update) {
 }
 ```
 
-这个函数，基本上就是用来确定`fiber.updateQueue`一定存在。
+这个函数，基本上就是用来确定`fiber.updateQueue`一定存在。如果不存在就创建一个，或从另一个 fiber 上拷贝。
 
 ```javascript
 function enqueueUpdate(fiber, update) {
