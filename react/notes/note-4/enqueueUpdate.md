@@ -148,11 +148,9 @@ function cloneUpdateQueue(currentQueue) {
 function createUpdate(expirationTime) {
     return {
         expirationTime: expirationTime,
-
-        tag: UpdateState, // 0
+        tag: UpdateState, // 0 常量
         payload: null,
         callback: null,
-
         next: null,
         nextEffect: null
     };
@@ -168,7 +166,22 @@ function appendUpdateToQueue(queue, update) {
         queue.lastUpdate = update;
     }
 }
+```
 
+## enqueueUpdate
+
+传入 fiber 及一个 update。在这里用到了 fiber 上的两个属性：
+
+```javascript
+{
+    alternate: null,  // 另一个fiber
+    updateQueue: null, // UpdateQueue对象
+}
+```
+
+这个函数，基本上就是用来确定`fiber.updateQueue`一定存在。
+
+```javascript
 function enqueueUpdate(fiber, update) {
     // Update queues are created lazily.
     // 更新队列是延迟创建的。
