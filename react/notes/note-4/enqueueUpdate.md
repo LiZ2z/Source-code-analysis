@@ -141,10 +141,7 @@ function cloneUpdateQueue(currentQueue) {
     };
     return queue;
 }
-// @caller scheduleRootUpdate
-/**
- * @param expirationTime oneOf maxSigned31BitInt<Sync>
- */
+
 function createUpdate(expirationTime) {
     return {
         expirationTime: expirationTime,
@@ -156,30 +153,62 @@ function createUpdate(expirationTime) {
     };
 }
 
+// Append the update to the end of the list.
+// 将 update 添加到 queue 的末尾
 function appendUpdateToQueue(queue, update) {
-    // Append the update to the end of the list.
     if (queue.lastUpdate === null) {
         // Queue is empty
         queue.firstUpdate = queue.lastUpdate = update;
     } else {
+        // update的格式：
+        //     {
+        //     expirationTime: expirationTime,
+        //     tag: UpdateState, // 0 常量
+        //     payload: null,
+        //     callback: null,
+        //     next: null,
+        //     nextEffect: null
+        // }
+        // 将 新的update 赋值给上一个update.next属性，
+        // 这样整个update就串联了起来
         queue.lastUpdate.next = update;
         queue.lastUpdate = update;
     }
 }
 ```
 
-## enqueueUpdate
+## `enqueueUpdate(fiber, update)`
 
-传入 fiber 及一个 update。在这里用到了 fiber 上的两个属性：
+传入 `fiber` 及一个 `update`作为参数。在这个函数里用到了 fiber 上的两个属性：
 
 ```javascript
 {
     alternate: null,  // 另一个fiber
-    updateQueue: null, // UpdateQueue对象
+    updateQueue: null, // updateQueue对象
 }
 ```
 
-这个函数，基本上就是用来确定`fiber.updateQueue`一定存在。如果不存在就创建一个，或从另一个 fiber 上拷贝。
+首先获取`fiber.alternate`，也就是另一个 fiber（这里我们称为`fiber2`），这个 `fiber2` 可能存在，也可能不存在。
+
+然后就是确定`fiber.updateQueue`及`fiber2.updateQueue`一定存在（如果`fiber2`不存在就不用管了）。如果不存在就创建一个，或从另一个 fiber 上拷贝。这里的`updateQueue`并不是真正的队列，而是一个具有下面格式的对象：
+
+```javascript
+        baseState: baseState,
+        firstUpdate: null,
+        lastUpdate: null,
+        firstCapturedUpdate: null,
+        lastCapturedUpdate: null,
+        firstEffect: null,
+        lastEffect: null,
+        firstCapturedEffect: null,
+        lastCapturedEffect: null
+```
+
+这个对象中的`firstUpdate`和`lastUpdate`属性保存着指向真正的 UpdateQueue 的指针。
+
+**这两个 fiber 的 updateQueue 属性指向不同对象，但他们维护的队列始终是同一个。**
+
+最后，将传入的参数`update`，添加到`updateQueue`所维护队列的末尾。
 
 ```javascript
 function enqueueUpdate(fiber, update) {
@@ -229,6 +258,8 @@ function enqueueUpdate(fiber, update) {
         // There are two queues. We need to append the update to both queues,
         // while accounting for the persistent structure of the list — we don't
         // want the same update to be added multiple times.
+        // 有两个队列。我们需要将更新附加到两个队列，同时考虑到列表的持久结构-
+        // 我们不希望多次添加相同的更新。
         if (queue1.lastUpdate === null || queue2.lastUpdate === null) {
             // One of the queues is not empty. We must add the update to both queues.
             appendUpdateToQueue(queue1, update);
