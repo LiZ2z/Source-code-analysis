@@ -1,5 +1,5 @@
 [current]: ../modules/current.md
-[enqueueupdate]: ./enqueueUpdate.md
+[enqueueupdate]: ../modules/UpdateQueue.md
 
 # 主线`scheduleRootUpdate`
 

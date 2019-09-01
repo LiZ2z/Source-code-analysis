@@ -19729,9 +19729,9 @@ function beginWork(current$$1, workInProgress, renderExpirationTime) {
 
 var valueCursor = createCursor(null);
 
-var rendererSigil = undefined;
+
 // Use this to detect multiple renderers using the same context
-rendererSigil = {};
+var rendererSigil = {};
 
 var currentlyRenderingFiber = null;
 var lastContextDependency = null;

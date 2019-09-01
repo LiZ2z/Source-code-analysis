@@ -4,6 +4,44 @@
 
 # UpdateQueue
 
+UpdateQueue 是用来处理 React 组件状态（state）更新的一种实现。PS: react 更新指的是通过调用`setState`、`forceUpdate`、`replaceState`等 api 后产生的更新。
+
+每产生一个更新，react 会创建一个 update 对象：
+
+```javascript
+{
+    // 更新的优先级，可能的值：NoWork（0）、Never（1）、Sync（maxSigned31BitInt = 1073741823）
+    expirationTime: expirationTime,
+
+    // 更新的类型，可能的值：UpdateState（0）、ReplaceState（1）、ForceUpdate（2）、CaptureUpdate（3）
+    tag: UpdateState,
+
+    // update 携带的数据通常为 state 的部分数据
+    payload: null,
+
+    // 副作用
+    callback: null,
+
+    // 用于链接下一个update
+    next: null,
+
+    // 用于链接下一个副作用
+    nextEffect: null
+}
+```
+
+然后 react 将这个 update 放到 Update Queue 末端。
+
+在 **某个特定的** 时候，react 将遍历 Update Queue 中的 update，并计算出新的状态（state）。大致过程如下：
+
+1. 遍历 Update Queue
+2. 根据 update 的优先级（ expirationTime > renderExpirationTime）决定哪些 update 需要先处理。PS: renderExpirationTime 为全局变量，代表着当前 react 要处理任务的最低优先级。
+3. 对于要处理的 update，react 会根据 update.tag 和 update.payload 计算出新的 state。
+
+4. 其他细节。
+
+## UpdateQueue 原理
+
 UpdateQueue 是按优先顺序排列的更新的链表。
 
 > UpdateQueue is a linked list of prioritized updates.
@@ -40,7 +78,7 @@ update twice.)
 > Updates are not sorted by priority, but by insertion; new updates are always
 > appended to the end of the list.
 
-不过，优先级仍然很重要。在渲染阶段处理更新队列时，结果中仅包括具有足够优先级的更新。如果我们跳过一个更新，因为它没有足够的优先级，它将保留在队列中，以便稍后在较低优先级渲染期间进行处理。至关重要的是，跳过更新之后的所有更新也会保留在队列中*而不管它们的优先级*。这意味着高优先级更新有时会以两个不同的优先级处理两次。我们还跟踪基本状态，它表示应用队列中的第一次更新之前的状态。
+不过，优先级仍然很重要。在渲染阶段处理更新队列时，结果中仅包括具有足够优先级的更新。如果一个更新没有足够的优先级，我们将跳过它，它将保留在队列中，以便稍后在较低优先级渲染期间进行处理。至关重要的是，跳过更新之后的所有更新也会保留在队列中*而不管它们的优先级*。这意味着高优先级更新有时会以两个不同的优先级处理两次。我们还跟踪基本状态，它表示应用队列中的第一次更新之前的状态。
 
 > The priority is still important, though. When processing the update queue
 > during the render phase, only the updates with sufficient priority are
@@ -91,6 +129,8 @@ Result state: 'ABCD'
 > regardless of priority. Intermediate state may vary according to system
 > resources, but the final state is always the same.
 
+## 全局状态（Global state）
+
 ```javascript
 var UpdateState = 0;
 var ReplaceState = 1;
@@ -102,11 +142,13 @@ var CaptureUpdate = 3;
 // `checkHasForceUpdateAfterProcessing`.
 var hasForceUpdate = false;
 var didWarnUpdateInsideUpdate = false;
-var currentlyProcessingQueue = null;
+var currentlyProcessingQueue = null; // 在 enqueueUpdate 函数中使用
 var resetCurrentlyProcessingQueue = function() {
     currentlyProcessingQueue = null;
 };
+```
 
+```javascript
 function createUpdateQueue(baseState) {
     var queue = {
         baseState: baseState,
@@ -293,6 +335,7 @@ function enqueueUpdate(fiber, update) {
 function enqueueCapturedUpdate(workInProgress, update) {
     // Captured updates go into a separate list, and only on the work-in-
     // progress queue.
+    // 捕获的更新将放入单独的列表中，并且仅在work-in-progress的队列中。
     var workInProgressQueue = workInProgress.updateQueue;
     if (workInProgressQueue === null) {
         workInProgressQueue = workInProgress.updateQueue = createUpdateQueue(
@@ -317,7 +360,13 @@ function enqueueCapturedUpdate(workInProgress, update) {
         workInProgressQueue.lastCapturedUpdate = update;
     }
 }
+```
 
+## `ensureWorkInProgressQueueIsAClone(workInProgress, queue)`
+
+确保`workInProgress.updateQueue`跟`workInProgress.alternate.updateQueue`不能是同一个。按照 UpdateQueue 的设计功能，所有的工作都在 workInProgress 上面进行，如果`workInProgress.updateQueue` 跟 `workInProgress.alternate.updateQueue`是同一个，则克隆 updateQueue 然后将其赋值给`workInProgress.updateQueue`。
+
+```javascript
 function ensureWorkInProgressQueueIsAClone(workInProgress, queue) {
     var current = workInProgress.alternate;
     if (current !== null) {
@@ -329,82 +378,15 @@ function ensureWorkInProgressQueueIsAClone(workInProgress, queue) {
     }
     return queue;
 }
+```
 
-function getStateFromUpdate(
-    workInProgress,
-    queue,
-    update,
-    prevState,
-    nextProps,
-    instance
-) {
-    switch (update.tag) {
-        case ReplaceState: {
-            var _payload = update.payload;
-            if (typeof _payload === 'function') {
-                // Updater function
-                {
-                    enterDisallowedContextReadInDEV();
-                    if (
-                        debugRenderPhaseSideEffects ||
-                        (debugRenderPhaseSideEffectsForStrictMode &&
-                            workInProgress.mode & StrictMode)
-                    ) {
-                        _payload.call(instance, prevState, nextProps);
-                    }
-                }
-                var nextState = _payload.call(instance, prevState, nextProps);
-                {
-                    exitDisallowedContextReadInDEV();
-                }
-                return nextState;
-            }
-            // State object
-            return _payload;
-        }
-        case CaptureUpdate: {
-            workInProgress.effectTag =
-                (workInProgress.effectTag & ~ShouldCapture) | DidCapture;
-        }
-        // Intentional fallthrough
-        case UpdateState: {
-            var _payload2 = update.payload;
-            var partialState = undefined;
-            if (typeof _payload2 === 'function') {
-                // Updater function
-                {
-                    enterDisallowedContextReadInDEV();
-                    if (
-                        debugRenderPhaseSideEffects ||
-                        (debugRenderPhaseSideEffectsForStrictMode &&
-                            workInProgress.mode & StrictMode)
-                    ) {
-                        _payload2.call(instance, prevState, nextProps);
-                    }
-                }
-                partialState = _payload2.call(instance, prevState, nextProps);
-                {
-                    exitDisallowedContextReadInDEV();
-                }
-            } else {
-                // Partial state object
-                partialState = _payload2;
-            }
-            if (partialState === null || partialState === undefined) {
-                // Null and undefined are treated as no-ops.
-                return prevState;
-            }
-            // Merge the partial state and the previous state.
-            return _assign({}, prevState, partialState);
-        }
-        case ForceUpdate: {
-            hasForceUpdate = true;
-            return prevState;
-        }
-    }
-    return prevState;
-}
+## `processUpdateQueue`（处理更新队列）
 
+这里的逻辑就是开头概述里描述的。
+
+> 在渲染阶段处理更新队列时，结果中仅包括具有足够优先级的更新。如果一个更新没有足够的优先级，我们将跳过它，它将保留在队列中，以便稍后在较低优先级渲染期间进行处理。至关重要的是，跳过更新之后的所有更新也会保留在队列中*而不管它们的优先级*。这意味着高优先级更新有时会以两个不同的优先级处理两次。我们还跟踪基本状态，它表示应用队列中的第一次更新之前的状态。
+
+```javascript
 function processUpdateQueue(
     workInProgress,
     queue,
@@ -414,22 +396,31 @@ function processUpdateQueue(
 ) {
     hasForceUpdate = false;
 
+    // 工作只在workInProgress上进行，确保`workInProgress.updateQueue`
+    // 是一个独立的queue，不会影响另一个updateQueue
     queue = ensureWorkInProgressQueueIsAClone(workInProgress, queue);
 
+    // 在 enqueueUpdate 函数中使用
     currentlyProcessingQueue = queue;
 
     // These values may change as we process the queue.
+    // 当我们处理队列时，这些值可能会改变
     var newBaseState = queue.baseState;
     var newFirstUpdate = null;
     var newExpirationTime = NoWork;
 
     // Iterate through the list of updates to compute the result.
+    // 遍历updates，计算最终结果
     var update = queue.firstUpdate;
     var resultState = newBaseState;
     while (update !== null) {
         var updateExpirationTime = update.expirationTime;
         if (updateExpirationTime < renderExpirationTime) {
             // This update does not have sufficient priority. Skip it.
+            // 此更新没有足够的优先级。跳过它。
+            //
+            // 在渲染阶段处理更新队列时，结果中仅包括具有足够优先级的更新。如果一个更新没有足够的优
+            // 先级，我们将跳过它，它将保留在队列中，以便稍后在较低优先级渲染期间进行处理。
             if (newFirstUpdate === null) {
                 // This is the first skipped update. It will be the first update in
                 // the new list.
@@ -446,6 +437,7 @@ function processUpdateQueue(
         } else {
             // This update does have sufficient priority. Process it and compute
             // a new result.
+            // update具有足够高的权限，处理它并获取结果。
             resultState = getStateFromUpdate(
                 workInProgress,
                 queue,
@@ -454,10 +446,19 @@ function processUpdateQueue(
                 props,
                 instance
             );
+            /* ----------- */
+            /* ----------- */
+            /* ----------- */
+            /* 暂时不懂这里 */
+            /* ----------- */
+            /* ----------- */
+            /* ----------- */
             var _callback = update.callback;
             if (_callback !== null) {
+                //                             32
                 workInProgress.effectTag |= Callback;
                 // Set this to null, in case it was mutated during an aborted render.
+                // 将此设置为NULL，以防在中止的渲染过程中发生变化。
                 update.nextEffect = null;
                 if (queue.lastEffect === null) {
                     queue.firstEffect = queue.lastEffect = update;
@@ -472,6 +473,7 @@ function processUpdateQueue(
     }
 
     // Separately, iterate though the list of captured updates.
+    // 单独地，遍历捕获的更新列表。
     var newFirstCapturedUpdate = null;
     update = queue.firstCapturedUpdate;
     while (update !== null) {
@@ -545,6 +547,11 @@ function processUpdateQueue(
     // dealt with the props. Context in components that specify
     // shouldComponentUpdate is tricky; but we'll have to account for
     // that regardless.
+    // 将剩余过期时间设置为队列中剩余的任何内容。
+    // 这应该没问题，因为导致到期时间的另外两个因素是道具和上下文。
+    // 当我们开始处理队列时，我们已经处于开始阶段的中间，所以我们已经处理好了道具。
+    // 指定shouldComponentUpdate的组件中的上下文是很棘手的；
+    // 但是无论如何我们都必须考虑到这一点。
     workInProgress.expirationTime = newExpirationTime;
     workInProgress.memoizedState = resultState;
 
@@ -552,7 +559,110 @@ function processUpdateQueue(
         currentlyProcessingQueue = null;
     }
 }
+```
 
+## **`getStateFromUpdate`**
+
+关于 state 的函数，调用下面这些方法：
+
+1. replaceState
+2. forceUpdate
+3. setState
+
+引起的更新，经过此方法处理，返回一个新的 state
+
+```javascript
+function getStateFromUpdate(
+    workInProgress,
+    queue,
+    update,
+    prevState,
+    nextProps,
+    instance
+) {
+    switch (update.tag) {
+        // replaceState() 暂时不看
+        case ReplaceState: {
+            var _payload = update.payload;
+            if (typeof _payload === 'function') {
+                // Updater function
+                {
+                    enterDisallowedContextReadInDEV();
+                    if (
+                        debugRenderPhaseSideEffects ||
+                        (debugRenderPhaseSideEffectsForStrictMode &&
+                            workInProgress.mode & StrictMode)
+                    ) {
+                        _payload.call(instance, prevState, nextProps);
+                    }
+                }
+                var nextState = _payload.call(instance, prevState, nextProps);
+                {
+                    exitDisallowedContextReadInDEV();
+                }
+                return nextState;
+            }
+            // State object
+            return _payload;
+        }
+        case CaptureUpdate: {
+            workInProgress.effectTag =
+                (workInProgress.effectTag & ~ShouldCapture) | DidCapture;
+        }
+        // Intentional fallthrough
+        // 故意跌落
+        // setState
+        case UpdateState: {
+            var _payload2 = update.payload;
+            var partialState = undefined;
+            if (typeof _payload2 === 'function') {
+                // Updater function
+                //
+                // setState(prev=>{
+                //    value: !prev.value
+                //})
+                {
+                    enterDisallowedContextReadInDEV();
+                    if (
+                        debugRenderPhaseSideEffects ||
+                        (debugRenderPhaseSideEffectsForStrictMode &&
+                            workInProgress.mode & StrictMode)
+                    ) {
+                        _payload2.call(instance, prevState, nextProps);
+                    }
+                }
+                partialState = _payload2.call(instance, prevState, nextProps);
+                {
+                    exitDisallowedContextReadInDEV();
+                }
+            } else {
+                // Partial state object
+                // 部分 state object
+                //
+                // setState({
+                //    value: 'value'
+                //})
+                partialState = _payload2;
+            }
+            if (partialState === null || partialState === undefined) {
+                // Null and undefined are treated as no-ops.
+                return prevState;
+            }
+            // Merge the partial state and the previous state.
+            return _assign({}, prevState, partialState);
+        }
+        case ForceUpdate: {
+            hasForceUpdate = true;
+            return prevState;
+        }
+    }
+    return prevState;
+}
+```
+
+## 其他
+
+```javascript
 function callCallback(callback, context) {
     !(typeof callback === 'function')
         ? invariant(
