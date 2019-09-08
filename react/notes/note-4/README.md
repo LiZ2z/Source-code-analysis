@@ -1,5 +1,6 @@
 [current]: ../modules/current.md
 [enqueueupdate]: ../modules/UpdateQueue.md
+[schedulework]: ../note-5/README.md
 
 # 主线`scheduleRootUpdate`
 
@@ -79,3 +80,7 @@ function flushPassiveEffects() {
 ## 支线，`enqueueUpdate(current$$1, update)`
 
 见 [**enqueueupdate**][enqueueupdate]
+
+## 主线，`scheduleWork(fiber, expirationTime)`
+
+[**schedulework**][schedulework]

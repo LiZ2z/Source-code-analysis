@@ -24662,6 +24662,10 @@ function scheduleWorkToRoot(fiber, expirationTime) {
     }
 
     if (root !== null) {
+        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        // 看不懂       看不懂
+        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        // 存储一个  new Set()
         var interactions = tracing.__interactionsRef.current;
         if (interactions.size > 0) {
             var pendingInteractionMap = root.pendingInteractionMap;
