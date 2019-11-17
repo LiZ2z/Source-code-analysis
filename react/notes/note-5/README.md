@@ -19,6 +19,7 @@ function scheduleWork(fiber, expirationTime) {
         return;
     }
 
+    // 不懂这里
     if (
         !isWorking &&
         nextRenderExpirationTime !== NoWork &&
@@ -34,14 +35,18 @@ function scheduleWork(fiber, expirationTime) {
     if (
         // If we're in the render phase, we don't need to schedule this root
         // for an update, because we'll do it before we exit...
+        // 如果在render阶段，我们不需要schedule这个root 的update，
+        // 因为我们将会在退出之前做
         !isWorking ||
         isCommitting ||
         // ...unless this is a different root than the one we're rendering.
+        // 除非，这是另一个root
         nextRoot !== root
     ) {
         var rootExpirationTime = root.expirationTime;
         requestWork(root, rootExpirationTime);
     }
+
     if (nestedUpdateCount > NESTED_UPDATE_LIMIT) {
         // Reset this back to zero so subsequent updates don't throw.
         nestedUpdateCount = 0;
@@ -160,5 +165,76 @@ function recordScheduleUpdate() {
     ) {
         hasScheduledUpdateInCurrentPhase = true;
     }
+}
+```
+
+## 支线，`markPendingPriorityLevel(root, expirationTime)`
+
+```javascript
+// TODO: Offscreen updates should never suspend. However, a promise that
+// suspended inside an offscreen subtree should be able to ping at the priority
+// of the outer render.
+function markPendingPriorityLevel(root, expirationTime) {
+    // If there's a gap between completing a failed root and retrying it,
+    // additional updates may be scheduled. Clear `didError`, in case the update
+    // is sufficient to fix the error.
+    root.didError = false;
+
+    // Update the latest and earliest pending times
+    var earliestPendingTime = root.earliestPendingTime;
+    if (earliestPendingTime === NoWork) {
+        // No other pending updates.
+        root.earliestPendingTime = root.latestPendingTime = expirationTime;
+    } else {
+        if (earliestPendingTime < expirationTime) {
+            // This is the earliest pending update.
+            root.earliestPendingTime = expirationTime;
+        } else {
+            var latestPendingTime = root.latestPendingTime;
+            if (latestPendingTime > expirationTime) {
+                // This is the latest pending update
+                root.latestPendingTime = expirationTime;
+            }
+        }
+    }
+    findNextExpirationTimeToWorkOn(expirationTime, root);
+}
+```
+
+## 支线，`findNextExpirationTimeToWorkOn(completedExpirationTime, root)`
+
+```javascript
+function findNextExpirationTimeToWorkOn(completedExpirationTime, root) {
+    var earliestSuspendedTime = root.earliestSuspendedTime;
+    var latestSuspendedTime = root.latestSuspendedTime;
+    var earliestPendingTime = root.earliestPendingTime;
+    var latestPingedTime = root.latestPingedTime;
+
+    // Work on the earliest pending time. Failing that, work on the latest
+    // pinged time.
+    var nextExpirationTimeToWorkOn =
+        earliestPendingTime !== NoWork ? earliestPendingTime : latestPingedTime;
+
+    // If there is no pending or pinged work, check if there's suspended work
+    // that's lower priority than what we just completed.
+    if (
+        nextExpirationTimeToWorkOn === NoWork &&
+        (completedExpirationTime === NoWork ||
+            latestSuspendedTime < completedExpirationTime)
+    ) {
+        // The lowest priority suspended work is the work most likely to be
+        // committed next. Let's start rendering it again, so that if it times out,
+        // it's ready to commit.
+        nextExpirationTimeToWorkOn = latestSuspendedTime;
+    }
+
+    var expirationTime = nextExpirationTimeToWorkOn;
+    if (expirationTime !== NoWork && earliestSuspendedTime > expirationTime) {
+        // Expire using the earliest known expiration time.
+        expirationTime = earliestSuspendedTime;
+    }
+
+    root.nextExpirationTimeToWorkOn = nextExpirationTimeToWorkOn;
+    root.expirationTime = expirationTime;
 }
 ```

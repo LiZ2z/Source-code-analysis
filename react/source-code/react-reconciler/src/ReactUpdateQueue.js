@@ -84,52 +84,56 @@
 // regardless of priority. Intermediate state may vary according to system
 // resources, but the final state is always the same.
 
-import type {Fiber} from './ReactFiber';
-import type {ExpirationTime} from './ReactFiberExpirationTime';
+import type { Fiber } from './ReactFiber';
+import type { ExpirationTime } from './ReactFiberExpirationTime';
 
-import {NoWork} from './ReactFiberExpirationTime';
+import { NoWork } from './ReactFiberExpirationTime';
 import {
-  enterDisallowedContextReadInDEV,
-  exitDisallowedContextReadInDEV,
+    enterDisallowedContextReadInDEV,
+    exitDisallowedContextReadInDEV
 } from './ReactFiberNewContext';
-import {Callback, ShouldCapture, DidCapture} from 'shared/ReactSideEffectTags';
-import {ClassComponent} from 'shared/ReactWorkTags';
+import {
+    Callback,
+    ShouldCapture,
+    DidCapture
+} from 'shared/ReactSideEffectTags';
+import { ClassComponent } from 'shared/ReactWorkTags';
 
 import {
-  debugRenderPhaseSideEffects,
-  debugRenderPhaseSideEffectsForStrictMode,
+    debugRenderPhaseSideEffects,
+    debugRenderPhaseSideEffectsForStrictMode
 } from 'shared/ReactFeatureFlags';
 
-import {StrictMode} from './ReactTypeOfMode';
+import { StrictMode } from './ReactTypeOfMode';
 
 import invariant from 'shared/invariant';
 import warningWithoutStack from 'shared/warningWithoutStack';
 
 export type Update<State> = {
-  expirationTime: ExpirationTime,
+    expirationTime: ExpirationTime,
 
-  tag: 0 | 1 | 2 | 3,
-  payload: any,
-  callback: (() => mixed) | null,
+    tag: 0 | 1 | 2 | 3,
+    payload: any,
+    callback: (() => mixed) | null,
 
-  next: Update<State> | null,
-  nextEffect: Update<State> | null,
+    next: Update<State> | null,
+    nextEffect: Update<State> | null
 };
 
 export type UpdateQueue<State> = {
-  baseState: State,
+    baseState: State,
 
-  firstUpdate: Update<State> | null,
-  lastUpdate: Update<State> | null,
+    firstUpdate: Update<State> | null,
+    lastUpdate: Update<State> | null,
 
-  firstCapturedUpdate: Update<State> | null,
-  lastCapturedUpdate: Update<State> | null,
+    firstCapturedUpdate: Update<State> | null,
+    lastCapturedUpdate: Update<State> | null,
 
-  firstEffect: Update<State> | null,
-  lastEffect: Update<State> | null,
+    firstEffect: Update<State> | null,
+    lastEffect: Update<State> | null,
 
-  firstCapturedEffect: Update<State> | null,
-  lastCapturedEffect: Update<State> | null,
+    firstCapturedEffect: Update<State> | null,
+    lastCapturedEffect: Update<State> | null
 };
 
 export const UpdateState = 0;
@@ -146,489 +150,492 @@ let didWarnUpdateInsideUpdate;
 let currentlyProcessingQueue;
 export let resetCurrentlyProcessingQueue;
 if (__DEV__) {
-  didWarnUpdateInsideUpdate = false;
-  currentlyProcessingQueue = null;
-  resetCurrentlyProcessingQueue = () => {
+    didWarnUpdateInsideUpdate = false;
     currentlyProcessingQueue = null;
-  };
+    resetCurrentlyProcessingQueue = () => {
+        currentlyProcessingQueue = null;
+    };
 }
 /**
  * @caller: [enqueueUpdate](226)
  */
 export function createUpdateQueue<State>(baseState: State): UpdateQueue<State> {
-  const queue: UpdateQueue<State> = {
-    baseState,
-    firstUpdate: null,
-    lastUpdate: null,
-    firstCapturedUpdate: null,
-    lastCapturedUpdate: null,
-    firstEffect: null,
-    lastEffect: null,
-    firstCapturedEffect: null,
-    lastCapturedEffect: null,
-  };
-  return queue;
+    const queue: UpdateQueue<State> = {
+        baseState,
+        firstUpdate: null,
+        lastUpdate: null,
+        firstCapturedUpdate: null,
+        lastCapturedUpdate: null,
+        firstEffect: null,
+        lastEffect: null,
+        firstCapturedEffect: null,
+        lastCapturedEffect: null
+    };
+    return queue;
 }
 
 function cloneUpdateQueue<State>(
-  currentQueue: UpdateQueue<State>,
+    currentQueue: UpdateQueue<State>
 ): UpdateQueue<State> {
-  const queue: UpdateQueue<State> = {
-    baseState: currentQueue.baseState,
-    firstUpdate: currentQueue.firstUpdate,
-    lastUpdate: currentQueue.lastUpdate,
+    const queue: UpdateQueue<State> = {
+        baseState: currentQueue.baseState,
+        firstUpdate: currentQueue.firstUpdate,
+        lastUpdate: currentQueue.lastUpdate,
 
-    // TODO: With resuming, if we bail out and resuse the child tree, we should
-    // keep these effects.
-    firstCapturedUpdate: null,
-    lastCapturedUpdate: null,
+        // TODO: With resuming, if we bail out and resuse the child tree, we should
+        // keep these effects.
+        firstCapturedUpdate: null,
+        lastCapturedUpdate: null,
 
-    firstEffect: null,
-    lastEffect: null,
+        firstEffect: null,
+        lastEffect: null,
 
-    firstCapturedEffect: null,
-    lastCapturedEffect: null,
-  };
-  return queue;
+        firstCapturedEffect: null,
+        lastCapturedEffect: null
+    };
+    return queue;
 }
 
 /**
  * @caller: [scheduleRootUpdate](./ReactFiberReconciler.js:118)
  */
 export function createUpdate(expirationTime: ExpirationTime): Update<*> {
-  return {
-    expirationTime: expirationTime,
+    return {
+        expirationTime: expirationTime,
 
-    tag: UpdateState, // 0
-    payload: null,
-    callback: null,
+        tag: UpdateState, // 0
+        payload: null,
+        callback: null,
 
-    next: null,
-    nextEffect: null,
-  };
+        next: null,
+        nextEffect: null
+    };
 }
 /**
  * @caller: [enqueueUpdate](226)
  */
 function appendUpdateToQueue<State>(
-  queue: UpdateQueue<State>,
-  update: Update<State>,
+    queue: UpdateQueue<State>,
+    update: Update<State>
 ) {
-  // Append the update to the end of the list.
-  if (queue.lastUpdate === null) {
-    // Queue is empty
-    queue.firstUpdate = queue.lastUpdate = update;
-  } else {
-    queue.lastUpdate.next = update;
-    queue.lastUpdate = update;
-  }
+    // Append the update to the end of the list.
+    if (queue.lastUpdate === null) {
+        // Queue is empty
+        queue.firstUpdate = queue.lastUpdate = update;
+    } else {
+        queue.lastUpdate.next = update;
+        queue.lastUpdate = update;
+    }
 }
 
 /**
  * @caller: [scheduleRootUpdate](./ReactFiberReconciler.js:118)
  */
 export function enqueueUpdate<State>(fiber: Fiber, update: Update<State>) {
-  // Update queues are created lazily.
-  const alternate = fiber.alternate;
-  let queue1;
-  let queue2;
-  if (alternate === null) {
-    // There's only one fiber.
-    queue1 = fiber.updateQueue;
-    queue2 = null;
-    if (queue1 === null) {
-      queue1 = fiber.updateQueue = createUpdateQueue(fiber.memoizedState);
-    }
-  } else {
-    // There are two owners.
-    queue1 = fiber.updateQueue;
-    queue2 = alternate.updateQueue;
-    if (queue1 === null) {
-      if (queue2 === null) {
-        // Neither fiber has an update queue. Create new ones.
-        queue1 = fiber.updateQueue = createUpdateQueue(fiber.memoizedState);
-        queue2 = alternate.updateQueue = createUpdateQueue(
-          alternate.memoizedState,
-        );
-      } else {
-        // Only one fiber has an update queue. Clone to create a new one.
-        queue1 = fiber.updateQueue = cloneUpdateQueue(queue2);
-      }
+    // Update queues are created lazily.
+    const alternate = fiber.alternate;
+    let queue1;
+    let queue2;
+    if (alternate === null) {
+        // There's only one fiber.
+        queue1 = fiber.updateQueue;
+        queue2 = null;
+        if (queue1 === null) {
+            queue1 = fiber.updateQueue = createUpdateQueue(fiber.memoizedState);
+        }
     } else {
-      if (queue2 === null) {
-        // Only one fiber has an update queue. Clone to create a new one.
-        queue2 = alternate.updateQueue = cloneUpdateQueue(queue1);
-      } else {
-        // Both owners have an update queue.
-      }
+        // There are two owners.
+        queue1 = fiber.updateQueue;
+        queue2 = alternate.updateQueue;
+        if (queue1 === null) {
+            if (queue2 === null) {
+                // Neither fiber has an update queue. Create new ones.
+                queue1 = fiber.updateQueue = createUpdateQueue(
+                    fiber.memoizedState
+                );
+                queue2 = alternate.updateQueue = createUpdateQueue(
+                    alternate.memoizedState
+                );
+            } else {
+                // Only one fiber has an update queue. Clone to create a new one.
+                queue1 = fiber.updateQueue = cloneUpdateQueue(queue2);
+            }
+        } else {
+            if (queue2 === null) {
+                // Only one fiber has an update queue. Clone to create a new one.
+                queue2 = alternate.updateQueue = cloneUpdateQueue(queue1);
+            } else {
+                // Both owners have an update queue.
+            }
+        }
     }
-  }
-  if (queue2 === null || queue1 === queue2) {
-    // There's only a single queue.
-    appendUpdateToQueue(queue1, update);
-  } else {
-    // There are two queues. We need to append the update to both queues,
-    // while accounting for the persistent structure of the list — we don't
-    // want the same update to be added multiple times.
-    if (queue1.lastUpdate === null || queue2.lastUpdate === null) {
-      // One of the queues is not empty. We must add the update to both queues.
-      appendUpdateToQueue(queue1, update);
-      appendUpdateToQueue(queue2, update);
+    if (queue2 === null || queue1 === queue2) {
+        // There's only a single queue.
+        appendUpdateToQueue(queue1, update);
     } else {
-      // Both queues are non-empty. The last update is the same in both lists,
-      // because of structural sharing. So, only append to one of the lists.
-      appendUpdateToQueue(queue1, update);
-      // But we still need to update the `lastUpdate` pointer of queue2.
-      queue2.lastUpdate = update;
+        // There are two queues. We need to append the update to both queues,
+        // while accounting for the persistent structure of the list — we don't
+        // want the same update to be added multiple times.
+        if (queue1.lastUpdate === null || queue2.lastUpdate === null) {
+            // One of the queues is not empty. We must add the update to both queues.
+            appendUpdateToQueue(queue1, update);
+            appendUpdateToQueue(queue2, update);
+        } else {
+            // Both queues are non-empty. The last update is the same in both lists,
+            // because of structural sharing. So, only append to one of the lists.
+            appendUpdateToQueue(queue1, update);
+            // But we still need to update the `lastUpdate` pointer of queue2.
+            queue2.lastUpdate = update;
+        }
     }
-  }
 
-  if (__DEV__) {
-    if (
-      fiber.tag === ClassComponent &&
-      (currentlyProcessingQueue === queue1 ||
-        (queue2 !== null && currentlyProcessingQueue === queue2)) &&
-      !didWarnUpdateInsideUpdate
-    ) {
-      warningWithoutStack(
-        false,
-        'An update (setState, replaceState, or forceUpdate) was scheduled ' +
-          'from inside an update function. Update functions should be pure, ' +
-          'with zero side-effects. Consider using componentDidUpdate or a ' +
-          'callback.',
-      );
-      didWarnUpdateInsideUpdate = true;
+    if (__DEV__) {
+        if (
+            fiber.tag === ClassComponent &&
+            (currentlyProcessingQueue === queue1 ||
+                (queue2 !== null && currentlyProcessingQueue === queue2)) &&
+            !didWarnUpdateInsideUpdate
+        ) {
+            warningWithoutStack(
+                false,
+                'An update (setState, replaceState, or forceUpdate) was scheduled ' +
+                    'from inside an update function. Update functions should be pure, ' +
+                    'with zero side-effects. Consider using componentDidUpdate or a ' +
+                    'callback.'
+            );
+            didWarnUpdateInsideUpdate = true;
+        }
     }
-  }
 }
 
 export function enqueueCapturedUpdate<State>(
-  workInProgress: Fiber,
-  update: Update<State>,
+    workInProgress: Fiber,
+    update: Update<State>
 ) {
-  // Captured updates go into a separate list, and only on the work-in-
-  // progress queue.
-  let workInProgressQueue = workInProgress.updateQueue;
-  if (workInProgressQueue === null) {
-    workInProgressQueue = workInProgress.updateQueue = createUpdateQueue(
-      workInProgress.memoizedState,
-    );
-  } else {
-    // TODO: I put this here rather than createWorkInProgress so that we don't
-    // clone the queue unnecessarily. There's probably a better way to
-    // structure this.
-    workInProgressQueue = ensureWorkInProgressQueueIsAClone(
-      workInProgress,
-      workInProgressQueue,
-    );
-  }
+    // Captured updates go into a separate list, and only on the work-in-
+    // progress queue.
+    let workInProgressQueue = workInProgress.updateQueue;
+    if (workInProgressQueue === null) {
+        workInProgressQueue = workInProgress.updateQueue = createUpdateQueue(
+            workInProgress.memoizedState
+        );
+    } else {
+        // TODO: I put this here rather than createWorkInProgress so that we don't
+        // clone the queue unnecessarily. There's probably a better way to
+        // structure this.
+        workInProgressQueue = ensureWorkInProgressQueueIsAClone(
+            workInProgress,
+            workInProgressQueue
+        );
+    }
 
-  // Append the update to the end of the list.
-  if (workInProgressQueue.lastCapturedUpdate === null) {
-    // This is the first render phase update
-    workInProgressQueue.firstCapturedUpdate = workInProgressQueue.lastCapturedUpdate = update;
-  } else {
-    workInProgressQueue.lastCapturedUpdate.next = update;
-    workInProgressQueue.lastCapturedUpdate = update;
-  }
+    // Append the update to the end of the list.
+    if (workInProgressQueue.lastCapturedUpdate === null) {
+        // This is the first render phase update
+        workInProgressQueue.firstCapturedUpdate = workInProgressQueue.lastCapturedUpdate = update;
+    } else {
+        workInProgressQueue.lastCapturedUpdate.next = update;
+        workInProgressQueue.lastCapturedUpdate = update;
+    }
 }
 
 function ensureWorkInProgressQueueIsAClone<State>(
-  workInProgress: Fiber,
-  queue: UpdateQueue<State>,
+    workInProgress: Fiber,
+    queue: UpdateQueue<State>
 ): UpdateQueue<State> {
-  const current = workInProgress.alternate;
-  if (current !== null) {
-    // If the work-in-progress queue is equal to the current queue,
-    // we need to clone it first.
-    if (queue === current.updateQueue) {
-      queue = workInProgress.updateQueue = cloneUpdateQueue(queue);
+    const current = workInProgress.alternate;
+    if (current !== null) {
+        // If the work-in-progress queue is equal to the current queue,
+        // we need to clone it first.
+        if (queue === current.updateQueue) {
+            queue = workInProgress.updateQueue = cloneUpdateQueue(queue);
+        }
     }
-  }
-  return queue;
+    return queue;
 }
 
 function getStateFromUpdate<State>(
-  workInProgress: Fiber,
-  queue: UpdateQueue<State>,
-  update: Update<State>,
-  prevState: State,
-  nextProps: any,
-  instance: any,
+    workInProgress: Fiber,
+    queue: UpdateQueue<State>,
+    update: Update<State>,
+    prevState: State,
+    nextProps: any,
+    instance: any
 ): any {
-  switch (update.tag) {
-    case ReplaceState: {
-      const payload = update.payload;
-      if (typeof payload === 'function') {
-        // Updater function
-        if (__DEV__) {
-          enterDisallowedContextReadInDEV();
-          if (
-            debugRenderPhaseSideEffects ||
-            (debugRenderPhaseSideEffectsForStrictMode &&
-              workInProgress.mode & StrictMode)
-          ) {
-            payload.call(instance, prevState, nextProps);
-          }
+    // eslint-disable-next-line default-case
+    switch (update.tag) {
+        case ReplaceState: {
+            const payload = update.payload;
+            if (typeof payload === 'function') {
+                // Updater function
+                if (__DEV__) {
+                    enterDisallowedContextReadInDEV();
+                    if (
+                        debugRenderPhaseSideEffects ||
+                        (debugRenderPhaseSideEffectsForStrictMode &&
+                            workInProgress.mode & StrictMode)
+                    ) {
+                        payload.call(instance, prevState, nextProps);
+                    }
+                }
+                const nextState = payload.call(instance, prevState, nextProps);
+                if (__DEV__) {
+                    exitDisallowedContextReadInDEV();
+                }
+                return nextState;
+            }
+            // State object
+            return payload;
         }
-        const nextState = payload.call(instance, prevState, nextProps);
-        if (__DEV__) {
-          exitDisallowedContextReadInDEV();
+        case CaptureUpdate: {
+            workInProgress.effectTag =
+                (workInProgress.effectTag & ~ShouldCapture) | DidCapture;
         }
-        return nextState;
-      }
-      // State object
-      return payload;
-    }
-    case CaptureUpdate: {
-      workInProgress.effectTag =
-        (workInProgress.effectTag & ~ShouldCapture) | DidCapture;
-    }
-    // Intentional fallthrough
-    case UpdateState: {
-      const payload = update.payload;
-      let partialState;
-      if (typeof payload === 'function') {
-        // Updater function
-        if (__DEV__) {
-          enterDisallowedContextReadInDEV();
-          if (
-            debugRenderPhaseSideEffects ||
-            (debugRenderPhaseSideEffectsForStrictMode &&
-              workInProgress.mode & StrictMode)
-          ) {
-            payload.call(instance, prevState, nextProps);
-          }
+        // Intentional fallthrough
+        case UpdateState: {
+            const payload = update.payload;
+            let partialState;
+            if (typeof payload === 'function') {
+                // Updater function
+                if (__DEV__) {
+                    enterDisallowedContextReadInDEV();
+                    if (
+                        debugRenderPhaseSideEffects ||
+                        (debugRenderPhaseSideEffectsForStrictMode &&
+                            workInProgress.mode & StrictMode)
+                    ) {
+                        payload.call(instance, prevState, nextProps);
+                    }
+                }
+                partialState = payload.call(instance, prevState, nextProps);
+                if (__DEV__) {
+                    exitDisallowedContextReadInDEV();
+                }
+            } else {
+                // Partial state object
+                partialState = payload;
+            }
+            if (partialState === null || partialState === undefined) {
+                // Null and undefined are treated as no-ops.
+                return prevState;
+            }
+            // Merge the partial state and the previous state.
+            return Object.assign({}, prevState, partialState);
         }
-        partialState = payload.call(instance, prevState, nextProps);
-        if (__DEV__) {
-          exitDisallowedContextReadInDEV();
+        case ForceUpdate: {
+            hasForceUpdate = true;
+            return prevState;
         }
-      } else {
-        // Partial state object
-        partialState = payload;
-      }
-      if (partialState === null || partialState === undefined) {
-        // Null and undefined are treated as no-ops.
-        return prevState;
-      }
-      // Merge the partial state and the previous state.
-      return Object.assign({}, prevState, partialState);
     }
-    case ForceUpdate: {
-      hasForceUpdate = true;
-      return prevState;
-    }
-  }
-  return prevState;
+    return prevState;
 }
 
 export function processUpdateQueue<State>(
-  workInProgress: Fiber,
-  queue: UpdateQueue<State>,
-  props: any,
-  instance: any,
-  renderExpirationTime: ExpirationTime,
+    workInProgress: Fiber,
+    queue: UpdateQueue<State>,
+    props: any,
+    instance: any,
+    renderExpirationTime: ExpirationTime
 ): void {
-  hasForceUpdate = false;
+    hasForceUpdate = false;
 
-  queue = ensureWorkInProgressQueueIsAClone(workInProgress, queue);
+    queue = ensureWorkInProgressQueueIsAClone(workInProgress, queue);
 
-  if (__DEV__) {
-    currentlyProcessingQueue = queue;
-  }
+    if (__DEV__) {
+        currentlyProcessingQueue = queue;
+    }
 
-  // These values may change as we process the queue.
-  let newBaseState = queue.baseState;
-  let newFirstUpdate = null;
-  let newExpirationTime = NoWork;
+    // These values may change as we process the queue.
+    let newBaseState = queue.baseState;
+    let newFirstUpdate = null;
+    let newExpirationTime = NoWork;
 
-  // Iterate through the list of updates to compute the result.
-  let update = queue.firstUpdate;
-  let resultState = newBaseState;
-  while (update !== null) {
-    const updateExpirationTime = update.expirationTime;
-    if (updateExpirationTime < renderExpirationTime) {
-      // This update does not have sufficient priority. Skip it.
-      if (newFirstUpdate === null) {
-        // This is the first skipped update. It will be the first update in
-        // the new list.
-        newFirstUpdate = update;
-        // Since this is the first update that was skipped, the current result
-        // is the new base state.
+    // Iterate through the list of updates to compute the result.
+    let update = queue.firstUpdate;
+    let resultState = newBaseState;
+    while (update !== null) {
+        const updateExpirationTime = update.expirationTime;
+        if (updateExpirationTime < renderExpirationTime) {
+            // This update does not have sufficient priority. Skip it.
+            if (newFirstUpdate === null) {
+                // This is the first skipped update. It will be the first update in
+                // the new list.
+                newFirstUpdate = update;
+                // Since this is the first update that was skipped, the current result
+                // is the new base state.
+                newBaseState = resultState;
+            }
+            // Since this update will remain in the list, update the remaining
+            // expiration time.
+            if (newExpirationTime < updateExpirationTime) {
+                newExpirationTime = updateExpirationTime;
+            }
+        } else {
+            // This update does have sufficient priority. Process it and compute
+            // a new result.
+            resultState = getStateFromUpdate(
+                workInProgress,
+                queue,
+                update,
+                resultState,
+                props,
+                instance
+            );
+            const callback = update.callback;
+            if (callback !== null) {
+                workInProgress.effectTag |= Callback;
+                // Set this to null, in case it was mutated during an aborted render.
+                update.nextEffect = null;
+                if (queue.lastEffect === null) {
+                    queue.firstEffect = queue.lastEffect = update;
+                } else {
+                    queue.lastEffect.nextEffect = update;
+                    queue.lastEffect = update;
+                }
+            }
+        }
+        // Continue to the next update.
+        update = update.next;
+    }
+
+    // Separately, iterate though the list of captured updates.
+    let newFirstCapturedUpdate = null;
+    update = queue.firstCapturedUpdate;
+    while (update !== null) {
+        const updateExpirationTime = update.expirationTime;
+        if (updateExpirationTime < renderExpirationTime) {
+            // This update does not have sufficient priority. Skip it.
+            if (newFirstCapturedUpdate === null) {
+                // This is the first skipped captured update. It will be the first
+                // update in the new list.
+                newFirstCapturedUpdate = update;
+                // If this is the first update that was skipped, the current result is
+                // the new base state.
+                if (newFirstUpdate === null) {
+                    newBaseState = resultState;
+                }
+            }
+            // Since this update will remain in the list, update the remaining
+            // expiration time.
+            if (newExpirationTime < updateExpirationTime) {
+                newExpirationTime = updateExpirationTime;
+            }
+        } else {
+            // This update does have sufficient priority. Process it and compute
+            // a new result.
+            resultState = getStateFromUpdate(
+                workInProgress,
+                queue,
+                update,
+                resultState,
+                props,
+                instance
+            );
+            const callback = update.callback;
+            if (callback !== null) {
+                workInProgress.effectTag |= Callback;
+                // Set this to null, in case it was mutated during an aborted render.
+                update.nextEffect = null;
+                if (queue.lastCapturedEffect === null) {
+                    queue.firstCapturedEffect = queue.lastCapturedEffect = update;
+                } else {
+                    queue.lastCapturedEffect.nextEffect = update;
+                    queue.lastCapturedEffect = update;
+                }
+            }
+        }
+        update = update.next;
+    }
+
+    if (newFirstUpdate === null) {
+        queue.lastUpdate = null;
+    }
+    if (newFirstCapturedUpdate === null) {
+        queue.lastCapturedUpdate = null;
+    } else {
+        workInProgress.effectTag |= Callback;
+    }
+    if (newFirstUpdate === null && newFirstCapturedUpdate === null) {
+        // We processed every update, without skipping. That means the new base
+        // state is the same as the result state.
         newBaseState = resultState;
-      }
-      // Since this update will remain in the list, update the remaining
-      // expiration time.
-      if (newExpirationTime < updateExpirationTime) {
-        newExpirationTime = updateExpirationTime;
-      }
-    } else {
-      // This update does have sufficient priority. Process it and compute
-      // a new result.
-      resultState = getStateFromUpdate(
-        workInProgress,
-        queue,
-        update,
-        resultState,
-        props,
-        instance,
-      );
-      const callback = update.callback;
-      if (callback !== null) {
-        workInProgress.effectTag |= Callback;
-        // Set this to null, in case it was mutated during an aborted render.
-        update.nextEffect = null;
-        if (queue.lastEffect === null) {
-          queue.firstEffect = queue.lastEffect = update;
-        } else {
-          queue.lastEffect.nextEffect = update;
-          queue.lastEffect = update;
-        }
-      }
     }
-    // Continue to the next update.
-    update = update.next;
-  }
 
-  // Separately, iterate though the list of captured updates.
-  let newFirstCapturedUpdate = null;
-  update = queue.firstCapturedUpdate;
-  while (update !== null) {
-    const updateExpirationTime = update.expirationTime;
-    if (updateExpirationTime < renderExpirationTime) {
-      // This update does not have sufficient priority. Skip it.
-      if (newFirstCapturedUpdate === null) {
-        // This is the first skipped captured update. It will be the first
-        // update in the new list.
-        newFirstCapturedUpdate = update;
-        // If this is the first update that was skipped, the current result is
-        // the new base state.
-        if (newFirstUpdate === null) {
-          newBaseState = resultState;
-        }
-      }
-      // Since this update will remain in the list, update the remaining
-      // expiration time.
-      if (newExpirationTime < updateExpirationTime) {
-        newExpirationTime = updateExpirationTime;
-      }
-    } else {
-      // This update does have sufficient priority. Process it and compute
-      // a new result.
-      resultState = getStateFromUpdate(
-        workInProgress,
-        queue,
-        update,
-        resultState,
-        props,
-        instance,
-      );
-      const callback = update.callback;
-      if (callback !== null) {
-        workInProgress.effectTag |= Callback;
-        // Set this to null, in case it was mutated during an aborted render.
-        update.nextEffect = null;
-        if (queue.lastCapturedEffect === null) {
-          queue.firstCapturedEffect = queue.lastCapturedEffect = update;
-        } else {
-          queue.lastCapturedEffect.nextEffect = update;
-          queue.lastCapturedEffect = update;
-        }
-      }
+    queue.baseState = newBaseState;
+    queue.firstUpdate = newFirstUpdate;
+    queue.firstCapturedUpdate = newFirstCapturedUpdate;
+
+    // Set the remaining expiration time to be whatever is remaining in the queue.
+    // This should be fine because the only two other things that contribute to
+    // expiration time are props and context. We're already in the middle of the
+    // begin phase by the time we start processing the queue, so we've already
+    // dealt with the props. Context in components that specify
+    // shouldComponentUpdate is tricky; but we'll have to account for
+    // that regardless.
+    workInProgress.expirationTime = newExpirationTime;
+    workInProgress.memoizedState = resultState;
+
+    if (__DEV__) {
+        currentlyProcessingQueue = null;
     }
-    update = update.next;
-  }
-
-  if (newFirstUpdate === null) {
-    queue.lastUpdate = null;
-  }
-  if (newFirstCapturedUpdate === null) {
-    queue.lastCapturedUpdate = null;
-  } else {
-    workInProgress.effectTag |= Callback;
-  }
-  if (newFirstUpdate === null && newFirstCapturedUpdate === null) {
-    // We processed every update, without skipping. That means the new base
-    // state is the same as the result state.
-    newBaseState = resultState;
-  }
-
-  queue.baseState = newBaseState;
-  queue.firstUpdate = newFirstUpdate;
-  queue.firstCapturedUpdate = newFirstCapturedUpdate;
-
-  // Set the remaining expiration time to be whatever is remaining in the queue.
-  // This should be fine because the only two other things that contribute to
-  // expiration time are props and context. We're already in the middle of the
-  // begin phase by the time we start processing the queue, so we've already
-  // dealt with the props. Context in components that specify
-  // shouldComponentUpdate is tricky; but we'll have to account for
-  // that regardless.
-  workInProgress.expirationTime = newExpirationTime;
-  workInProgress.memoizedState = resultState;
-
-  if (__DEV__) {
-    currentlyProcessingQueue = null;
-  }
 }
 
 function callCallback(callback, context) {
-  invariant(
-    typeof callback === 'function',
-    'Invalid argument passed as callback. Expected a function. Instead ' +
-      'received: %s',
-    callback,
-  );
-  callback.call(context);
+    invariant(
+        typeof callback === 'function',
+        'Invalid argument passed as callback. Expected a function. Instead ' +
+            'received: %s',
+        callback
+    );
+    callback.call(context);
 }
 
 export function resetHasForceUpdateBeforeProcessing() {
-  hasForceUpdate = false;
+    hasForceUpdate = false;
 }
 
 export function checkHasForceUpdateAfterProcessing(): boolean {
-  return hasForceUpdate;
+    return hasForceUpdate;
 }
 
 export function commitUpdateQueue<State>(
-  finishedWork: Fiber,
-  finishedQueue: UpdateQueue<State>,
-  instance: any,
-  renderExpirationTime: ExpirationTime,
+    finishedWork: Fiber,
+    finishedQueue: UpdateQueue<State>,
+    instance: any,
+    renderExpirationTime: ExpirationTime
 ): void {
-  // If the finished render included captured updates, and there are still
-  // lower priority updates left over, we need to keep the captured updates
-  // in the queue so that they are rebased and not dropped once we process the
-  // queue again at the lower priority.
-  if (finishedQueue.firstCapturedUpdate !== null) {
-    // Join the captured update list to the end of the normal list.
-    if (finishedQueue.lastUpdate !== null) {
-      finishedQueue.lastUpdate.next = finishedQueue.firstCapturedUpdate;
-      finishedQueue.lastUpdate = finishedQueue.lastCapturedUpdate;
+    // If the finished render included captured updates, and there are still
+    // lower priority updates left over, we need to keep the captured updates
+    // in the queue so that they are rebased and not dropped once we process the
+    // queue again at the lower priority.
+    if (finishedQueue.firstCapturedUpdate !== null) {
+        // Join the captured update list to the end of the normal list.
+        if (finishedQueue.lastUpdate !== null) {
+            finishedQueue.lastUpdate.next = finishedQueue.firstCapturedUpdate;
+            finishedQueue.lastUpdate = finishedQueue.lastCapturedUpdate;
+        }
+        // Clear the list of captured updates.
+        finishedQueue.firstCapturedUpdate = finishedQueue.lastCapturedUpdate = null;
     }
-    // Clear the list of captured updates.
-    finishedQueue.firstCapturedUpdate = finishedQueue.lastCapturedUpdate = null;
-  }
 
-  // Commit the effects
-  commitUpdateEffects(finishedQueue.firstEffect, instance);
-  finishedQueue.firstEffect = finishedQueue.lastEffect = null;
+    // Commit the effects
+    commitUpdateEffects(finishedQueue.firstEffect, instance);
+    finishedQueue.firstEffect = finishedQueue.lastEffect = null;
 
-  commitUpdateEffects(finishedQueue.firstCapturedEffect, instance);
-  finishedQueue.firstCapturedEffect = finishedQueue.lastCapturedEffect = null;
+    commitUpdateEffects(finishedQueue.firstCapturedEffect, instance);
+    finishedQueue.firstCapturedEffect = finishedQueue.lastCapturedEffect = null;
 }
 
 function commitUpdateEffects<State>(
-  effect: Update<State> | null,
-  instance: any,
+    effect: Update<State> | null,
+    instance: any
 ): void {
-  while (effect !== null) {
-    const callback = effect.callback;
-    if (callback !== null) {
-      effect.callback = null;
-      callCallback(callback, instance);
+    while (effect !== null) {
+        const callback = effect.callback;
+        if (callback !== null) {
+            effect.callback = null;
+            callCallback(callback, instance);
+        }
+        effect = effect.nextEffect;
     }
-    effect = effect.nextEffect;
-  }
 }

@@ -250,7 +250,6 @@ if (
     invokeGuardedCallbackImpl = invokeGuardedCallbackDev;
 }
 
-var invokeGuardedCallbackImpl$1 = invokeGuardedCallbackImpl;
 
 // Used by Fiber to simulate a try-catch.
 var hasError = false;
@@ -283,7 +282,7 @@ var reporter = {
 function invokeGuardedCallback(name, func, context, a, b, c, d, e, f) {
     hasError = false;
     caughtError = null;
-    invokeGuardedCallbackImpl$1.apply(reporter, arguments);
+    invokeGuardedCallbackImpl.apply(reporter, arguments);
 }
 
 /**
@@ -24019,7 +24018,9 @@ function performUnitOfWork(workInProgress) {
         );
     }
 
-    var next = undefined;
+    var next = 
+    
+    undefined;
     // if (enableProfilerTimer) {
     if (workInProgress.mode & ProfileMode) {
         startProfilerTimer(workInProgress);
@@ -25014,6 +25015,7 @@ function addRootToSchedule(root, expirationTime) {
         }
     } else {
         // This root is already scheduled, but its priority may have increased.
+        // 此root已scheduled，但其优先级可能已增加。
         var remainingExpirationTime = root.expirationTime;
         if (expirationTime > remainingExpirationTime) {
             // Update the priority.
