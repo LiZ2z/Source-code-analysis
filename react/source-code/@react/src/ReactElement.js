@@ -7,7 +7,7 @@
 
 import invariant from 'shared/invariant';
 import warningWithoutStack from 'shared/warningWithoutStack';
-import {REACT_ELEMENT_TYPE} from 'shared/ReactSymbols';
+import { REACT_ELEMENT_TYPE } from 'shared/ReactSymbols';
 
 import ReactCurrentOwner from './ReactCurrentOwner';
 
@@ -15,79 +15,79 @@ const hasOwnProperty = Object.prototype.hasOwnProperty;
 
 // 保留的props (props保留字)
 const RESERVED_PROPS = {
-  key: true,
-  ref: true,
-  __self: true,
-  __source: true,
+    key: true,
+    ref: true,
+    __self: true,
+    __source: true
 };
 
 let specialPropKeyWarningShown, specialPropRefWarningShown;
 
 // config.ref 不等于 undefined
 function hasValidRef(config) {
-  if (__DEV__) {
-    if (hasOwnProperty.call(config, 'ref')) {
-      const getter = Object.getOwnPropertyDescriptor(config, 'ref').get;
-      if (getter && getter.isReactWarning) {
-        return false;
-      }
+    if (__DEV__) {
+        if (hasOwnProperty.call(config, 'ref')) {
+            const getter = Object.getOwnPropertyDescriptor(config, 'ref').get;
+            if (getter && getter.isReactWarning) {
+                return false;
+            }
+        }
     }
-  }
-  return config.ref !== undefined;
+    return config.ref !== undefined;
 }
 // config.key 不等于 undefined
 function hasValidKey(config) {
-  if (__DEV__) {
-    if (hasOwnProperty.call(config, 'key')) {
-      const getter = Object.getOwnPropertyDescriptor(config, 'key').get;
-      if (getter && getter.isReactWarning) {
-        return false;
-      }
+    if (__DEV__) {
+        if (hasOwnProperty.call(config, 'key')) {
+            const getter = Object.getOwnPropertyDescriptor(config, 'key').get;
+            if (getter && getter.isReactWarning) {
+                return false;
+            }
+        }
     }
-  }
-  return config.key !== undefined;
+    return config.key !== undefined;
 }
 
 function defineKeyPropWarningGetter(props, displayName) {
-  const warnAboutAccessingKey = function() {
-    if (!specialPropKeyWarningShown) {
-      specialPropKeyWarningShown = true;
-      warningWithoutStack(
-        false,
-        '%s: `key` is not a prop. Trying to access it will result ' +
-          'in `undefined` being returned. If you need to access the same ' +
-          'value within the child component, you should pass it as a different ' +
-          'prop. (https://fb.me/react-special-props)',
-        displayName,
-      );
-    }
-  };
-  warnAboutAccessingKey.isReactWarning = true;
-  Object.defineProperty(props, 'key', {
-    get: warnAboutAccessingKey,
-    configurable: true,
-  });
+    const warnAboutAccessingKey = function() {
+        if (!specialPropKeyWarningShown) {
+            specialPropKeyWarningShown = true;
+            warningWithoutStack(
+                false,
+                '%s: `key` is not a prop. Trying to access it will result ' +
+                    'in `undefined` being returned. If you need to access the same ' +
+                    'value within the child component, you should pass it as a different ' +
+                    'prop. (https://fb.me/react-special-props)',
+                displayName
+            );
+        }
+    };
+    warnAboutAccessingKey.isReactWarning = true;
+    Object.defineProperty(props, 'key', {
+        get: warnAboutAccessingKey,
+        configurable: true
+    });
 }
 
 function defineRefPropWarningGetter(props, displayName) {
-  const warnAboutAccessingRef = function() {
-    if (!specialPropRefWarningShown) {
-      specialPropRefWarningShown = true;
-      warningWithoutStack(
-        false,
-        '%s: `ref` is not a prop. Trying to access it will result ' +
-          'in `undefined` being returned. If you need to access the same ' +
-          'value within the child component, you should pass it as a different ' +
-          'prop. (https://fb.me/react-special-props)',
-        displayName,
-      );
-    }
-  };
-  warnAboutAccessingRef.isReactWarning = true;
-  Object.defineProperty(props, 'ref', {
-    get: warnAboutAccessingRef,
-    configurable: true,
-  });
+    const warnAboutAccessingRef = function() {
+        if (!specialPropRefWarningShown) {
+            specialPropRefWarningShown = true;
+            warningWithoutStack(
+                false,
+                '%s: `ref` is not a prop. Trying to access it will result ' +
+                    'in `undefined` being returned. If you need to access the same ' +
+                    'value within the child component, you should pass it as a different ' +
+                    'prop. (https://fb.me/react-special-props)',
+                displayName
+            );
+        }
+    };
+    warnAboutAccessingRef.isReactWarning = true;
+    Object.defineProperty(props, 'ref', {
+        get: warnAboutAccessingRef,
+        configurable: true
+    });
 }
 
 /**
@@ -96,7 +96,7 @@ function defineRefPropWarningGetter(props, displayName) {
  * will work. Instead test $$typeof field against Symbol.for('react.element') to check
  * if something is a React Element.
  *
- * @param {*} type react Element 
+ * @param {*} type react Element
  * @param {*} key
  * @param {string|object} ref
  * @param {*} self A *temporary* helper to detect places where `this` is
@@ -111,59 +111,59 @@ function defineRefPropWarningGetter(props, displayName) {
  * @internal
  */
 const ReactElement = function(type, key, ref, self, source, owner, props) {
-  const element = {
-    // This tag allows us to uniquely identify this as a React Element
-    $$typeof: REACT_ELEMENT_TYPE,
+    const element = {
+        // This tag allows us to uniquely identify this as a React Element
+        $$typeof: REACT_ELEMENT_TYPE,
 
-    // Built-in properties that belong on the element
-    type: type,
-    key: key,
-    ref: ref,
-    props: props,
+        // Built-in properties that belong on the element
+        type: type,
+        key: key,
+        ref: ref,
+        props: props,
 
-    // Record the component responsible for creating this element.
-    _owner: owner,
-  };
+        // Record the component responsible for creating this element.
+        _owner: owner
+    };
 
-  if (__DEV__) {
-    // The validation flag is currently mutative. We put it on
-    // an external backing store so that we can freeze the whole object.
-    // This can be replaced with a WeakMap once they are implemented in
-    // commonly used development environments.
-    element._store = {};
+    if (__DEV__) {
+        // The validation flag is currently mutative. We put it on
+        // an external backing store so that we can freeze the whole object.
+        // This can be replaced with a WeakMap once they are implemented in
+        // commonly used development environments.
+        element._store = {};
 
-    // To make comparing ReactElements easier for testing purposes, we make
-    // the validation flag non-enumerable (where possible, which should
-    // include every environment we run tests in), so the test framework
-    // ignores it.
-    Object.defineProperty(element._store, 'validated', {
-      configurable: false,
-      enumerable: false,
-      writable: true,
-      value: false,
-    });
-    // self and source are DEV only properties.
-    Object.defineProperty(element, '_self', {
-      configurable: false,
-      enumerable: false,
-      writable: false,
-      value: self,
-    });
-    // Two elements created in two different places should be considered
-    // equal for testing purposes and therefore we hide it from enumeration.
-    Object.defineProperty(element, '_source', {
-      configurable: false,
-      enumerable: false,
-      writable: false,
-      value: source,
-    });
-    if (Object.freeze) {
-      Object.freeze(element.props);
-      Object.freeze(element);
+        // To make comparing ReactElements easier for testing purposes, we make
+        // the validation flag non-enumerable (where possible, which should
+        // include every environment we run tests in), so the test framework
+        // ignores it.
+        Object.defineProperty(element._store, 'validated', {
+            configurable: false,
+            enumerable: false,
+            writable: true,
+            value: false
+        });
+        // self and source are DEV only properties.
+        Object.defineProperty(element, '_self', {
+            configurable: false,
+            enumerable: false,
+            writable: false,
+            value: self
+        });
+        // Two elements created in two different places should be considered
+        // equal for testing purposes and therefore we hide it from enumeration.
+        Object.defineProperty(element, '_source', {
+            configurable: false,
+            enumerable: false,
+            writable: false,
+            value: source
+        });
+        if (Object.freeze) {
+            Object.freeze(element.props);
+            Object.freeze(element);
+        }
     }
-  }
 
-  return element;
+    return element;
 };
 
 /**
@@ -172,94 +172,98 @@ const ReactElement = function(type, key, ref, self, source, owner, props) {
  * 根据传入的type 值 创建并返回一个新的 reactElement
  */
 export function createElement(type, config, children) {
-  let propName;
+    let propName;
 
-  // Reserved names are extracted
-  const props = {};
+    // Reserved names are extracted 提取保留名称
+    const props = {};
 
-  let key = null;
-  let ref = null;
-  let self = null;
-  let source = null;
+    let key = null;
+    let ref = null;
+    let self = null;
+    let source = null;
 
-  if (config != null) {
+    if (config != null) {
+        if (hasValidRef(config)) {
+            // 提取ref
+            ref = config.ref;
+        }
+        if (hasValidKey(config)) {
+            // 提取key
+            key = '' + config.key;
+        }
 
-    if (hasValidRef(config)) {
-      ref = config.ref;
+        self = config.__self === undefined ? null : config.__self;
+        source = config.__source === undefined ? null : config.__source;
+        // Remaining（剩余的） properties are added to a new props object
+        for (propName in config) {
+            if (
+                hasOwnProperty.call(config, propName) &&
+                !RESERVED_PROPS.hasOwnProperty(propName)
+            ) {
+                props[propName] = config[propName];
+            }
+        }
     }
-    if (hasValidKey(config)) {
-      key = '' + config.key;
+
+    // Children can be more than one argument, and those are transferred onto
+    // the newly allocated props object.
+    // 第三个参数及后面的参数都是子元素，
+    // 将所有的子元素放在props.children属性下
+    // 如果只有一个子元素，props.children是这个子元素
+    // 如果有多个子元素，props.children是多个子元素组成的数组
+    const childrenLength = arguments.length - 2;
+    if (childrenLength === 1) {
+        props.children = children;
+    } else if (childrenLength > 1) {
+        const childArray = Array(childrenLength);
+        for (let i = 0; i < childrenLength; i++) {
+            childArray[i] = arguments[i + 2];
+        }
+        if (__DEV__) {
+            if (Object.freeze) {
+                Object.freeze(childArray);
+            }
+        }
+        props.children = childArray;
     }
 
-    self = config.__self === undefined ? null : config.__self;
-    source = config.__source === undefined ? null : config.__source;
-    // Remaining properties are added to a new props object
-    for (propName in config) {
-      if (
-        hasOwnProperty.call(config, propName) &&
-        !RESERVED_PROPS.hasOwnProperty(propName)
-      ) {
-        props[propName] = config[propName];
-      }
-    }
-  }
-
-  // Children can be more than one argument, and those are transferred onto
-  // the newly allocated props object.
-  // 第三个参数及后面的参数都是子元素，
-  // 将所有的子元素放在props.children属性下
-  // 如果只有一个子元素，props.children是这个子元素
-  // 如果有多个子元素，props.children是多个子元素组成的数组
-  const childrenLength = arguments.length - 2;
-  if (childrenLength === 1) {
-    props.children = children;
-  } else if (childrenLength > 1) {
-    const childArray = Array(childrenLength);
-    for (let i = 0; i < childrenLength; i++) {
-      childArray[i] = arguments[i + 2];
+    // Resolve default props
+    // 这个步骤针对React 组件
+    // 解析 defaultProps
+    if (type && type.defaultProps) {
+        const defaultProps = type.defaultProps;
+        for (propName in defaultProps) {
+            if (props[propName] === undefined) {
+                props[propName] = defaultProps[propName];
+            }
+        }
     }
     if (__DEV__) {
-      if (Object.freeze) {
-        Object.freeze(childArray);
-      }
+        if (key || ref) {
+            // 在dev模式下，
+            // 给props添加ref , key  getter
+            // 在组件中不可以使用 props.key props.ref
+            const displayName =
+                typeof type === 'function'
+                    ? type.displayName || type.name || 'Unknown'
+                    : type;
+            if (key) {
+                defineKeyPropWarningGetter(props, displayName);
+            }
+            if (ref) {
+                defineRefPropWarningGetter(props, displayName);
+            }
+        }
     }
-    props.children = childArray;
-  }
-
-  // Resolve default props
-  // 这个步骤针对React 组件
-  // 解析 defaultProps
-  if (type && type.defaultProps) {
-    const defaultProps = type.defaultProps;
-    for (propName in defaultProps) {
-      if (props[propName] === undefined) {
-        props[propName] = defaultProps[propName];
-      }
-    }
-  }
-  if (__DEV__) {
-    if (key || ref) {
-      const displayName =
-        typeof type === 'function'
-          ? type.displayName || type.name || 'Unknown'
-          : type;
-      if (key) {
-        defineKeyPropWarningGetter(props, displayName);
-      }
-      if (ref) {
-        defineRefPropWarningGetter(props, displayName);
-      }
-    }
-  }
-  return ReactElement(
-    type,
-    key,
-    ref,
-    self,
-    source,
-    ReactCurrentOwner.current,
-    props,
-  );
+    return ReactElement(
+        type,
+        key,
+        ref,
+        self,
+        source,
+        ReactCurrentOwner.current,
+        props
+    );
 }
 
 /**
@@ -267,103 +271,110 @@ export function createElement(type, config, children) {
  * See https://reactjs.org/docs/react-api.html#createfactory
  */
 export function createFactory(type) {
-  const factory = createElement.bind(null, type);
-  // Expose the type on the factory and the prototype so that it can be
-  // easily accessed on elements. E.g. `<Foo />.type === Foo`.
-  // This should not be named `constructor` since this may not be the function
-  // that created the element, and it may not even be a constructor.
-  // Legacy hook: remove it
-  factory.type = type;
-  return factory;
+    const factory = createElement.bind(null, type);
+    // Expose the type on the factory and the prototype so that it can be
+    // easily accessed on elements. E.g. `<Foo />.type === Foo`.
+    // This should not be named `constructor` since this may not be the function
+    // that created the element, and it may not even be a constructor.
+    // Legacy hook: remove it
+    factory.type = type;
+    return factory;
 }
 
 export function cloneAndReplaceKey(oldElement, newKey) {
-  const newElement = ReactElement(
-    oldElement.type,
-    newKey,
-    oldElement.ref,
-    oldElement._self,
-    oldElement._source,
-    oldElement._owner,
-    oldElement.props,
-  );
+    const newElement = ReactElement(
+        oldElement.type,
+        newKey,
+        oldElement.ref,
+        oldElement._self,
+        oldElement._source,
+        oldElement._owner,
+        oldElement.props
+    );
 
-  return newElement;
+    return newElement;
 }
 
 /**
  * Clone and return a new ReactElement using element as the starting point.
  * See https://reactjs.org/docs/react-api.html#cloneelement
+ * @example
+ *
+ * React.clooneElement(children, {
+ * })
  */
 export function cloneElement(element, config, children) {
-  invariant(
-    !(element === null || element === undefined),
-    'React.cloneElement(...): The argument must be a React element, but you passed %s.',
-    element,
-  );
+    invariant(
+        !(element === null || element === undefined),
+        'React.cloneElement(...): The argument must be a React element, but you passed %s.',
+        element
+    );
 
-  let propName;
+    let propName;
 
-  // Original props are copied
-  const props = Object.assign({}, element.props);
+    // Original props are copied
+    const props = Object.assign({}, element.props);
 
-  // Reserved names are extracted
-  let key = element.key;
-  let ref = element.ref;
-  // Self is preserved since the owner is preserved.
-  const self = element._self;
-  // Source is preserved since cloneElement is unlikely to be targeted by a
-  // transpiler, and the original source is probably a better indicator of the
-  // true owner.
-  const source = element._source;
+    // Reserved names are extracted
+    let key = element.key;
+    let ref = element.ref;
+    // Self is preserved since the owner is preserved.
+    const self = element._self;
+    // Source is preserved since cloneElement is unlikely to be targeted by a
+    // transpiler, and the original source is probably a better indicator of the
+    // true owner.
+    const source = element._source;
 
-  // Owner will be preserved, unless ref is overridden
-  let owner = element._owner;
+    // Owner will be preserved, unless ref is overridden
+    let owner = element._owner;
 
-  if (config != null) {
-    if (hasValidRef(config)) {
-      // Silently steal the ref from the parent.
-      ref = config.ref;
-      owner = ReactCurrentOwner.current;
-    }
-    if (hasValidKey(config)) {
-      key = '' + config.key;
-    }
-
-    // Remaining properties override existing props
-    let defaultProps;
-    if (element.type && element.type.defaultProps) {
-      defaultProps = element.type.defaultProps;
-    }
-    for (propName in config) {
-      if (
-        hasOwnProperty.call(config, propName) &&
-        !RESERVED_PROPS.hasOwnProperty(propName)
-      ) {
-        if (config[propName] === undefined && defaultProps !== undefined) {
-          // Resolve default props
-          props[propName] = defaultProps[propName];
-        } else {
-          props[propName] = config[propName];
+    if (config != null) {
+        if (hasValidRef(config)) {
+            // Silently steal the ref from the parent.
+            ref = config.ref;
+            owner = ReactCurrentOwner.current;
         }
-      }
-    }
-  }
+        if (hasValidKey(config)) {
+            key = '' + config.key;
+        }
 
-  // Children can be more than one argument, and those are transferred onto
-  // the newly allocated props object.
-  const childrenLength = arguments.length - 2;
-  if (childrenLength === 1) {
-    props.children = children;
-  } else if (childrenLength > 1) {
-    const childArray = Array(childrenLength);
-    for (let i = 0; i < childrenLength; i++) {
-      childArray[i] = arguments[i + 2];
+        // Remaining properties override existing props
+        let defaultProps;
+        if (element.type && element.type.defaultProps) {
+            defaultProps = element.type.defaultProps;
+        }
+        for (propName in config) {
+            if (
+                hasOwnProperty.call(config, propName) &&
+                !RESERVED_PROPS.hasOwnProperty(propName)
+            ) {
+                if (
+                    config[propName] === undefined &&
+                    defaultProps !== undefined
+                ) {
+                    // Resolve default props
+                    props[propName] = defaultProps[propName];
+                } else {
+                    props[propName] = config[propName];
+                }
+            }
+        }
     }
-    props.children = childArray;
-  }
 
-  return ReactElement(element.type, key, ref, self, source, owner, props);
+    // Children can be more than one argument, and those are transferred onto
+    // the newly allocated props object.
+    const childrenLength = arguments.length - 2;
+    if (childrenLength === 1) {
+        props.children = children;
+    } else if (childrenLength > 1) {
+        const childArray = Array(childrenLength);
+        for (let i = 0; i < childrenLength; i++) {
+            childArray[i] = arguments[i + 2];
+        }
+        props.children = childArray;
+    }
+
+    return ReactElement(element.type, key, ref, self, source, owner, props);
 }
 
 /**
@@ -374,9 +385,9 @@ export function cloneElement(element, config, children) {
  * @final
  */
 export function isValidElement(object) {
-  return (
-    typeof object === 'object' &&
-    object !== null &&
-    object.$$typeof === REACT_ELEMENT_TYPE
-  );
+    return (
+        typeof object === 'object' &&
+        object !== null &&
+        object.$$typeof === REACT_ELEMENT_TYPE
+    );
 }
