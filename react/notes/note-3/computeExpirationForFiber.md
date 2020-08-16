@@ -1,14 +1,18 @@
 ### 正文
 
 ```javascript
+// var NoContext = 0;
+// var ConcurrentMode = 1;
+// var StrictMode = 2;
+// var ProfileMode = 4;
+
 function computeExpirationForFiber(currentTime, fiber) {
     var priorityLevel = scheduler.unstable_getCurrentPriorityLevel();
 
     var expirationTime = undefined;
-    //              & 0b0001              0b0000
-    // 也就是只要fiber的mode不是 0b0001 （ConcurrentMode 并发模式） 都会同步执行
+
     if ((fiber.mode & ConcurrentMode) === NoContext) {
-        // 除了 concurrent mode， 其他的updates都是同步的
+        //   fiber.mode    &   0b0001        0b0000
         expirationTime = Sync; // maxSigned31BitInt 永不工期
     } else if (isWorking && !isCommitting) {
         // During render phase, updates expire during as the current render.

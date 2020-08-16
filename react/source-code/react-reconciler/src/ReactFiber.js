@@ -84,7 +84,7 @@ if (__DEV__) {
 
 // A Fiber is work on a Component that needs to be done or was done. There can
 // be more than one per component.
-export type Fiber = {|
+export type Fiber = {
   // These first fields are conceptually members of an Instance. This used to
   // be split into a separate type and intersected with the other Fiber fields,
   // but until Flow fixes its intersection bugs, we've merged them into a

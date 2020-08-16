@@ -32,13 +32,10 @@ var nestedUpdateCount = 0;
 var lastCommittedRootDuringThisBatch = null;
 ```
 
-`requestCurrentTime` 函数由 *scheduler(调度表)*调用，用来计算*过期时间*。
-
-_过期时间是通过将当前时间 (the start time)相加来计算的。如果在同一个事件中调用了两次 updates, 即使第一次调度的实际时间比第二次调度的实际时间早，我们也应将他们的开始时间视为同时进行_。因为 过期时间 决定了这次 updates 如何被批处理，所以我们想要所有由同一个事件触发的 updates 都能有相同的过期时间。
+requestCurrentTime is called by the scheduler to compute an expiration time. Expiration times are computed by adding to the current time (the start time).
+如果在同一个事件中调用了两次 updates, 即使第一次调度的实际时间比第二次调度的实际时间早，我们也应将他们的开始时间视为同时进行\_。因为 过期时间 决定了这次 updates 如何被批处理，所以我们想要所有由同一个事件触发的 updates 都能有相同的过期时间。
 
 我们跟踪两个不同的时间：当前的 **"renderer" time** 和当前的 **"scheduler" time**。_"renderer" time 可以随时更新；它的存在只是为了最大限度地降低调用性能。但是，只有在没有需要处理的工作时，或者我们确信自己不在某个事件的中间时，"scheduler" time 才能被更新。_
-
-`requestCurrentTime`的 current time 指的是`currentSchedulerTime`。
 
 该函数的大致流程为：
 
@@ -46,7 +43,7 @@ _过期时间是通过将当前时间 (the start time)相加来计算的。如�
 2. 否则，通过`findHighestPriorityRoot()`检查是否有待处理的工作，并将其赋值给全局的变量`nextFlushedExpirationTime`。
 3. 之后对`nextFlushedExpirationTime`进行判断，是否存在待完成的工作（`nextFlushedExpirationTime`值不等于`NoWork` or `Never`）。
 4. 如果不存在待完成的工作。则重新计算 `currentRendererTime`，并将其赋值给`currentSchedulerTime`，返回`currentSchedulerTime`。
-   5。如果存在待完成的工作，直接返回`currentSchedulerTime`。
+5. 如果存在待完成的工作，直接返回`currentSchedulerTime`。
 
 ```javascript
 function requestCurrentTime() {
@@ -106,13 +103,13 @@ root 之间通过`root.nextScheduledRoot`属性依次链接并形成一个闭环
 ```javascript
 // `expirationTime`（过期时间）
 var NoWork = 0; // 没有工作要做
-var Never = 1; // 过期时间为 never，永不过期，也就是有工作要做
+var Never = 1; // 过期时间为 never，永不过期，但权限较低，可以先放着，等其他工作做完再处理
 var Sync = maxSigned31BitInt; // 有工作要做，而且是权限最高的工作
 ```
 
 React 将根据每个 root 的`root.expirationTime` 大小来决定 root 优先级，优先级高的 root 上的工作将被优先处理。
 
-该函数就是通过`root.nextScheduledRoot`属性来遍历 list，根据`root.expirationTime`来找到 list 中优先级最高的 root，并将其赋值给“modules”`nextFlushedRoot`。同时，将这个 root 的`expirationTime`属性赋值给“modules”`nextFlushedExpirationTime`。
+该函数就是通过`root.nextScheduledRoot`属性来遍历 list，根据`root.expirationTime`来找到 list 中优先级最高的 root，并将其赋值给`nextFlushedRoot`。同时，将这个 root 的`expirationTime`属性赋值给`nextFlushedExpirationTime`。
 
 另外，在遍历的时候，如果发现`root.expirationTime === NoWork; // 0`，即当前 root 上已经没有工作要做了，就会将其从这个 list 中移除。
 
@@ -200,8 +197,8 @@ function findHighestPriorityRoot() {
 
 ```javascript
 function recomputeCurrentRendererTime() {
-    // scheduler.unstable_now    performance.now()
-    // originalStartTimeMs原点时间   当前代码执行时的 performance.now()
+    // scheduler.unstable_now = performance.now
+    // originalStartTimeMs（原点时间）=> 当前代码执行时的 performance.now() 的返回值
     var currentTimeMs = scheduler.unstable_now() - originalStartTimeMs;
     currentRendererTime = msToExpirationTime(currentTimeMs);
 }

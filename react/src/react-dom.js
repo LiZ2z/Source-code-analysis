@@ -250,8 +250,7 @@ if (
     invokeGuardedCallbackImpl = invokeGuardedCallbackDev;
 }
 
-
-// Used by Fiber to simulate a try-catch.
+// Used by Fiber to simulate（模仿） a try-catch.
 var hasError = false;
 var caughtError = null;
 
@@ -3739,7 +3738,6 @@ function getToStringValue(value) {
             return '';
     }
 }
-
 
 var ReactControlledValuePropTypes = {
     checkPropTypes: null
@@ -7934,7 +7932,6 @@ var voidElementTags = _assign(
 // or add stack by default to invariants where possible.
 var HTML$1 = '__html';
 
-
 function assertValidProps(tag, props) {
     if (!props) {
         return;
@@ -9539,6 +9536,7 @@ function diffProperties(
             !lastProps.hasOwnProperty(propKey) ||
             lastProps[propKey] == null
         ) {
+            //
             continue;
         }
         if (propKey === STYLE$1) {
@@ -11351,7 +11349,7 @@ function recordEffect() {
         effectCountInCurrentCommit++;
     }
 }
-// @caller scheduleWorkToRoot
+
 function recordScheduleUpdate() {
     if (isCommitting) {
         hasScheduledUpdateInCurrentCommit = true;
@@ -11635,14 +11633,18 @@ function stopCommitLifeCyclesTimer() {
 }
 
 /* -------------------------------- */
-/*         fiberStack start         */
+/*         fiber stack              */
 /* -------------------------------- */
+/**
+ * react context的实现
+ * 利用栈型数据结构储存context.Provider接收到的数据
+ */
 var valueStack = [];
 var fiberStack = [];
 var index = -1;
 
 /**
- * 创建一个光标（指针？）
+ * 创建一个指针
  */
 function createCursor(defaultValue) {
     return {
@@ -11690,9 +11692,6 @@ function resetStackAfterFatalErrorInDev() {
     valueStack.length = 0;
     fiberStack.length = 0;
 }
-/* -------------------------------------  */
-/*         fiberStack END !!!!!           */
-/* -------------------------------------  */
 
 var warnedAboutMissingGetChildContext = {};
 
@@ -11945,6 +11944,9 @@ function findCurrentUnmaskedContext(fiber) {
         'Found unexpected detached subtree parent. This error is likely caused by a bug in React. Please file an issue.'
     );
 }
+/* -------------------------------------  */
+/*         react context END !!!!!           */
+/* -------------------------------------  */
 
 var onCommitFiberRoot = null;
 var onCommitFiberUnmount = null;
@@ -11980,6 +11982,10 @@ var MAGIC_NUMBER_OFFSET = maxSigned31BitInt - 1;
 // 一单位的过期时间 代表 10ms
 function msToExpirationTime(ms) {
     // Always add an offset so that we don't clash with the magic number for NoWork.
+    // 以前react在这里使用加法，16.8.6版本改为了减法
+    // ms 不断增大，返回值不断减小，
+    // 也就是越晚创建的fiber的过期时间越小
+    // TODO: 万一计算结果与 noWork Never 重合了咋办？
     return MAGIC_NUMBER_OFFSET - ((ms / UNIT_SIZE) | 0);
 }
 
@@ -12062,11 +12068,11 @@ var debugCounter = 1;
 
 function FiberNode(tag, pendingProps, key, mode) {
     // Instance
-    this.tag = tag;
+    this.tag = tag; // fiber的类型，目前有18种。常用的： FunctionComponent = 0;  ClassComponent = 1; HostRoot = 3;
     this.key = key;
-    this.elementType = null;
-    this.type = null;
-    this.stateNode = null;
+    this.elementType = null; // 对应jsx中的标签名（React.createElement函数的第一个参数）。
+    this.type = null; // Function or Class
+    this.stateNode = null; // 指向fiber挂载的节点或其他一些对象
 
     // Fiber
     this.return = null;
@@ -12532,7 +12538,6 @@ function assignFiberPropertiesInDEV(target, source) {
     return target;
 }
 
-// @caller createContainer
 function createFiberRoot(container, isConcurrent, hydrate) {
     var uninitializedFiber = createHostRootFiber(isConcurrent);
 
@@ -12990,7 +12995,7 @@ var ReactFiberInstrumentation_1 = ReactFiberInstrumentation;
 // suspended inside an offscreen subtree should be able to ping at the priority
 // of the outer render.
 // 屏幕外更新永远不应挂起。但是，挂起在屏幕外子树中的承诺应该能够以外部呈现的优先级执行ping操作。
-// @caller scheduleWork
+
 function markPendingPriorityLevel(root, expirationTime) {
     // If there's a gap between completing a failed root and retrying it,
     // additional updates may be scheduled. Clear `didError`, in case the update
@@ -13410,18 +13415,19 @@ var classComponentUpdater = {
     isMounted: isMounted,
     enqueueSetState: function(inst, payload, callback) {
         var fiber = get(inst);
+
         var currentTime = requestCurrentTime();
+
         var expirationTime = computeExpirationForFiber(currentTime, fiber);
 
         var update = createUpdate(expirationTime);
+
         update.payload = payload;
+
         if (callback !== undefined && callback !== null) {
-            {
-                warnOnInvalidCallback$1(callback, 'setState');
-            }
             update.callback = callback;
         }
-
+        // TODO: 回头看
         flushPassiveEffects();
         enqueueUpdate(fiber, update);
         scheduleWork(fiber, expirationTime);
@@ -18175,6 +18181,7 @@ function updateClassComponent(
     }
 
     // Push context providers early to prevent context stack mismatches.
+    // 尽早的将Context provider放入context栈，以防止 context栈不匹配。
     // During mounting we don't know the child context yet as the instance doesn't exist.
     // We will invalidate the child context in finishClassComponent() right after rendering.
     var hasContext = undefined;
@@ -19728,7 +19735,6 @@ function beginWork(current$$1, workInProgress, renderExpirationTime) {
 
 var valueCursor = createCursor(null);
 
-
 // Use this to detect multiple renderers using the same context
 var rendererSigil = {};
 
@@ -20186,18 +20192,29 @@ function cloneUpdateQueue(currentQueue) {
     };
     return queue;
 }
-// @caller scheduleRootUpdate
+
 /**
- * @param expirationTime oneOf maxSigned31BitInt<Sync>
+ * expirationTime 为这个update的过期时间
  */
 function createUpdate(expirationTime) {
     return {
+        // 过期时间决定了这个update将如何被处理
         expirationTime: expirationTime,
 
-        tag: UpdateState, // 0
+        // tag：引起更新的方式，在react中，引起更新的方式有
+        // var UpdateState = 0;
+        // var ReplaceState = 1;
+        // var ForceUpdate = 2;
+        // var CaptureUpdate = 3;
+        tag: UpdateState,
+
+        // 如果通过 setState引起更新，upload即为setState的参数
         payload: null,
+
+        // 如果通过 setState引起更新，callback为setState的第二个参数
         callback: null,
 
+        // 指向updateQueue链表中的下一个更新
         next: null,
         nextEffect: null
     };
@@ -23035,6 +23052,9 @@ function unwindWork(workInProgress, renderExpirationTime) {
     }
 }
 
+/**
+ * 解除中断的工作
+ */
 function unwindInterruptedWork(interruptedWork) {
     switch (interruptedWork.tag) {
         case ClassComponent: {
@@ -24007,6 +24027,7 @@ function performUnitOfWork(workInProgress) {
     var current$$1 = workInProgress.alternate;
 
     // See if beginning this work spawns more work.
+    // 看看开始这项工作后是否会产生更多工作
     startWorkTimer(workInProgress);
 
     setCurrentFiber(workInProgress);
@@ -24018,9 +24039,7 @@ function performUnitOfWork(workInProgress) {
         );
     }
 
-    var next = 
-    
-    undefined;
+    var next = undefined;
     // if (enableProfilerTimer) {
     if (workInProgress.mode & ProfileMode) {
         startProfilerTimer(workInProgress);
@@ -24126,7 +24145,6 @@ function renderRoot(root, isYieldy) {
                 });
             }
         });
-
         // Store the current set of interactions on the FiberRoot for a few reasons:
         // We can re-use it in hot functions like renderRoot() without having to recalculate it.
         // We will also use it in commitWork() to pass to any Profiler onRender() hooks.
@@ -24463,24 +24481,19 @@ function computeUniqueAsyncExpiration() {
     return lastUniqueAsyncExpiration;
 }
 
-// @caller updateContainer
-
 /**
+ * !!! 重要步骤
  * 为fiber任务计算过期时间
- *
- * @param {*} currentTime
- * @param {*} fiber
  */
 function computeExpirationForFiber(currentTime, fiber) {
     var priorityLevel = scheduler.unstable_getCurrentPriorityLevel();
 
     var expirationTime = undefined;
     //              & 0b0001              0b0000
-    // 也就是只要fiber的mode不是 0b0001 （ConcurrentMode 并发模式） 都会同步执行
     if ((fiber.mode & ConcurrentMode) === NoContext) {
         // Outside of concurrent mode, updates are always synchronous.
-        // 除了 concurrent mode， 其他的updates都是同步的
-        expirationTime = Sync; // maxSigned31BitInt 永不工期
+        // 除了 concurrent mode(0b0001)， 都是同步的
+        expirationTime = Sync; // maxSigned31BitInt
     } else if (isWorking && !isCommitting) {
         // During render phase, updates expire during as the current render.
         // 在渲染阶段，更新将在当前渲染期间过期
@@ -24615,15 +24628,17 @@ function retryTimedOutBoundary(boundaryFiber, thenable) {
     }
 }
 
-// @caller scheduleWork
 function scheduleWorkToRoot(fiber, expirationTime) {
+    // TODO: WEIKAN
     recordScheduleUpdate();
 
     if (fiber.tag === ClassComponent) {
         var instance = fiber.stateNode;
+        // 在render函数中发起的更新是无效的
         warnAboutInvalidUpdates(instance);
     }
 
+    // 更新fiber上的过期时间
     // Update the source fiber's expiration time
     if (fiber.expirationTime < expirationTime) {
         fiber.expirationTime = expirationTime;
@@ -24632,6 +24647,8 @@ function scheduleWorkToRoot(fiber, expirationTime) {
     if (alternate !== null && alternate.expirationTime < expirationTime) {
         alternate.expirationTime = expirationTime;
     }
+
+    // 从当前fiber开始向父级遍历，更新父级fiber的 childExpirationTime；找到root
     // Walk the parent path to the root and update the child expiration time.
     var node = fiber.return;
     var root = null;
@@ -24723,12 +24740,16 @@ function warnIfNotCurrentlyBatchingInDev(fiber) {
         );
     }
 }
-// @caller scheduleRootUpdate
 
 function scheduleWork(fiber, expirationTime) {
+    // 更新fiber的过期时间
+    // 从当前要更新的fiber开始，依次向父级遍历，更新 child expired time
     var root = scheduleWorkToRoot(fiber, expirationTime);
 
     if (root === null) {
+        // 如果一个fiber上有更新，但是却找不到root，这个fiber可能已被卸载
+        // 再在上面执行更新可能是因为用户未手动注销某些异步操作
+        // 这可能导致内存泄漏
         switch (fiber.tag) {
             case ClassComponent:
                 warnAboutUpdateOnUnmounted(fiber, true);
@@ -24752,7 +24773,10 @@ function scheduleWork(fiber, expirationTime) {
         interruptedBy = fiber;
         resetStack();
     }
-
+    // TODO: 暂时不懂这里
+    // 大致是更新：
+    // root.expirationTime
+    // root.nextExpirationTimeToWorkOn
     markPendingPriorityLevel(root, expirationTime);
 
     if (
@@ -24767,6 +24791,7 @@ function scheduleWork(fiber, expirationTime) {
         requestWork(root, rootExpirationTime);
     }
     if (nestedUpdateCount > NESTED_UPDATE_LIMIT) {
+        // 嵌套 更新次数超过 最大限度 50 次， 比如在willUpdate生命周期中调用setState，则引起错误
         // Reset this back to zero so subsequent updates don't throw.
         nestedUpdateCount = 0;
         invariant(
@@ -24784,9 +24809,6 @@ function syncUpdates(fn, a, b, c, d) {
         }
     );
 }
-
-// TODO: Everything below this is written as if it has been lifted to the
-// renderers. I'll do this in a follow-up.
 
 // Linked-list of roots
 var firstScheduledRoot = null;
@@ -24815,14 +24837,14 @@ var NESTED_UPDATE_LIMIT = 50;
 var nestedUpdateCount = 0;
 var lastCommittedRootDuringThisBatch = null;
 
-//caller requestCurrentTime
 /**
  * 重新计算当前rendererTime
  */
 function recomputeCurrentRendererTime() {
-    // scheduler.unstable_now    performance.now()
-    // originalStartTimeMs原点时间   当前代码被解释执行时的 performance.now()
+    //                  performance.now()    -     当前代码被解释执行时的 performance.now()
+    // 这个值随时间变大
     var currentTimeMs = scheduler.unstable_now() - originalStartTimeMs;
+    // 这个值随时间变小
     currentRendererTime = msToExpirationTime(currentTimeMs);
 }
 
@@ -24907,18 +24929,21 @@ function onCommit(root, expirationTime) {
     root.expirationTime = expirationTime;
     root.finishedWork = null;
 }
-// @caller　updateContainer
+
 function requestCurrentTime() {
-    // 翻译：requestCurrentTime函数由scheduler(调度表)调用，用来计算过期时间
-    // 翻译：过期时间是通过将当前时间 (the start time)相加来计算的。如果在同一个事件中调用了
-    // 两次updates, 即使第一次调度的实际时间比第二次调度的实际时间早，我们也应将他们的
+    // requestCurrentTime函数由scheduler(调度表)调用，用来计算过期时间。
+    //
+    // 过期时间是通过将当前时间 (the start time)相加来计算的。如果在同一个事件中
+    // 产生了两次update, 即使第一次调度的实际时间比第二次调度的实际时间早，我们也应将他们的
     // 开始时间视为同时进行。
-    // 翻译：因为 过期时间 决定了这次updates如何被批处理，所以我们想要所有由同一个事件
+    //
+    // 因为 过期时间 决定了这次updates如何被批处理，所以我们想要所有由同一个事件
     // 触发的updates都能有相同的过期时间。
-    // 翻译：我们跟踪两个不同的时间：当前的 "renderer" time 和当前的"scheduler" time。
-    //  "renderer" time  可以随时更新；它的存在只是为了最大限度地降低调用性能。
+    //
+    // 我们跟踪两个不同的时间：renderer time 和scheduler time。
+    //  renderer time可以随时更新，它的存在只是为了降低调用 performance.now() 函数的性能消耗。
     // 但是，只有在没有需要处理的工作时，或者我们确信自己不在某个事件的中间时，
-    //  "scheduler" time 才能被更新。
+    //  scheduler time 才能被更新。
     //
     //
     // requestCurrentTime is called by the scheduler to compute an expiration
@@ -24941,17 +24966,14 @@ function requestCurrentTime() {
         // 我们已经在渲染了。返回最近读取时间。
         return currentSchedulerTime;
     }
-    // Check if there's pending work.
+
     // 检查是否有待处理(正在处理的 ？)的工作。
-    // 找最高权限的root
     findHighestPriorityRoot();
 
     if (
         nextFlushedExpirationTime === NoWork ||
         nextFlushedExpirationTime === Never
     ) {
-        // If there's no pending work, or if the pending work is offscreen, we can
-        // read the current time without risk of tearing.
         // 如果没有正在处理的工作，或者正在处理的工作在可视区域外，我们可以读取当前时间
         // 而不用担心会导致问题
         recomputeCurrentRendererTime();
@@ -25023,18 +25045,42 @@ function addRootToSchedule(root, expirationTime) {
         }
     }
 }
-// @caller requestCurrentTime
 
+/**
+ * ReactDOM.render()最终会创建一个root对象，在实际项目中，可能会存在多个root对象
+ * （有多个ReactDOM.render() ）， * 后续react组件产生的所有更新工作最终都会归纳到
+ * 各自对应的root对象上。
+ *
+ * 当root对象上有工作要完成时（root.expirationTime ！== noWork）时，root会被添加到
+ * __scheduledRoot链表__中，这个链表可以通过全局变量firstScheduledRoot 或 lastScheduledRoot
+ * 访问到。
+ *
+ * 这个函数就是遍历这个链表，找到工作优先级最高的root，并将其赋值给全局变量：
+ * nextFlushedRoot = highestPriorityRoot;
+ * nextFlushedExpirationTime = highestPriorityWork;
+ *
+ * 当然如果链表不存在（没有一个root上有待完成的工作），则：
+ * nextFlushedExpirationTime = noWork
+ * nextFlushedRoot = null;
+ *
+ * 所以可以通过nextFlushedExpirationTime来判断当前线程内是否有任务在执行
+ *
+ * */
 function findHighestPriorityRoot() {
+    // scheduledRoot 也是一个链表，可以通过firstScheduledRoot或lastScheduledRoot
+    // 查找
     var highestPriorityWork = NoWork;
     var highestPriorityRoot = null;
     if (lastScheduledRoot !== null) {
+        // 存在scheduledRoot链表
         var previousScheduledRoot = lastScheduledRoot;
         var root = firstScheduledRoot;
         while (root !== null) {
+            // 遍历 scheduledRoot 链表...
             var remainingExpirationTime = root.expirationTime;
             if (remainingExpirationTime === NoWork) {
                 // This root no longer has work. Remove it from the scheduler.
+                // ... 如果root上没有待完成的工作了，从链表中移除它
 
                 // TODO: This check is redudant, but Flow is confused by the branch
                 // below where we set lastScheduledRoot to null, even though we break
@@ -25069,17 +25115,21 @@ function findHighestPriorityRoot() {
                 }
                 root = previousScheduledRoot.nextScheduledRoot;
             } else {
+                // root上有待完成的工作
+                // 将root上工作的过期时间与当前权重最大的工作的过期时间比较。。。
                 if (remainingExpirationTime > highestPriorityWork) {
-                    // Update the priority, if it's higher
+                    // 。。。root上工作的过期时间比当前权重最大的工作的过期时间还要重要
+                    // 更新当前权重最大的工作为此root同时更新过期时间
                     highestPriorityWork = remainingExpirationTime;
                     highestPriorityRoot = root;
                 }
                 if (root === lastScheduledRoot) {
+                    // 如果链表上只有一个root，那这个就是权重最高的了
                     break;
                 }
                 if (highestPriorityWork === Sync) {
-                    // Sync is highest priority by definition so
-                    // we can stop searching.
+                    // 如果当前权重最高的工作过期时间已经是Sync（最高级别），
+                    // 就可以停止继续遍历了
                     break;
                 }
                 previousScheduledRoot = root;
@@ -25524,7 +25574,7 @@ function scheduleRootUpdate(current$$1, element, expirationTime, callback) {
     scheduleWork(current$$1, expirationTime);
     return expirationTime;
 }
-// @caller updateContainer
+
 /**
  * @param element oneOfType <App/>
  * @param container oneOfType <HostFiberRoot>
@@ -25539,19 +25589,8 @@ function updateContainerAtExpirationTime(
     expirationTime,
     callback
 ) {
-    // TODO: If this is a nested container, this won't be the root.
     var current$$1 = container.current;
 
-    // fiber debugtool 对于普通开发者无用 https://github.com/facebook/react/pull/8033
-    // if (ReactFiberInstrumentation_1.debugTool) {
-    //     if (current$$1.alternate === null) {
-    //         ReactFiberInstrumentation_1.debugTool.onMountContainer(container);
-    //     } else if (element === null) {
-    //         ReactFiberInstrumentation_1.debugTool.onUnmountContainer(container);
-    //     } else {
-    //         ReactFiberInstrumentation_1.debugTool.onUpdateContainer(container);
-    //     }
-    // }
     // 应该就是获取父fiber上的任务
     var context = getContextForSubtree(parentComponent); // {}
     if (container.context === null) {
@@ -25639,7 +25678,7 @@ function findHostInstanceWithWarning(component, methodName) {
     }
     // return findHostInstance(component);
 }
-// @caller ReactRoot
+
 /**
  * 根据container 创建一个root
  * root是一个普通对象，包含着重要属性
@@ -25649,15 +25688,15 @@ function findHostInstanceWithWarning(component, methodName) {
 function createContainer(container, isConcurrent, hydrate) {
     return createFiberRoot(container, isConcurrent, hydrate);
 }
-// @caller ReactRoot new ReactRoot().render
+
 /**
  * @param element <App/>
- * @param container HostFiberRoot
+ * @param container root
  * @param parentComponent null
  * @param callback work._onCommit
  */
 function updateContainer(element, container, parentComponent, callback) {
-    var fiber = container.current; // FiberNode
+    var fiber = container.current;
 
     var currentTime = requestCurrentTime();
     var expirationTime = computeExpirationForFiber(currentTime, fiber);
@@ -25920,7 +25959,6 @@ ReactBatch.prototype._onComplete = function() {
         _callback();
     }
 };
-// @caller ReactRoot new ReactRoot().render 就在下面
 /**
  * 通过 work._didCommit 管理状态
  * 通过 work.then() 注册回调函数
@@ -25981,7 +26019,6 @@ function ReactRoot(container, isConcurrent, hydrate) {
     // 内部的Root?
     this._internalRoot = root;
 }
-// @caller legacyRenderSubtreeIntoContainer
 
 ReactRoot.prototype.render = function(children, callback) {
     var root = this._internalRoot;
@@ -26097,12 +26134,9 @@ setBatchingImplementation(
  * 调用 new ReactRoot() 之前的一些操作
  * 返回 reactRoot
  */
-function legacyCreateRootFromDOMContainer(container, forceHydrate) {
+function legacyCreateRootFromDOMContainer(container) {
     var shouldHydrate = false;
-    // var shouldHydrate = forceHydrate || shouldHydrateDueToLegacyHeuristic(container);
-    // shouldHydrate 第一次mount时是false
     // First clear any existing content.
-    // if (!shouldHydrate) {
     var warned = false;
     var rootSibling = undefined;
     while ((rootSibling = container.lastChild)) {
@@ -26123,22 +26157,17 @@ function legacyCreateRootFromDOMContainer(container, forceHydrate) {
         }
         container.removeChild(rootSibling);
     }
-    // }
-    // {
-    //     if (shouldHydrate && !forceHydrate && !warnedAboutHydrateAPI) {
-    //         warnedAboutHydrateAPI = true;
-    //         lowPriorityWarning(false, 'render(): Calling ReactDOM.render() to hydrate server-rendered markup ' + 'will stop working in React v17. Replace the ReactDOM.render() call ' + 'with ReactDOM.hydrate() if you want React to attach to the server HTML.');
-    //     }
-    // }
+
     // Legacy roots are not async by default.
-    // 同步的
+    // 默认是同步的
+    // concurrent 并发
     var isConcurrent = false;
     return new ReactRoot(container, isConcurrent, shouldHydrate);
 }
 
-// legacy 遗产？ 以后可能会修改的api
+// legacy 历史遗留api, 以后可能会修改的api
 // 如果我们发现很多应用中必要的模式我们找不到一个完美的API，我们会提供一个临时欠佳的 API，只要以后可以移除它并且方便后续的优化。
-// forceHydrate ReactDOM.hydrate() 用于服务端渲染，暂时不管
+// forceHydrate ReactDOM.hydrate() 用于服务端渲染后的注水操作，暂时不管
 
 /**
  * 该函数被 ReactDOM.render 和 ReactDOM.unmountComponentAtNode 调用。
@@ -26157,9 +26186,10 @@ function legacyRenderSubtreeIntoContainer(
     // member of intersection type." Whyyyyyy.
     var root = container._reactRootContainer;
     if (!root) {
+        // render操作之后，container(html元素)会被添加一个_reactRootContainer属性指向root
         root = container._reactRootContainer = legacyCreateRootFromDOMContainer(
             container,
-            forceHydrate
+            forceHydrate // FALSE
         );
 
         if (typeof callback === 'function') {
@@ -26253,21 +26283,6 @@ var ReactDOM = {
      * ReactDOM.render()最终调用的是 new ReactRoot(container).render(children)
      */
     render: function(element, container, callback) {
-        !isValidContainer(container)
-            ? invariant(false, 'Target container is not a DOM element.')
-            : undefined;
-
-        !!container._reactHasBeenPassedToCreateRootDEV
-            ? warningWithoutStack(
-                  false,
-                  'You are calling ReactDOM.render() on a container that was previously ' +
-                      'passed to ReactDOM.%s(). This is not supported. ' +
-                      'Did you mean to call root.render(element)?',
-                  enableStableConcurrentModeAPIs
-                      ? 'createRoot'
-                      : 'unstable_createRoot'
-              )
-            : undefined;
         // 将虚拟节点渲染到 真实的 dom节点中
         return legacyRenderSubtreeIntoContainer(
             null,
@@ -26346,36 +26361,5 @@ var ReactDOM = {
         }
     }
 };
-
-// function createRoot(container, options) {
-//   var functionName = enableStableConcurrentModeAPIs
-//     ? "createRoot"
-//     : "unstable_createRoot";
-//   !isValidContainer(container)
-//     ? invariant(
-//         false,
-//         "%s(...): Target container is not a DOM element.",
-//         functionName
-//       )
-//     : undefined;
-//   {
-//     !!container._reactRootContainer
-//       ? warningWithoutStack(
-//           false,
-//           "You are calling ReactDOM.%s() on a container that was previously " +
-//             "passed to ReactDOM.render(). This is not supported.",
-//           enableStableConcurrentModeAPIs ? "createRoot" : "unstable_createRoot"
-//         )
-//       : undefined;
-//     container._reactHasBeenPassedToCreateRootDEV = true;
-//   }
-//   var hydrate = options != null && options.hydrate === true;
-//   return new ReactRoot(container, true, hydrate);
-// }
-
-// if (enableStableConcurrentModeAPIs) {
-//   ReactDOM.createRoot = createRoot;
-//   ReactDOM.unstable_createRoot = undefined;
-// }
 
 export default ReactDOM;

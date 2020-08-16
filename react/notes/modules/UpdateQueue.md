@@ -232,19 +232,7 @@ function appendUpdateToQueue(queue, update) {
 
 首先获取`fiber.alternate`，也就是另一个 fiber（这里我们称为`fiber2`），这个 `fiber2` 可能存在，也可能不存在。
 
-然后就是确定`fiber.updateQueue`及`fiber2.updateQueue`一定存在（如果`fiber2`不存在就不用管了）。如果不存在就创建一个，或从另一个 fiber 上拷贝。这里的`updateQueue`并不是真正的队列，而是一个具有下面格式的对象：
-
-```javascript
-        baseState: baseState,
-        firstUpdate: null,
-        lastUpdate: null,
-        firstCapturedUpdate: null,
-        lastCapturedUpdate: null,
-        firstEffect: null,
-        lastEffect: null,
-        firstCapturedEffect: null,
-        lastCapturedEffect: null
-```
+然后就是确定`fiber.updateQueue`及`fiber2.updateQueue`一定存在（如果`fiber2`不存在就不用管了）。如果不存在就创建一个，或从另一个 fiber 上拷贝。这里的`updateQueue`就是通过上面`createUpdateQueue`创建的对象。
 
 这个对象中的`firstUpdate`和`lastUpdate`属性保存着指向真正的 UpdateQueue 的指针。
 

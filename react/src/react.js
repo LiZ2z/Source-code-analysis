@@ -741,7 +741,7 @@ var ReactElement = function (type, key, ref, self, source, owner, props) {
       Object.freeze(element.props);
       Object.freeze(element);
     }
-  }
+  } 
 
   return element;
 };

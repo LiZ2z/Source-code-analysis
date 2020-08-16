@@ -1,7 +1,7 @@
 /* eslint-disable no-var */
 /**
  *  priority  [ praɪ'ɔːrətɪ ] 优先级
- * 
+ *
  */
 'use strict';
 Object.defineProperty(exports, '__esModule', { value: true });
@@ -14,7 +14,7 @@ var IdlePriority = 5; // 空闲优先级
 
 // Max 31 bit integer. The max integer size in V8 for 32-bit systems. Math.pow(2, 30) - 1
 // 运行在在32位系统中的v8引擎中的最大的31位整数 Math.pow(2, 30) - 1
-// 0b111111111111111111111111111111
+//  0b111111111111111111111111111111
 var maxSigned31BitInt = 1073741823;
 
 // Times out immediately
@@ -31,6 +31,7 @@ var IDLE_PRIORITY = maxSigned31BitInt;
 var firstCallbackNode = null;
 
 var currentDidTimeout = false;
+
 // Pausing the scheduler is useful for debugging.
 // var isSchedulerPaused = false;
 
@@ -43,8 +44,6 @@ var currentExpirationTime = -1;
 var isExecutingCallback = false;
 
 var isHostCallbackScheduled = false;
-
-var hasNativePerformanceNow = typeof performance === 'object' && typeof performance.now === 'function';
 
 function ensureHostCallbackIsScheduled() {
     if (isExecutingCallback) {
@@ -68,6 +67,7 @@ function flushFirstCallback() {
 
     // Remove the node from the list before calling the callback. That way the
     // list is in a consistent state even if the callback throws.
+    // 在调用回调之前从列表中删除该节点。这样，即使回调抛出，列表也处于一致状态。
     var next = firstCallbackNode.next;
     if (firstCallbackNode === next) {
         // This is the last callback in the list.
@@ -149,14 +149,20 @@ function flushFirstCallback() {
 function flushImmediateWork() {
     if (
         // Confirm we've exited the outer most event handler
-        currentEventStartTime === -1 && firstCallbackNode !== null && firstCallbackNode.priorityLevel === ImmediatePriority) {
+        // 确认我们已退出最外层的事件处理程序
+        currentEventStartTime === -1 &&
+        firstCallbackNode !== null &&
+        firstCallbackNode.priorityLevel === ImmediatePriority
+    ) {
         isExecutingCallback = true;
         try {
             do {
                 flushFirstCallback();
             } while (
                 // Keep flushing until there are no more immediate callbacks
-                firstCallbackNode !== null && firstCallbackNode.priorityLevel === ImmediatePriority);
+                firstCallbackNode !== null &&
+                firstCallbackNode.priorityLevel === ImmediatePriority
+            );
         } finally {
             isExecutingCallback = false;
             if (firstCallbackNode !== null) {
@@ -176,22 +182,25 @@ function flushWork(didTimeout) {
     try {
         if (didTimeout) {
             // Flush all the expired callbacks without yielding.
+            // 清空所有已经过期的回调。
             while (firstCallbackNode !== null) {
-                // TODO Wrap in feature flag
-                // Read the current time. Flush all the callbacks that expire at or
-                // earlier than that time. Then read the current time again and repeat.
-                // This optimizes for as few performance.now calls as possible.
+                // 读取 current time. 清除所有已经过期或刚好过期的回调。
+                // 之后继续读取，清除，重复这个步骤。
+                // 尽可能的减少 performance.now 的调用次数以优化性能。
                 var currentTime = exports.unstable_now();
                 if (firstCallbackNode.expirationTime <= currentTime) {
                     do {
                         flushFirstCallback();
-                    } while (firstCallbackNode !== null && firstCallbackNode.expirationTime <= currentTime);
+                    } while (
+                        firstCallbackNode !== null &&
+                        firstCallbackNode.expirationTime <= currentTime
+                    );
                     continue;
                 }
                 break;
             }
         } else {
-            // Keep flushing callbacks until we run out of time in the frame.
+            // 清空所有回调，直到当前帧的时间耗尽。
             if (firstCallbackNode !== null) {
                 do {
                     flushFirstCallback();
@@ -202,12 +211,13 @@ function flushWork(didTimeout) {
         isExecutingCallback = false;
         currentDidTimeout = previousDidTimeout;
         if (firstCallbackNode !== null) {
-            // There's still work remaining. Request another callback.
+            // 还有工作要做。请求另一个回调。
             ensureHostCallbackIsScheduled();
         } else {
             isHostCallbackScheduled = false;
         }
         // Before exiting, flush all the immediate work that was scheduled.
+        // 在退出之前，清除所有优先级为 ImmediatePriority 的工作。
         flushImmediateWork();
     }
 }
@@ -273,7 +283,7 @@ function unstable_next(eventHandler) {
 
 function unstable_wrapCallback(callback) {
     var parentPriorityLevel = currentPriorityLevel;
-    return function () {
+    return function() {
         // This is a fork of runWithPriority, inlined for performance.
         var previousPriorityLevel = currentPriorityLevel;
         var previousEventStartTime = currentEventStartTime;
@@ -291,10 +301,17 @@ function unstable_wrapCallback(callback) {
 }
 
 function unstable_scheduleCallback(callback, deprecated_options) {
-    var startTime = currentEventStartTime !== -1 ? currentEventStartTime : exports.unstable_now();
+    var startTime =
+        currentEventStartTime !== -1
+            ? currentEventStartTime
+            : exports.unstable_now();
 
     var expirationTime;
-    if (typeof deprecated_options === 'object' && deprecated_options !== null && typeof deprecated_options.timeout === 'number') {
+    if (
+        typeof deprecated_options === 'object' &&
+        deprecated_options !== null &&
+        typeof deprecated_options.timeout === 'number'
+    ) {
         // FIXME: Remove this branch once we lift expiration times out of React.
         expirationTime = startTime + deprecated_options.timeout;
     } else {
@@ -406,259 +423,218 @@ function unstable_getCurrentPriorityLevel() {
 }
 
 function unstable_shouldYield() {
-    return !currentDidTimeout && (firstCallbackNode !== null && firstCallbackNode.expirationTime < currentExpirationTime || shouldYieldToHost());
+    return (
+        !currentDidTimeout &&
+        ((firstCallbackNode !== null &&
+            firstCallbackNode.expirationTime < currentExpirationTime) ||
+            shouldYieldToHost())
+    );
 }
-
-// The remaining code is essentially a polyfill for requestIdleCallback. It
-// works by scheduling a requestAnimationFrame, storing the time for the start
-// of the frame, then scheduling a postMessage which gets scheduled after paint.
-// Within the postMessage handler do as much work as possible until time + frame
-// rate. By separating the idle call into a separate event tick we ensure that
-// layout, paint and other browser work is counted against the available time.
-// The frame rate is dynamically adjusted.
-
-// We capture a local reference to any global, in case it gets polyfilled after
-// this module is initially evaluated. We want to be using a
-// consistent implementation.
-var localDate = Date;
 
 // This initialization code may run even on server environments if a component
 // just imports ReactDOM (e.g. for findDOMNode). Some environments might not
 // have setTimeout or clearTimeout. However, we always expect them to be defined
 // on the client. https://github.com/facebook/react/pull/13088
-var localSetTimeout = typeof setTimeout === 'function' ? setTimeout : undefined;
-var localClearTimeout = typeof clearTimeout === 'function' ? clearTimeout : undefined;
+var localSetTimeout = setTimeout;
+var localClearTimeout = clearTimeout;
 
 // We don't expect either of these to necessarily be defined, but we will error
 // later if they are missing on the client.
-var localRequestAnimationFrame = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : undefined;
-var localCancelAnimationFrame = typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : undefined;
+var localRequestAnimationFrame = requestAnimationFrame;
 
-// requestAnimationFrame does not run when the tab is in the background. If
-// we're backgrounded we prefer for that work to happen so that the page
-// continues to load in the background. So we also schedule a 'setTimeout' as
-// a fallback.
+var localCancelAnimationFrame = cancelAnimationFrame;
+
+// 因为电源管理策略（笔记本电脑节能），浏览器会中止那些后台打开的标签页的脚本运行及一些其他操作
+// 当标签页进入后台时，requestAnimationFrame将不会执行。但我们希望即使标签页在后台打开，脚本还是能
+// 继续执行，这样页面可以继续加载，所以我们这时使用setTimeout作为备用功能。
 // TODO: Need a better heuristic for backgrounded work.
 var ANIMATION_FRAME_TIMEOUT = 100;
 var rAFID;
 var rAFTimeoutID;
-var requestAnimationFrameWithTimeout = function (callback) {
+var requestAnimationFrameWithTimeout = function(callback) {
+    // 这个函数的作用就是用来在每一帧开始前调用animationTick函数
+    // 所以callback指的就是固定的 animationTick 函数
+
     // schedule rAF and also a setTimeout
-    rAFID = localRequestAnimationFrame(function (timestamp) {
+    rAFID = localRequestAnimationFrame(function(timestamp) {
+        // 下一次重绘之前更新动画帧所调用的函数(即上面所说的回调函数)。
+        // 该回调函数会被传入DOMHighResTimeStamp参数，该参数与performance.now()的返回值相同，
+        // 它表示requestAnimationFrame() 开始去执行回调函数的时刻。
+
         // cancel the setTimeout
         localClearTimeout(rAFTimeoutID);
         callback(timestamp);
     });
-    rAFTimeoutID = localSetTimeout(function () {
+    rAFTimeoutID = localSetTimeout(function() {
         // cancel the requestAnimationFrame
         localCancelAnimationFrame(rAFID);
         callback(exports.unstable_now());
     }, ANIMATION_FRAME_TIMEOUT);
 };
 
-if (hasNativePerformanceNow) {
-    var Performance = performance;
-    exports.unstable_now = function () {
-        return Performance.now();
-    };
-} else {
-    exports.unstable_now = function () {
-        return localDate.now();
-    };
-}
+exports.unstable_now = function() {
+    return performance.now();
+};
 
-var requestHostCallback;
-var cancelHostCallback;
-var shouldYieldToHost;
+var scheduledHostCallback = null;
+var isMessageEventScheduled = false;
+var timeoutTime = -1;
 
-var globalValue = null;
-if (typeof window !== 'undefined') {
-    globalValue = window;
-} else if (typeof global !== 'undefined') {
-    globalValue = global;
-}
+var isAnimationFrameScheduled = false;
 
-if (globalValue && globalValue._schedMock) {
-    // 动态注入，仅用于测试目的。
-    // Dynamic injection, only for testing purposes.
-    var globalImpl = globalValue._schedMock;
-    requestHostCallback = globalImpl[0];
-    cancelHostCallback = globalImpl[1];
-    shouldYieldToHost = globalImpl[2];
-    exports.unstable_now = globalImpl[3];
-} else if (
-    // 如果Scheduler在非DOM环境中运行，它将回退到使用setTimeout的简单实现。
-    typeof window === 'undefined' ||
-    // Check if MessageChannel is supported, too.
-    typeof MessageChannel !== 'function') {
-    // 如果意外地在非浏览器环境(例如JavaScriptCore)中导入，则退回到简单的实现。
-    var _callback = null;
-    var _flushCallback = function (didTimeout) {
-        if (_callback !== null) {
-            try {
-                _callback(didTimeout);
-            } finally {
-                _callback = null;
-            }
-        }
-    };
-    requestHostCallback = function (cb, ms) {
-        if (_callback !== null) {
-            // Protect against re-entrancy.
-            setTimeout(requestHostCallback, 0, cb);
+var isFlushingHostCallback = false;
+
+// frameDeadline指的是当前帧最迟的执行时间
+var frameDeadline = 0;
+// FrameTime 这里指的是帧与帧的间隔时间，如果帧率为30fps，则间隔大约为 33ms。
+// 一开始假设我们以30fps运行，即帧与帧间隔时间为33ms，后续算法会判断当前屏幕的实际刷新率，从而动态调整
+var previousFrameTime = 33;
+var activeFrameTime = 33;
+
+var shouldYieldToHost = function() {
+    return frameDeadline <= exports.unstable_now();
+};
+
+// We use the postMessage trick to defer idle work until after the repaint.
+// 我们使用postMessage技巧将闲置工作推迟到重新绘制之后。
+var channel = new MessageChannel();
+var port = channel.port2;
+channel.port1.onmessage = function(event) {
+    isMessageEventScheduled = false;
+
+    var prevScheduledCallback = scheduledHostCallback;
+    var prevTimeoutTime = timeoutTime;
+    scheduledHostCallback = null;
+    timeoutTime = -1;
+
+    var currentTime = exports.unstable_now();
+
+    var didTimeout = false;
+
+    // 这个函数在重新绘制帧后开始执行。currentTime: 当前执行的时间； frameDeadline: 下一帧开始时间
+    // 如果frameDeadline < currentTime，说明我们在这段空闲的时间里已经没有剩余的时间了
+    if (frameDeadline - currentTime <= 0) {
+        // There's no time left in this idle period. Check if the callback has
+        // a timeout and whether it's been exceeded.
+        if (prevTimeoutTime !== -1 && prevTimeoutTime <= currentTime) {
+            // 已超时。
+            // 即使没有剩余空闲时间，也要调用回调。
+            didTimeout = true;
         } else {
-            _callback = cb;
-            setTimeout(_flushCallback, 0, false);
-        }
-    };
-    cancelHostCallback = function () {
-        _callback = null;
-    };
-    shouldYieldToHost = function () {
-        return false;
-    };
-} else {
-    // 这里是主要的步骤，在浏览器环境中执行这一步
-    if (typeof console !== 'undefined') {
-        // TODO: Remove fb.me link
-        if (typeof localRequestAnimationFrame !== 'function') {
-            console.error("This browser doesn't support requestAnimationFrame. " + 'Make sure that you load a ' + 'polyfill in older browsers. https://fb.me/react-polyfills');
-        }
-        if (typeof localCancelAnimationFrame !== 'function') {
-            console.error("This browser doesn't support cancelAnimationFrame. " + 'Make sure that you load a ' + 'polyfill in older browsers. https://fb.me/react-polyfills');
+            // 没超时
+            if (!isAnimationFrameScheduled) {
+                // Schedule another animation callback so we retry later.
+                isAnimationFrameScheduled = true;
+                requestAnimationFrameWithTimeout(animationTick);
+            }
+            // Exit without invoking the callback.
+            scheduledHostCallback = prevScheduledCallback;
+            timeoutTime = prevTimeoutTime;
+            return;
         }
     }
 
-    var scheduledHostCallback = null;
-    var isMessageEventScheduled = false;
-    var timeoutTime = -1;
-
-    var isAnimationFrameScheduled = false;
-
-    var isFlushingHostCallback = false;
-
-    var frameDeadline = 0;
-    // We start out assuming that we run at 30fps but then the heuristic tracking
-    // will adjust this value to a faster fps if we get more frequent animation
-    // frames.
-    // 我们一开始假设我们以30fps运行，但随后启发式跟踪会将此值调整为更快的fps，如果我们获得更频繁的动画帧。
-    var previousFrameTime = 33;
-    var activeFrameTime = 33;
-
-    shouldYieldToHost = function () {
-        return frameDeadline <= exports.unstable_now();
-    };
-
-    // We use the postMessage trick to defer idle work until after the repaint.
-    // 我们使用postMessage技巧将闲置工作推迟到重新绘制之后。
-    var channel = new MessageChannel();
-    var port = channel.port2;
-    channel.port1.onmessage = function (event) {
-        isMessageEventScheduled = false;
-
-        var prevScheduledCallback = scheduledHostCallback;
-        var prevTimeoutTime = timeoutTime;
-        scheduledHostCallback = null;
-        timeoutTime = -1;
-
-        var currentTime = exports.unstable_now();
-
-        var didTimeout = false;
-        if (frameDeadline - currentTime <= 0) {
-            // There's no time left in this idle period. Check if the callback has
-            // a timeout and whether it's been exceeded.
-            if (prevTimeoutTime !== -1 && prevTimeoutTime <= currentTime) {
-                // Exceeded the timeout. Invoke the callback even though there's no
-                // time left.
-                didTimeout = true;
-            } else {
-                // No timeout.
-                if (!isAnimationFrameScheduled) {
-                    // Schedule another animation callback so we retry later.
-                    isAnimationFrameScheduled = true;
-                    requestAnimationFrameWithTimeout(animationTick);
-                }
-                // Exit without invoking the callback.
-                scheduledHostCallback = prevScheduledCallback;
-                timeoutTime = prevTimeoutTime;
-                return;
-            }
+    if (prevScheduledCallback !== null) {
+        // 开始执行闲置任务，做个记号
+        isFlushingHostCallback = true;
+        try {
+            prevScheduledCallback(didTimeout);
+        } finally {
+            isFlushingHostCallback = false;
         }
+    }
+};
 
-        if (prevScheduledCallback !== null) {
-            isFlushingHostCallback = true;
-            try {
-                prevScheduledCallback(didTimeout);
-            } finally {
-                isFlushingHostCallback = false;
-            }
-        }
-    };
+var animationTick = function(rafTime) {
+    // animationTick 会作为requestAnimationFrame的回调函数被调用，
+    // 该回调函数会被传入DOMHighResTimeStamp参数，该参数与performance.now()的返回值相同，
+    // 它表示requestAnimationFrame() 开始去执行回调函数的时刻。
+    // 所以rafTime的值是可以认为是performance.now()
 
-    var animationTick = function (rafTime) {
-        if (scheduledHostCallback !== null) {
-            // Eagerly schedule the next animation callback at the beginning of the
-            // frame. If the scheduler queue is not empty at the end of the frame, it
-            // will continue flushing inside that callback. If the queue *is* empty,
-            // then it will exit immediately. Posting the callback at the start of the
-            // frame ensures it's fired within the earliest possible frame. If we
-            // waited until the end of the frame to post the callback, we risk the
-            // browser skipping a frame and not firing the callback until the frame
-            // after that.
-            requestAnimationFrameWithTimeout(animationTick);
-        } else {
-            // No pending work. Exit.
-            isAnimationFrameScheduled = false;
-            return;
-        }
+    if (scheduledHostCallback !== null) {
+        // Eagerly schedule the next animation callback at the beginning of the
+        // frame. If the scheduler queue is not empty at the end of the frame, it
+        // will continue flushing inside that callback. If the queue *is* empty,
+        // then it will exit immediately. Posting the callback at the start of the
+        // frame ensures it's fired within the earliest possible frame. If we
+        // waited until the end of the frame to post the callback, we risk the
+        // browser skipping a frame and not firing the callback until the frame
+        // after that.
+        // 尽早的将下一个 requestAnimationFrameWithTimeout(animationTick) 安排在这一帧的开始。
+        // 如果调度任务队列在当前帧的末尾不是空的，则继续调用，否则立即退出。
+        // 在帧的开头放置回调可确保在尽可能早的帧内触发回调。
+        // 如果我们等到帧的末尾才执行回调，那么浏览器可能会跳过一帧，直到下一帧才触发回调。
+        requestAnimationFrameWithTimeout(animationTick);
+    } else {
+        // No pending work. Exit.
+        // scheduledHostCallback === null，不存在需要进行的处理的工作，没必要继续执行
+        isAnimationFrameScheduled = false;
+        return;
+    }
 
-        var nextFrameTime = rafTime - frameDeadline + activeFrameTime;
-        if (nextFrameTime < activeFrameTime && previousFrameTime < activeFrameTime) {
-            if (nextFrameTime < 8) {
-                // Defensive coding. We don't support higher frame rates than 120hz.
-                // If the calculated frame time gets lower than 8, it is probably a bug.
-                nextFrameTime = 8;
-            }
-            // If one frame goes long, then the next one can be short to catch up.
-            // If two frames are short in a row, then that's an indication that we
-            // actually have a higher frame rate than what we're currently optimizing.
-            // We adjust our heuristic dynamically accordingly. For example, if we're
-            // running on 120hz display or 90hz VR display.
-            // Take the max of the two in case one of them was an anomaly due to
-            // missed frame deadlines.
-            activeFrameTime = nextFrameTime < previousFrameTime ? previousFrameTime : nextFrameTime;
-        } else {
-            previousFrameTime = nextFrameTime;
-        }
-        frameDeadline = rafTime + activeFrameTime;
-        if (!isMessageEventScheduled) {
-            isMessageEventScheduled = true;
-            port.postMessage(undefined);
-        }
-    };
+    /* ----------------- */
+    /* 用来矫正帧率的算法 */
+    /* ----------------- */
 
-    requestHostCallback = function (callback, absoluteTimeout) {
-        scheduledHostCallback = callback;
-        timeoutTime = absoluteTimeout;
-        if (isFlushingHostCallback || absoluteTimeout < 0) {
-            // Don't wait for the next frame. Continue working ASAP, in a new event.
-            port.postMessage(undefined);
-        } else if (!isAnimationFrameScheduled) {
-            // If rAF didn't already schedule one, we need to schedule a frame.
-            // TODO: If this rAF doesn't materialize because the browser throttles, we
-            // might want to still have setTimeout trigger rIC as a backup to ensure
-            // that we keep performing work.
-            isAnimationFrameScheduled = true;
-            requestAnimationFrameWithTimeout(animationTick);
+    // frameDeadLine：上一帧时我们预测的这一帧开始的时间： rafTime + activeFrameTime。
+    // rafTime：这帧实际开始时间
+    // nextFrameTime = rafTime - frameDeadline + activeFrameTime ===> rafTime - prevRafTime - activeFrameTime + activeFrameTime
+    // nextFrameTime：当前帧与上一帧的实际时间间隔
+    var nextFrameTime = rafTime - frameDeadline + activeFrameTime;
+    if (
+        nextFrameTime < activeFrameTime &&
+        previousFrameTime < activeFrameTime
+    ) {
+        if (nextFrameTime < 8) {
+            // 防御性编码。我们不支持高于120 Hz的帧频。如果计算的帧时间小于8，则可能是错误。
+            // 1s = 1000ms  1000ms/120hz = 8.33333333 即帧间隔时间为8.33333333ms
+            nextFrameTime = 8;
         }
-    };
+        // 如果一帧变长了，那么下一帧可以变短来互补。
+        // 但是如果连续有两个帧较短，则表明我们的帧速率实际上高于我们当前设定的帧率（在120 Hz显示器或90 Hz VR显示器上运行）。
+        // 我们相应地动态调整我们的启发式算法。
+        // 取两个中的最大值，以防其中一个因错过帧截止日期而出现异常。
+        activeFrameTime =
+            nextFrameTime < previousFrameTime
+                ? previousFrameTime
+                : nextFrameTime;
+    } else {
+        previousFrameTime = nextFrameTime;
+    }
+    // 这个frameDeadline才是我们真正想要的东西
+    frameDeadline = rafTime + activeFrameTime;
 
-    cancelHostCallback = function () {
-        scheduledHostCallback = null;
-        isMessageEventScheduled = false;
-        timeoutTime = -1;
-    };
-}
+    // 调用port.postMessage，postMessage技巧将闲置工作推迟到重新绘制之后
+    if (!isMessageEventScheduled) {
+        // channel.port1.onmessage 的回调中会将 isMessageEventScheduled 这个值设为 false
+        isMessageEventScheduled = true;
+        port.postMessage(undefined);
+    }
+};
+
+var requestHostCallback = function(callback, absoluteTimeout) {
+    // callback就是 flushWork 函数
+    scheduledHostCallback = callback;
+    timeoutTime = absoluteTimeout;
+
+    if (isFlushingHostCallback || absoluteTimeout < 0) {
+        // Don't wait for the next frame. Continue working ASAP, in a new event.
+        port.postMessage(undefined);
+    } else if (!isAnimationFrameScheduled) {
+        // If rAF didn't already schedule one, we need to schedule a frame.
+        // TODO: If this rAF doesn't materialize because the browser throttles, we
+        // might want to still have setTimeout trigger rIC as a backup to ensure
+        // that we keep performing work.
+        isAnimationFrameScheduled = true;
+        requestAnimationFrameWithTimeout(animationTick);
+    }
+};
+
+var cancelHostCallback = function() {
+    scheduledHostCallback = null;
+    isMessageEventScheduled = false;
+    timeoutTime = -1;
+};
 
 exports.unstable_ImmediatePriority = ImmediatePriority;
 exports.unstable_UserBlockingPriority = UserBlockingPriority;

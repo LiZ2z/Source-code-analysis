@@ -51,16 +51,6 @@ function updateContainerAtExpirationTime(
     // TODO: If this is a nested container, this won't be the root.
     var current$$1 = container.current;
 
-    // fiber debugtool 对于普通开发者无用 https://github.com/facebook/react/pull/8033
-    // if (ReactFiberInstrumentation_1.debugTool) {
-    //     if (current$$1.alternate === null) {
-    //         ReactFiberInstrumentation_1.debugTool.onMountContainer(container);
-    //     } else if (element === null) {
-    //         ReactFiberInstrumentation_1.debugTool.onUnmountContainer(container);
-    //     } else {
-    //         ReactFiberInstrumentation_1.debugTool.onUpdateContainer(container);
-    //     }
-    // }
     // 应该就是获取父fiber上的任务
     var context = getContextForSubtree(parentComponent); // {}
     if (container.context === null) {

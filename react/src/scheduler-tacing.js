@@ -1,40 +1,24 @@
-
 Object.defineProperty(exports, '__esModule', { value: true });
 
 // Helps identify side effects in begin-phase lifecycle hooks and setState reducers:
-
 
 // In some cases, StrictMode should also double-render lifecycles.
 // This can be confusing for tests though,
 // And it can be bad for performance in production.
 // This feature flag can be used to control the behavior:
 
-
 // To preserve the "Pause on caught exceptions" behavior of the debugger, we
 // replay the begin phase of a failed component inside invokeGuardedCallback.
 
-
 // Warn about deprecated, async-unsafe lifecycles; relates to RFC #6:
 
-
 // Gather advanced timing metrics for Profiler subtrees.
-
 
 // Trace which interactions trigger each commit.
 var enableSchedulerTracing = true;
 
-// Only used in www builds.
-// TODO: true? Here it might just be false.
-
-// Only used in www builds.
-
-
-// Only used in www builds.
-
-
 // React Fire: prevent the value and checked attributes from syncing
 // with their related DOM properties
-
 
 // These APIs will no longer be "unstable" in the upcoming 16.7 release,
 // Control this behavior with a flag to support 16.6 minor releases in the meanwhile.
@@ -91,7 +75,10 @@ function unstable_getThreadID() {
 }
 
 function unstable_trace(name, timestamp, callback) {
-    var threadID = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : DEFAULT_THREAD_ID;
+    var threadID =
+        arguments.length > 3 && arguments[3] !== undefined
+            ? arguments[3]
+            : DEFAULT_THREAD_ID;
 
     if (!enableSchedulerTracing) {
         return callback();
@@ -141,7 +128,9 @@ function unstable_trace(name, timestamp, callback) {
                     // If no async work was scheduled for this interaction,
                     // Notify subscribers that it's completed.
                     if (subscriber !== null && interaction.__count === 0) {
-                        subscriber.onInteractionScheduledWorkCompleted(interaction);
+                        subscriber.onInteractionScheduledWorkCompleted(
+                            interaction
+                        );
                     }
                 }
             }
@@ -152,7 +141,10 @@ function unstable_trace(name, timestamp, callback) {
 }
 
 function unstable_wrap(callback) {
-    var threadID = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : DEFAULT_THREAD_ID;
+    var threadID =
+        arguments.length > 1 && arguments[1] !== undefined
+            ? arguments[1]
+            : DEFAULT_THREAD_ID;
 
     if (!enableSchedulerTracing) {
         return callback;
@@ -167,7 +159,7 @@ function unstable_wrap(callback) {
 
     // Update the pending async work count for the current interactions.
     // Update after calling subscribers in case of error.
-    wrappedInteractions.forEach(function (interaction) {
+    wrappedInteractions.forEach(function(interaction) {
         interaction.__count++;
     });
 
@@ -209,11 +201,13 @@ function unstable_wrap(callback) {
                 // Update pending async counts for all wrapped interactions.
                 // If this was the last scheduled async work for any of them,
                 // Mark them as completed.
-                wrappedInteractions.forEach(function (interaction) {
+                wrappedInteractions.forEach(function(interaction) {
                     interaction.__count--;
 
                     if (subscriber !== null && interaction.__count === 0) {
-                        subscriber.onInteractionScheduledWorkCompleted(interaction);
+                        subscriber.onInteractionScheduledWorkCompleted(
+                            interaction
+                        );
                     }
                 });
             }
@@ -231,7 +225,7 @@ function unstable_wrap(callback) {
             // Update pending async counts for all wrapped interactions.
             // If this was the last scheduled async work for any of them,
             // Mark them as completed.
-            wrappedInteractions.forEach(function (interaction) {
+            wrappedInteractions.forEach(function(interaction) {
                 interaction.__count--;
 
                 if (subscriber && interaction.__count === 0) {
@@ -280,7 +274,7 @@ function onInteractionTraced(interaction) {
     var didCatchError = false;
     var caughtError = null;
 
-    subscribers.forEach(function (subscriber) {
+    subscribers.forEach(function(subscriber) {
         try {
             subscriber.onInteractionTraced(interaction);
         } catch (error) {
@@ -300,7 +294,7 @@ function onInteractionScheduledWorkCompleted(interaction) {
     var didCatchError = false;
     var caughtError = null;
 
-    subscribers.forEach(function (subscriber) {
+    subscribers.forEach(function(subscriber) {
         try {
             subscriber.onInteractionScheduledWorkCompleted(interaction);
         } catch (error) {
@@ -320,7 +314,7 @@ function onWorkScheduled(interactions, threadID) {
     var didCatchError = false;
     var caughtError = null;
 
-    subscribers.forEach(function (subscriber) {
+    subscribers.forEach(function(subscriber) {
         try {
             subscriber.onWorkScheduled(interactions, threadID);
         } catch (error) {
@@ -340,7 +334,7 @@ function onWorkStarted(interactions, threadID) {
     var didCatchError = false;
     var caughtError = null;
 
-    subscribers.forEach(function (subscriber) {
+    subscribers.forEach(function(subscriber) {
         try {
             subscriber.onWorkStarted(interactions, threadID);
         } catch (error) {
@@ -360,7 +354,7 @@ function onWorkStopped(interactions, threadID) {
     var didCatchError = false;
     var caughtError = null;
 
-    subscribers.forEach(function (subscriber) {
+    subscribers.forEach(function(subscriber) {
         try {
             subscriber.onWorkStopped(interactions, threadID);
         } catch (error) {
@@ -380,7 +374,7 @@ function onWorkCanceled(interactions, threadID) {
     var didCatchError = false;
     var caughtError = null;
 
-    subscribers.forEach(function (subscriber) {
+    subscribers.forEach(function(subscriber) {
         try {
             subscriber.onWorkCanceled(interactions, threadID);
         } catch (error) {
