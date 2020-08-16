@@ -48,11 +48,9 @@ requestCurrentTime is called by the scheduler to compute an expiration time. Exp
 ```javascript
 function requestCurrentTime() {
     if (isRendering) {
-        // We're already rendering. Return the most recently read time.
         // 已经在渲染了。返回最近读取时间。
         return currentSchedulerTime;
     }
-    // Check if there's pending work.
     // 检查是否有待处理的工作。
     findHighestPriorityRoot();
 
@@ -60,10 +58,9 @@ function requestCurrentTime() {
         nextFlushedExpirationTime === NoWork ||
         nextFlushedExpirationTime === Never
     ) {
-        // If there's no pending work, or if the pending work is offscreen, we can
-        // read the current time without risk of tearing.
-        // 如果没有正在处理的工作，或者正在处理的工作在可视区域外，我们可以读取当前时间
-        // 而不用担心会导致问题
+        // 如果没有正在处理的工作（NoWork），
+        // 或者正在处理的工作在可视区域外（Never），
+        // 我们可以读取当前时间而不用担心会导致问题
         recomputeCurrentRendererTime();
         currentSchedulerTime = currentRendererTime;
         return currentSchedulerTime;
@@ -73,9 +70,10 @@ function requestCurrentTime() {
     // within the same event to receive different expiration times, leading to
     // tearing. Return the last read time. During the next idle callback, the
     // time will be updated.
-    // 如果存在待完成的工作。此时我们可能正处在某个浏览器事件中。如果我们去重新计算current renderer time，
-    // 可能导致在同一个事件引起的多次更新中收到的过期时间却不同，所以我们直接返回最后一次 计算的
-    // currentSchedulerTime
+    // 存在待完成的工作（maxSigned31BitInt）。此时我们可能正处在某个浏览器事件中。
+    // 如果我们去重新计算current renderer time，可能导致在同一个event引起的多次update
+    // 中收到不同的 expiration times，所以我们直接返回最后一次 计算的currentSchedulerTime
+    //
 
     return currentSchedulerTime;
 }
@@ -83,9 +81,7 @@ function requestCurrentTime() {
 
 #### `findHighestPriorityRoot`
 
-// TODO: 这个 list 是用来干嘛的？
-
-React 运行时会创建一个 Scheduled 的 list，这个 list 并不是一个数组，而是一系列相互引用的对象——root（root 通过[**createFiberRoot**][createfiberroot] 函数创建）。root 格式大致如下：
+React 运行时会创建一个 Scheduled list，这个 list 是由一系列有着待完成工作的对象（root，由[**createFiberRoot**][createfiberroot] 函数创建）组成的链表。root 格式大致如下：
 
 ```javascript
 const root = {
