@@ -105,7 +105,7 @@ function flushFirstCallback() {
             priorityLevel: priorityLevel,
             expirationTime: expirationTime,
             next: null,
-            previous: null
+            previous: null,
         };
 
         // Insert the new callback into the list, sorted by its expiration. This is
@@ -283,7 +283,7 @@ function unstable_next(eventHandler) {
 
 function unstable_wrapCallback(callback) {
     var parentPriorityLevel = currentPriorityLevel;
-    return function() {
+    return function () {
         // This is a fork of runWithPriority, inlined for performance.
         var previousPriorityLevel = currentPriorityLevel;
         var previousEventStartTime = currentEventStartTime;
@@ -339,7 +339,7 @@ function unstable_scheduleCallback(callback, deprecated_options) {
         priorityLevel: currentPriorityLevel,
         expirationTime: expirationTime,
         next: null,
-        previous: null
+        previous: null,
     };
 
     // Insert the new callback into the list, ordered first by expiration, then
@@ -451,12 +451,12 @@ var localCancelAnimationFrame = cancelAnimationFrame;
 var ANIMATION_FRAME_TIMEOUT = 100;
 var rAFID;
 var rAFTimeoutID;
-var requestAnimationFrameWithTimeout = function(callback) {
+var requestAnimationFrameWithTimeout = function (callback) {
     // 这个函数的作用就是用来在每一帧开始前调用animationTick函数
     // 所以callback指的就是固定的 animationTick 函数
 
     // schedule rAF and also a setTimeout
-    rAFID = localRequestAnimationFrame(function(timestamp) {
+    rAFID = localRequestAnimationFrame(function (timestamp) {
         // 下一次重绘之前更新动画帧所调用的函数(即上面所说的回调函数)。
         // 该回调函数会被传入DOMHighResTimeStamp参数，该参数与performance.now()的返回值相同，
         // 它表示requestAnimationFrame() 开始去执行回调函数的时刻。
@@ -465,15 +465,16 @@ var requestAnimationFrameWithTimeout = function(callback) {
         localClearTimeout(rAFTimeoutID);
         callback(timestamp);
     });
-    rAFTimeoutID = localSetTimeout(function() {
+    rAFTimeoutID = localSetTimeout(function () {
         // cancel the requestAnimationFrame
         localCancelAnimationFrame(rAFID);
         callback(exports.unstable_now());
     }, ANIMATION_FRAME_TIMEOUT);
 };
 
-exports.unstable_now = function() {
-    return performance.now();
+var Performance = performance;
+exports.unstable_now = function () {
+    return Performance.now();
 };
 
 var scheduledHostCallback = null;
@@ -491,7 +492,7 @@ var frameDeadline = 0;
 var previousFrameTime = 33;
 var activeFrameTime = 33;
 
-var shouldYieldToHost = function() {
+var shouldYieldToHost = function () {
     return frameDeadline <= exports.unstable_now();
 };
 
@@ -499,7 +500,7 @@ var shouldYieldToHost = function() {
 // 我们使用postMessage技巧将闲置工作推迟到重新绘制之后。
 var channel = new MessageChannel();
 var port = channel.port2;
-channel.port1.onmessage = function(event) {
+channel.port1.onmessage = function (event) {
     isMessageEventScheduled = false;
 
     var prevScheduledCallback = scheduledHostCallback;
@@ -545,12 +546,12 @@ channel.port1.onmessage = function(event) {
     }
 };
 
-var animationTick = function(rafTime) {
-    // animationTick 会作为requestAnimationFrame的回调函数被调用，
-    // 该回调函数会被传入DOMHighResTimeStamp参数，该参数与performance.now()的返回值相同，
-    // 它表示requestAnimationFrame() 开始去执行回调函数的时刻。
-    // 所以rafTime的值是可以认为是performance.now()
+// animationTick 会作为requestAnimationFrame的回调函数被调用，
+// 该回调函数会被传入DOMHighResTimeStamp参数，该参数与performance.now()的返回值相同，
+// 它表示requestAnimationFrame() 开始去执行回调函数的时刻。
+// 所以rafTime的值是可以认为是performance.now()
 
+var animationTick = function (rafTime) {
     if (scheduledHostCallback !== null) {
         // Eagerly schedule the next animation callback at the beginning of the
         // frame. If the scheduler queue is not empty at the end of the frame, it
@@ -612,7 +613,7 @@ var animationTick = function(rafTime) {
     }
 };
 
-var requestHostCallback = function(callback, absoluteTimeout) {
+var requestHostCallback = function (callback, absoluteTimeout) {
     // callback就是 flushWork 函数
     scheduledHostCallback = callback;
     timeoutTime = absoluteTimeout;
@@ -630,7 +631,7 @@ var requestHostCallback = function(callback, absoluteTimeout) {
     }
 };
 
-var cancelHostCallback = function() {
+var cancelHostCallback = function () {
     scheduledHostCallback = null;
     isMessageEventScheduled = false;
     timeoutTime = -1;
