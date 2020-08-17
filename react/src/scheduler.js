@@ -1,7 +1,7 @@
 /* eslint-disable no-var */
 /**
  *  priority  [ praɪ'ɔːrətɪ ] 优先级
- * 
+ *
  */
 'use strict';
 Object.defineProperty(exports, '__esModule', { value: true });
@@ -31,6 +31,7 @@ var IDLE_PRIORITY = maxSigned31BitInt;
 var firstCallbackNode = null;
 
 var currentDidTimeout = false;
+
 // Pausing the scheduler is useful for debugging.
 // var isSchedulerPaused = false;
 
@@ -44,7 +45,8 @@ var isExecutingCallback = false;
 
 var isHostCallbackScheduled = false;
 
-var hasNativePerformanceNow = typeof performance === 'object' && typeof performance.now === 'function';
+var hasNativePerformanceNow =
+    typeof performance === 'object' && typeof performance.now === 'function';
 
 function ensureHostCallbackIsScheduled() {
     if (isExecutingCallback) {
@@ -105,7 +107,7 @@ function flushFirstCallback() {
             priorityLevel: priorityLevel,
             expirationTime: expirationTime,
             next: null,
-            previous: null
+            previous: null,
         };
 
         // Insert the new callback into the list, sorted by its expiration. This is
@@ -149,14 +151,19 @@ function flushFirstCallback() {
 function flushImmediateWork() {
     if (
         // Confirm we've exited the outer most event handler
-        currentEventStartTime === -1 && firstCallbackNode !== null && firstCallbackNode.priorityLevel === ImmediatePriority) {
+        currentEventStartTime === -1 &&
+        firstCallbackNode !== null &&
+        firstCallbackNode.priorityLevel === ImmediatePriority
+    ) {
         isExecutingCallback = true;
         try {
             do {
                 flushFirstCallback();
             } while (
                 // Keep flushing until there are no more immediate callbacks
-                firstCallbackNode !== null && firstCallbackNode.priorityLevel === ImmediatePriority);
+                firstCallbackNode !== null &&
+                firstCallbackNode.priorityLevel === ImmediatePriority
+            );
         } finally {
             isExecutingCallback = false;
             if (firstCallbackNode !== null) {
@@ -185,7 +192,10 @@ function flushWork(didTimeout) {
                 if (firstCallbackNode.expirationTime <= currentTime) {
                     do {
                         flushFirstCallback();
-                    } while (firstCallbackNode !== null && firstCallbackNode.expirationTime <= currentTime);
+                    } while (
+                        firstCallbackNode !== null &&
+                        firstCallbackNode.expirationTime <= currentTime
+                    );
                     continue;
                 }
                 break;
@@ -291,10 +301,17 @@ function unstable_wrapCallback(callback) {
 }
 
 function unstable_scheduleCallback(callback, deprecated_options) {
-    var startTime = currentEventStartTime !== -1 ? currentEventStartTime : exports.unstable_now();
+    var startTime =
+        currentEventStartTime !== -1
+            ? currentEventStartTime
+            : exports.unstable_now();
 
     var expirationTime;
-    if (typeof deprecated_options === 'object' && deprecated_options !== null && typeof deprecated_options.timeout === 'number') {
+    if (
+        typeof deprecated_options === 'object' &&
+        deprecated_options !== null &&
+        typeof deprecated_options.timeout === 'number'
+    ) {
         // FIXME: Remove this branch once we lift expiration times out of React.
         expirationTime = startTime + deprecated_options.timeout;
     } else {
@@ -322,7 +339,7 @@ function unstable_scheduleCallback(callback, deprecated_options) {
         priorityLevel: currentPriorityLevel,
         expirationTime: expirationTime,
         next: null,
-        previous: null
+        previous: null,
     };
 
     // Insert the new callback into the list, ordered first by expiration, then
@@ -406,7 +423,12 @@ function unstable_getCurrentPriorityLevel() {
 }
 
 function unstable_shouldYield() {
-    return !currentDidTimeout && (firstCallbackNode !== null && firstCallbackNode.expirationTime < currentExpirationTime || shouldYieldToHost());
+    return (
+        !currentDidTimeout &&
+        ((firstCallbackNode !== null &&
+            firstCallbackNode.expirationTime < currentExpirationTime) ||
+            shouldYieldToHost())
+    );
 }
 
 // The remaining code is essentially a polyfill for requestIdleCallback. It
@@ -427,12 +449,19 @@ var localDate = Date;
 // have setTimeout or clearTimeout. However, we always expect them to be defined
 // on the client. https://github.com/facebook/react/pull/13088
 var localSetTimeout = typeof setTimeout === 'function' ? setTimeout : undefined;
-var localClearTimeout = typeof clearTimeout === 'function' ? clearTimeout : undefined;
+var localClearTimeout =
+    typeof clearTimeout === 'function' ? clearTimeout : undefined;
 
 // We don't expect either of these to necessarily be defined, but we will error
 // later if they are missing on the client.
-var localRequestAnimationFrame = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : undefined;
-var localCancelAnimationFrame = typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : undefined;
+var localRequestAnimationFrame =
+    typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : undefined;
+var localCancelAnimationFrame =
+    typeof cancelAnimationFrame === 'function'
+        ? cancelAnimationFrame
+        : undefined;
 
 // requestAnimationFrame does not run when the tab is in the background. If
 // we're backgrounded we prefer for that work to happen so that the page
@@ -467,198 +496,141 @@ if (hasNativePerformanceNow) {
     };
 }
 
-var requestHostCallback;
-var cancelHostCallback;
-var shouldYieldToHost;
+var scheduledHostCallback = null;
+var isMessageEventScheduled = false;
+var timeoutTime = -1;
 
-var globalValue = null;
-if (typeof window !== 'undefined') {
-    globalValue = window;
-} else if (typeof global !== 'undefined') {
-    globalValue = global;
-}
+var isAnimationFrameScheduled = false;
 
-if (globalValue && globalValue._schedMock) {
-    // 动态注入，仅用于测试目的。
-    // Dynamic injection, only for testing purposes.
-    var globalImpl = globalValue._schedMock;
-    requestHostCallback = globalImpl[0];
-    cancelHostCallback = globalImpl[1];
-    shouldYieldToHost = globalImpl[2];
-    exports.unstable_now = globalImpl[3];
-} else if (
-    // 如果Scheduler在非DOM环境中运行，它将回退到使用setTimeout的简单实现。
-    typeof window === 'undefined' ||
-    // Check if MessageChannel is supported, too.
-    typeof MessageChannel !== 'function') {
-    // 如果意外地在非浏览器环境(例如JavaScriptCore)中导入，则退回到简单的实现。
-    var _callback = null;
-    var _flushCallback = function (didTimeout) {
-        if (_callback !== null) {
-            try {
-                _callback(didTimeout);
-            } finally {
-                _callback = null;
-            }
-        }
-    };
-    requestHostCallback = function (cb, ms) {
-        if (_callback !== null) {
-            // Protect against re-entrancy.
-            setTimeout(requestHostCallback, 0, cb);
+var isFlushingHostCallback = false;
+
+var frameDeadline = 0;
+// We start out assuming that we run at 30fps but then the heuristic tracking
+// will adjust this value to a faster fps if we get more frequent animation
+// frames.
+// 我们一开始假设我们以30fps运行，但随后启发式跟踪会将此值调整为更快的fps，如果我们获得更频繁的动画帧。
+var previousFrameTime = 33;
+var activeFrameTime = 33;
+
+var shouldYieldToHost = function () {
+    return frameDeadline <= exports.unstable_now();
+};
+
+// We use the postMessage trick to defer idle work until after the repaint.
+// 我们使用postMessage技巧将闲置工作推迟到重新绘制之后。
+var channel = new MessageChannel();
+var port = channel.port2;
+channel.port1.onmessage = function (event) {
+    isMessageEventScheduled = false;
+
+    var prevScheduledCallback = scheduledHostCallback;
+    var prevTimeoutTime = timeoutTime;
+    scheduledHostCallback = null;
+    timeoutTime = -1;
+
+    var currentTime = exports.unstable_now();
+
+    var didTimeout = false;
+    if (frameDeadline - currentTime <= 0) {
+        // There's no time left in this idle period. Check if the callback has
+        // a timeout and whether it's been exceeded.
+        if (prevTimeoutTime !== -1 && prevTimeoutTime <= currentTime) {
+            // Exceeded the timeout. Invoke the callback even though there's no
+            // time left.
+            didTimeout = true;
         } else {
-            _callback = cb;
-            setTimeout(_flushCallback, 0, false);
-        }
-    };
-    cancelHostCallback = function () {
-        _callback = null;
-    };
-    shouldYieldToHost = function () {
-        return false;
-    };
-} else {
-    // 这里是主要的步骤，在浏览器环境中执行这一步
-    if (typeof console !== 'undefined') {
-        // TODO: Remove fb.me link
-        if (typeof localRequestAnimationFrame !== 'function') {
-            console.error("This browser doesn't support requestAnimationFrame. " + 'Make sure that you load a ' + 'polyfill in older browsers. https://fb.me/react-polyfills');
-        }
-        if (typeof localCancelAnimationFrame !== 'function') {
-            console.error("This browser doesn't support cancelAnimationFrame. " + 'Make sure that you load a ' + 'polyfill in older browsers. https://fb.me/react-polyfills');
+            // No timeout.
+            if (!isAnimationFrameScheduled) {
+                // Schedule another animation callback so we retry later.
+                isAnimationFrameScheduled = true;
+                requestAnimationFrameWithTimeout(animationTick);
+            }
+            // Exit without invoking the callback.
+            scheduledHostCallback = prevScheduledCallback;
+            timeoutTime = prevTimeoutTime;
+            return;
         }
     }
 
-    var scheduledHostCallback = null;
-    var isMessageEventScheduled = false;
-    var timeoutTime = -1;
-
-    var isAnimationFrameScheduled = false;
-
-    var isFlushingHostCallback = false;
-
-    var frameDeadline = 0;
-    // We start out assuming that we run at 30fps but then the heuristic tracking
-    // will adjust this value to a faster fps if we get more frequent animation
-    // frames.
-    // 我们一开始假设我们以30fps运行，但随后启发式跟踪会将此值调整为更快的fps，如果我们获得更频繁的动画帧。
-    var previousFrameTime = 33;
-    var activeFrameTime = 33;
-
-    shouldYieldToHost = function () {
-        return frameDeadline <= exports.unstable_now();
-    };
-
-    // We use the postMessage trick to defer idle work until after the repaint.
-    // 我们使用postMessage技巧将闲置工作推迟到重新绘制之后。
-    var channel = new MessageChannel();
-    var port = channel.port2;
-    channel.port1.onmessage = function (event) {
-        isMessageEventScheduled = false;
-
-        var prevScheduledCallback = scheduledHostCallback;
-        var prevTimeoutTime = timeoutTime;
-        scheduledHostCallback = null;
-        timeoutTime = -1;
-
-        var currentTime = exports.unstable_now();
-
-        var didTimeout = false;
-        if (frameDeadline - currentTime <= 0) {
-            // There's no time left in this idle period. Check if the callback has
-            // a timeout and whether it's been exceeded.
-            if (prevTimeoutTime !== -1 && prevTimeoutTime <= currentTime) {
-                // Exceeded the timeout. Invoke the callback even though there's no
-                // time left.
-                didTimeout = true;
-            } else {
-                // No timeout.
-                if (!isAnimationFrameScheduled) {
-                    // Schedule another animation callback so we retry later.
-                    isAnimationFrameScheduled = true;
-                    requestAnimationFrameWithTimeout(animationTick);
-                }
-                // Exit without invoking the callback.
-                scheduledHostCallback = prevScheduledCallback;
-                timeoutTime = prevTimeoutTime;
-                return;
-            }
+    if (prevScheduledCallback !== null) {
+        isFlushingHostCallback = true;
+        try {
+            prevScheduledCallback(didTimeout);
+        } finally {
+            isFlushingHostCallback = false;
         }
+    }
+};
 
-        if (prevScheduledCallback !== null) {
-            isFlushingHostCallback = true;
-            try {
-                prevScheduledCallback(didTimeout);
-            } finally {
-                isFlushingHostCallback = false;
-            }
-        }
-    };
+var animationTick = function (rafTime) {
+    if (scheduledHostCallback !== null) {
+        // Eagerly schedule the next animation callback at the beginning of the
+        // frame. If the scheduler queue is not empty at the end of the frame, it
+        // will continue flushing inside that callback. If the queue *is* empty,
+        // then it will exit immediately. Posting the callback at the start of the
+        // frame ensures it's fired within the earliest possible frame. If we
+        // waited until the end of the frame to post the callback, we risk the
+        // browser skipping a frame and not firing the callback until the frame
+        // after that.
+        requestAnimationFrameWithTimeout(animationTick);
+    } else {
+        // No pending work. Exit.
+        isAnimationFrameScheduled = false;
+        return;
+    }
 
-    var animationTick = function (rafTime) {
-        if (scheduledHostCallback !== null) {
-            // Eagerly schedule the next animation callback at the beginning of the
-            // frame. If the scheduler queue is not empty at the end of the frame, it
-            // will continue flushing inside that callback. If the queue *is* empty,
-            // then it will exit immediately. Posting the callback at the start of the
-            // frame ensures it's fired within the earliest possible frame. If we
-            // waited until the end of the frame to post the callback, we risk the
-            // browser skipping a frame and not firing the callback until the frame
-            // after that.
-            requestAnimationFrameWithTimeout(animationTick);
-        } else {
-            // No pending work. Exit.
-            isAnimationFrameScheduled = false;
-            return;
+    var nextFrameTime = rafTime - frameDeadline + activeFrameTime;
+    if (
+        nextFrameTime < activeFrameTime &&
+        previousFrameTime < activeFrameTime
+    ) {
+        if (nextFrameTime < 8) {
+            // Defensive coding. We don't support higher frame rates than 120hz.
+            // If the calculated frame time gets lower than 8, it is probably a bug.
+            nextFrameTime = 8;
         }
+        // If one frame goes long, then the next one can be short to catch up.
+        // If two frames are short in a row, then that's an indication that we
+        // actually have a higher frame rate than what we're currently optimizing.
+        // We adjust our heuristic dynamically accordingly. For example, if we're
+        // running on 120hz display or 90hz VR display.
+        // Take the max of the two in case one of them was an anomaly due to
+        // missed frame deadlines.
+        activeFrameTime =
+            nextFrameTime < previousFrameTime
+                ? previousFrameTime
+                : nextFrameTime;
+    } else {
+        previousFrameTime = nextFrameTime;
+    }
+    frameDeadline = rafTime + activeFrameTime;
+    if (!isMessageEventScheduled) {
+        isMessageEventScheduled = true;
+        port.postMessage(undefined);
+    }
+};
 
-        var nextFrameTime = rafTime - frameDeadline + activeFrameTime;
-        if (nextFrameTime < activeFrameTime && previousFrameTime < activeFrameTime) {
-            if (nextFrameTime < 8) {
-                // Defensive coding. We don't support higher frame rates than 120hz.
-                // If the calculated frame time gets lower than 8, it is probably a bug.
-                nextFrameTime = 8;
-            }
-            // If one frame goes long, then the next one can be short to catch up.
-            // If two frames are short in a row, then that's an indication that we
-            // actually have a higher frame rate than what we're currently optimizing.
-            // We adjust our heuristic dynamically accordingly. For example, if we're
-            // running on 120hz display or 90hz VR display.
-            // Take the max of the two in case one of them was an anomaly due to
-            // missed frame deadlines.
-            activeFrameTime = nextFrameTime < previousFrameTime ? previousFrameTime : nextFrameTime;
-        } else {
-            previousFrameTime = nextFrameTime;
-        }
-        frameDeadline = rafTime + activeFrameTime;
-        if (!isMessageEventScheduled) {
-            isMessageEventScheduled = true;
-            port.postMessage(undefined);
-        }
-    };
+var requestHostCallback = function (callback, absoluteTimeout) {
+    scheduledHostCallback = callback;
+    timeoutTime = absoluteTimeout;
+    if (isFlushingHostCallback || absoluteTimeout < 0) {
+        // Don't wait for the next frame. Continue working ASAP, in a new event.
+        port.postMessage(undefined);
+    } else if (!isAnimationFrameScheduled) {
+        // If rAF didn't already schedule one, we need to schedule a frame.
+        // TODO: If this rAF doesn't materialize because the browser throttles, we
+        // might want to still have setTimeout trigger rIC as a backup to ensure
+        // that we keep performing work.
+        isAnimationFrameScheduled = true;
+        requestAnimationFrameWithTimeout(animationTick);
+    }
+};
 
-    requestHostCallback = function (callback, absoluteTimeout) {
-        scheduledHostCallback = callback;
-        timeoutTime = absoluteTimeout;
-        if (isFlushingHostCallback || absoluteTimeout < 0) {
-            // Don't wait for the next frame. Continue working ASAP, in a new event.
-            port.postMessage(undefined);
-        } else if (!isAnimationFrameScheduled) {
-            // If rAF didn't already schedule one, we need to schedule a frame.
-            // TODO: If this rAF doesn't materialize because the browser throttles, we
-            // might want to still have setTimeout trigger rIC as a backup to ensure
-            // that we keep performing work.
-            isAnimationFrameScheduled = true;
-            requestAnimationFrameWithTimeout(animationTick);
-        }
-    };
-
-    cancelHostCallback = function () {
-        scheduledHostCallback = null;
-        isMessageEventScheduled = false;
-        timeoutTime = -1;
-    };
-}
+var cancelHostCallback = function () {
+    scheduledHostCallback = null;
+    isMessageEventScheduled = false;
+    timeoutTime = -1;
+};
 
 exports.unstable_ImmediatePriority = ImmediatePriority;
 exports.unstable_UserBlockingPriority = UserBlockingPriority;
