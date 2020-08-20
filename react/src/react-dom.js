@@ -23295,6 +23295,8 @@ if (true && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
     };
 }
 
+// 一般来说，如果有个高优先级任务导致当前任务被中断，需要清理当前
+// 任务的堆栈，然后准备开始执行高优先级任务
 function resetStack() {
     if (nextUnitOfWork !== null) {
         var interruptedWork = nextUnitOfWork.return;
@@ -25181,6 +25183,8 @@ function shouldYieldToRenderer() {
     if (didYield) {
         return true;
     }
+    // 猜测： 这里是检测当前帧是否还有剩余时间，如果没有，
+    // shouldYield为true
     if (scheduler.unstable_shouldYield()) {
         didYield = true;
         return true;
@@ -25225,6 +25229,7 @@ function performWork(minExpirationTime, isYieldy) {
         recomputeCurrentRendererTime();
         currentSchedulerTime = currentRendererTime;
 
+        // 性能检测，不看
         if (enableUserTimingAPI) {
             var didExpire = nextFlushedExpirationTime > currentRendererTime;
             var timeout = expirationTimeToMs(nextFlushedExpirationTime);
@@ -25340,56 +25345,37 @@ function performWorkOnRoot(root, expirationTime, isYieldy) {
 
     isRendering = true;
 
-    // Check if this is async work or sync/expired work.
-    if (!isYieldy) {
-        // 同步渲染
-        // Flush work without yielding.
-        // TODO: Non-yieldy work does not necessarily imply expired work. A renderer
-        // may want to perform some work without yielding, but also without
-        // requiring the root to complete (by triggering placeholders).
+    var finishedWork = root.finishedWork;
+    if (finishedWork !== null) {
+        // root 上的工作已经全部完成，可以 commit
+        // This root is already complete. We can commit it.
+        completeRoot(root, finishedWork, expirationTime);
+    } else {
+        // 开始渲染
+        root.finishedWork = null;
+        // If this root previously suspended, clear its existing timeout, since
+        // we're about to try rendering again.
+        var timeoutHandle = root.timeoutHandle;
+        if (timeoutHandle !== noTimeout) {
+            root.timeoutHandle = noTimeout;
+            // $FlowFixMe Complains noTimeout is not a TimeoutID, despite the check above
+            cancelTimeout(timeoutHandle);
+        }
+        renderRoot(root, isYieldy);
+        finishedWork = root.finishedWork;
 
-        var finishedWork = root.finishedWork;
         if (finishedWork !== null) {
-            // root 上的工作已经全部完成，可以 commit
-            // This root is already complete. We can commit it.
-            completeRoot(root, finishedWork, expirationTime);
-        } else {
-            // 开始渲染
-            root.finishedWork = null;
-            // If this root previously suspended, clear its existing timeout, since
-            // we're about to try rendering again.
-            var timeoutHandle = root.timeoutHandle;
-            if (timeoutHandle !== noTimeout) {
-                root.timeoutHandle = noTimeout;
-                // $FlowFixMe Complains noTimeout is not a TimeoutID, despite the check above
-                cancelTimeout(timeoutHandle);
-            }
-            renderRoot(root, isYieldy);
-            finishedWork = root.finishedWork;
-            if (finishedWork !== null) {
+            // Check if this is async work or sync/expired work.
+            if (!isYieldy) {
+                // 同步渲染
+                // Flush work without yielding.
+                // TODO: Non-yieldy work does not necessarily imply expired work. A renderer
+                // may want to perform some work without yielding, but also without
+                // requiring the root to complete (by triggering placeholders).
+
                 // We've completed the root. Commit it.
                 completeRoot(root, finishedWork, expirationTime);
-            }
-        }
-    } else {
-        // Flush async work.
-        var _finishedWork = root.finishedWork;
-        if (_finishedWork !== null) {
-            // This root is already complete. We can commit it.
-            completeRoot(root, _finishedWork, expirationTime);
-        } else {
-            root.finishedWork = null;
-            // If this root previously suspended, clear its existing timeout, since
-            // we're about to try rendering again.
-            var _timeoutHandle = root.timeoutHandle;
-            if (_timeoutHandle !== noTimeout) {
-                root.timeoutHandle = noTimeout;
-                // $FlowFixMe Complains noTimeout is not a TimeoutID, despite the check above
-                cancelTimeout(_timeoutHandle);
-            }
-            renderRoot(root, isYieldy);
-            _finishedWork = root.finishedWork;
-            if (_finishedWork !== null) {
+            } else {
                 // We've completed the root. Check the if we should yield one more time
                 // before committing.
                 if (!shouldYieldToRenderer()) {
