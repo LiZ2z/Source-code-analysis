@@ -11992,9 +11992,8 @@ var MAGIC_NUMBER_OFFSET = maxSigned31BitInt - 1;
 function msToExpirationTime(ms) {
     // Always add an offset so that we don't clash with the magic number for NoWork.
     // 以前react在这里使用加法，16.8.6版本改为了减法
-    // ms 不断增大，返回值不断减小，
-    // 也就是越晚创建的fiber的过期时间越小
-    // TODO: 万一计算结果与 noWork Never 重合了咋办？
+    // ms 不断增大，返回值不断减小
+    // TODO: 万一计算结果 与 noWork Never 重合了咋办？
     return MAGIC_NUMBER_OFFSET - ((ms / UNIT_SIZE) | 0);
 }
 
@@ -12012,6 +12011,8 @@ function ceiling(num, precision) {
     return (((num / precision) | 0) + 1) * precision;
 }
 
+// 给fiber计算过期时间的函数
+// 任务优先级越高，过期时间越大
 function computeExpirationBucket(currentTime, expirationInMs, bucketSizeMs) {
     return (
         MAGIC_NUMBER_OFFSET -
@@ -12274,9 +12275,10 @@ function createWorkInProgress(current, pendingProps, expirationTime) {
 }
 
 function createHostRootFiber(isConcurrent) {
-    //                         1             |  2            0
-    //                        0b0001         |0b0010         0b0000
-    //  1|2 => 3            0b0001 | 0b0010 =>  0b0011
+    // isConcurrent ? (1 | 2) : 0
+    //      (0b0001 | 0b0010)   0b0000
+    //      0b0001 | 0b0010 =>  0b0011
+    //  1|2 => 3
     var mode = isConcurrent ? ConcurrentMode | StrictMode : NoContext;
 
     if (enableProfilerTimer && isDevToolsPresent) {
@@ -12289,6 +12291,7 @@ function createHostRootFiber(isConcurrent) {
         // 0b0100 | 0b0000 => 0b0100  5
         mode |= ProfileMode;
     }
+
     return createFiber(HostRoot, null, null, mode);
 }
 
@@ -23101,7 +23104,7 @@ function unwindInterruptedWork(interruptedWork) {
     }
 }
 
-var ReactCurrentDispatcher =  .ReactCurrentDispatcher;
+var ReactCurrentDispatcher = ReactSharedInternals.ReactCurrentDispatcher;
 var ReactCurrentOwner$2 = ReactSharedInternals.ReactCurrentOwner;
 
 var didWarnAboutStateTransition = undefined;
@@ -24514,8 +24517,11 @@ function computeExpirationForFiber(currentTime, fiber) {
     //              & 0b0001              0b0000
     if ((fiber.mode & ConcurrentMode) === NoContext) {
         // Outside of concurrent mode, updates are always synchronous.
-        // 除了 concurrent mode(0b0001)， 都是同步的
-        expirationTime = Sync; // maxSigned31BitInt
+        // ConcurrentMode: 0b0001 & 0b0001 ===> 0b0001 走else的逻辑
+        // NoContext: 0b0000 & 0b0001 === 0b0000， 同步
+        // StrictMode: 0b0010 & 0b0001 === 0b0000， 同步
+        // ProfileMode: 0b0100 & 0b0001 === 0b0000， 同步
+        expirationTime = Sync;
     } else if (isWorking && !isCommitting) {
         // During render phase, updates expire during as the current render.
         // 在渲染阶段，更新将在当前渲染期间过期
@@ -24772,7 +24778,7 @@ function warnIfNotCurrentlyBatchingInDev(fiber) {
 
 function scheduleWork(fiber, expirationTime) {
     // 更新fiber的过期时间
-    // 从当前要更新的fiber开始，依次向父级遍历，更新 child expired time
+    // 从当前要更新的fiber开始，依次向父级遍历，一直到root，更新 childExpirationTime
     var root = scheduleWorkToRoot(fiber, expirationTime);
 
     if (root === null) {
@@ -24794,7 +24800,8 @@ function scheduleWork(fiber, expirationTime) {
     }
 
     // TODO: 暂时不懂这里
-    // 猜测：这里中断正在执行的任务，清理所有stack
+    // 猜测：这里中断正在执行的任务，清理所有context  stack
+    // context api相关
     if (
         !isWorking &&
         nextRenderExpirationTime !== NoWork &&
@@ -24806,8 +24813,8 @@ function scheduleWork(fiber, expirationTime) {
     }
     // TODO: 暂时不懂这里
     // 大致是更新：
-    // root.expirationTime
-    // root.nextExpirationTimeToWorkOn
+    // root.earliestPendingTime
+    // root.latestPendingTime
     markPendingPriorityLevel(root, expirationTime);
 
     if (
@@ -25015,7 +25022,7 @@ function requestCurrentTime() {
 // 在将来的某个时间点，由渲染器调用renderRoot。
 function requestWork(root, expirationTime) {
     addRootToSchedule(root, expirationTime);
-    
+
     if (isRendering) {
         // Prevent reentrancy. Remaining work will be scheduled at the end of
         // the currently rendering batch.
@@ -25023,6 +25030,7 @@ function requestWork(root, expirationTime) {
         return;
     }
 
+    // TODO: 不懂，推测与用户交互有关
     if (isBatchingUpdates) {
         // Flush work at the end of the batch.
         if (isUnbatchingUpdates) {
@@ -25036,6 +25044,7 @@ function requestWork(root, expirationTime) {
     }
 
     // TODO: Get rid of Sync and use current time?
+    // 默认走这里，至少updateContainer走这里
     if (expirationTime === Sync) {
         performSyncWork();
     } else {
@@ -25591,6 +25600,8 @@ function scheduleRootUpdate(current$$1, element, expirationTime, callback) {
         update.callback = callback;
     }
     flushPassiveEffects();
+
+    // 将更新推入fiber的更新队列中
     enqueueUpdate(current$$1, update);
 
     scheduleWork(current$$1, expirationTime);
