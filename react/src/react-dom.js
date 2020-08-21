@@ -13017,7 +13017,11 @@ function markPendingPriorityLevel(root, expirationTime) {
     // is sufficient to fix the error.
     root.didError = false;
 
-    // Update the latest and earliest pending times
+    // 一个root上会有很多任务需要更新。earliestPendingTime 和 latestPendingTime
+    // 分别记录了root优先级最高的任务的过期时间以及优先级最低任务的过期时间。
+    //
+    // 这里的逻辑就是更新这些时间
+    // 
     var earliestPendingTime = root.earliestPendingTime;
     if (earliestPendingTime === NoWork) {
         // No other pending updates.
@@ -13034,6 +13038,7 @@ function markPendingPriorityLevel(root, expirationTime) {
             }
         }
     }
+
     findNextExpirationTimeToWorkOn(expirationTime, root);
 }
 
@@ -13219,6 +13224,11 @@ function didExpireAtExpirationTime(root, currentTime) {
     }
 }
 // @caller markPendingPriorityLevel
+/**
+ * ！！！ 这是很重要的一步
+ * 
+ * 找到下一步应该执行的任务。
+ * */
 function findNextExpirationTimeToWorkOn(completedExpirationTime, root) {
     var earliestSuspendedTime = root.earliestSuspendedTime;
     var latestSuspendedTime = root.latestSuspendedTime;
@@ -13227,6 +13237,8 @@ function findNextExpirationTimeToWorkOn(completedExpirationTime, root) {
 
     // Work on the earliest pending time. Failing that, work on the latest
     // pinged time.
+    // 优先判断earliestPendingTime，这个是优先级最高的任务，如果没有任务，
+    // 则取latestPingedTime （还不知道这是啥）
     var nextExpirationTimeToWorkOn =
         earliestPendingTime !== NoWork ? earliestPendingTime : latestPingedTime;
 
@@ -13243,6 +13255,7 @@ function findNextExpirationTimeToWorkOn(completedExpirationTime, root) {
         nextExpirationTimeToWorkOn = latestSuspendedTime;
     }
 
+    // TODO: 这里不懂
     var expirationTime = nextExpirationTimeToWorkOn;
     if (expirationTime !== NoWork && earliestSuspendedTime > expirationTime) {
         // Expire using the earliest known expiration time.
@@ -24118,7 +24131,9 @@ function renderRoot(root, isYieldy) {
     !!isWorking
         ? invariant(
               false,
-              'renderRoot was called recursively. This error is likely caused by a bug in React. Please file an issue.'
+              `renderRoot was called recursively. 
+              This error is likely caused by a bug in React. 
+              Please file an issue.`
           )
         : undefined;
 
@@ -24502,7 +24517,7 @@ function computeUniqueAsyncExpiration() {
  * !!! 重要步骤
  * 为fiber任务计算过期时间
  *
- * 过期时间越小，任务越早被处理
+ * 过期时间越大，任务越早被处理
  *
  * @param {*} currentTime
  * @param {*} fiber
@@ -24672,6 +24687,7 @@ function scheduleWorkToRoot(fiber, expirationTime) {
 
     // 更新source fiber上的过期时间
     // Update the source fiber's expiration time
+    // 说明expirationTime越大，任务优先级越高
     if (fiber.expirationTime < expirationTime) {
         fiber.expirationTime = expirationTime;
     }
@@ -24794,20 +24810,20 @@ function scheduleWork(fiber, expirationTime) {
     }
 
     // TODO: 暂时不懂这里
-    // 猜测：这里中断正在执行的任务，清理所有stack
+    // 猜测：这里新的update的优先级更高， 中断正在执行的任务，清理所有stack
     if (
         !isWorking &&
         nextRenderExpirationTime !== NoWork &&
+        // 新的update的优先级更高
         expirationTime > nextRenderExpirationTime
     ) {
         // This is an interruption. (Used for performance tracking.)
         interruptedBy = fiber;
         resetStack();
     }
-    // TODO: 暂时不懂这里
-    // 大致是更新：
-    // root.expirationTime
-    // root.nextExpirationTimeToWorkOn
+
+    // TODO: 这里不清楚
+    // 猜测：更新： root 的状态，找到这个root中优先级最高的任务
     markPendingPriorityLevel(root, expirationTime);
 
     if (
@@ -24986,9 +25002,12 @@ function requestCurrentTime() {
         return currentSchedulerTime;
     }
 
-    // 检查是否有待处理(正在处理的 ？)的工作。
+    // 检查是否有待处理的工作 
     findHighestPriorityRoot();
 
+    // 执行完上面的函数，nextFlushedExpirationTime变量就会被更新 
+    // nextFlushedExpirationTime === NoWork，就说明整个App都没有任务要做了
+    //   nextFlushedExpirationTime === Never，说明任务不重要
     if (
         nextFlushedExpirationTime === NoWork ||
         nextFlushedExpirationTime === Never
@@ -25014,6 +25033,8 @@ function requestCurrentTime() {
 // 只要root收到更新，调度程序就会调用requestWork。
 // 在将来的某个时间点，由渲染器调用renderRoot。
 function requestWork(root, expirationTime) {
+    // 将当前root添加到schedule 链表中，
+    // 只有放进链表中，后面才会真正的被执行
     addRootToSchedule(root, expirationTime);
     
     if (isRendering) {
@@ -25239,8 +25260,10 @@ function performWork(minExpirationTime, isYieldy) {
         }
     } else {
         while (
+            // 一直有任务要做
             nextFlushedRoot !== null &&
             nextFlushedExpirationTime !== NoWork &&
+            // 且未到限制的过期时间
             minExpirationTime <= nextFlushedExpirationTime
         ) {
             performWorkOnRoot(
@@ -25325,7 +25348,10 @@ function performWorkOnRoot(root, expirationTime, isYieldy) {
     !!isRendering
         ? invariant(
               false,
-              'performWorkOnRoot was called recursively. This error is likely caused by a bug in React. Please file an issue.'
+              `
+              performWorkOnRoot was called recursively. 
+              This error is likely caused by a bug in React. Please file an issue.
+              `
           )
         : undefined;
 
