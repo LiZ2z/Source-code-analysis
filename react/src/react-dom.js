@@ -11992,9 +11992,8 @@ var MAGIC_NUMBER_OFFSET = maxSigned31BitInt - 1;
 function msToExpirationTime(ms) {
     // Always add an offset so that we don't clash with the magic number for NoWork.
     // 以前react在这里使用加法，16.8.6版本改为了减法
-    // ms 不断增大，返回值不断减小，
-    // 也就是越晚创建的fiber的过期时间越小
-    // TODO: 万一计算结果与 noWork Never 重合了咋办？
+    // ms 不断增大，返回值不断减小
+    // TODO: 万一计算结果 与 noWork Never 重合了咋办？
     return MAGIC_NUMBER_OFFSET - ((ms / UNIT_SIZE) | 0);
 }
 
@@ -12012,6 +12011,8 @@ function ceiling(num, precision) {
     return (((num / precision) | 0) + 1) * precision;
 }
 
+// 给fiber计算过期时间的函数
+// 任务优先级越高，过期时间越大
 function computeExpirationBucket(currentTime, expirationInMs, bucketSizeMs) {
     return (
         MAGIC_NUMBER_OFFSET -
@@ -12274,9 +12275,10 @@ function createWorkInProgress(current, pendingProps, expirationTime) {
 }
 
 function createHostRootFiber(isConcurrent) {
-    //                         1             |  2            0
-    //                        0b0001         |0b0010         0b0000
-    //  1|2 => 3            0b0001 | 0b0010 =>  0b0011
+    // isConcurrent ? (1 | 2) : 0
+    //      (0b0001 | 0b0010)   0b0000
+    //      0b0001 | 0b0010 =>  0b0011
+    //  1|2 => 3
     var mode = isConcurrent ? ConcurrentMode | StrictMode : NoContext;
 
     if (enableProfilerTimer && isDevToolsPresent) {
@@ -12289,6 +12291,7 @@ function createHostRootFiber(isConcurrent) {
         // 0b0100 | 0b0000 => 0b0100  5
         mode |= ProfileMode;
     }
+
     return createFiber(HostRoot, null, null, mode);
 }
 
@@ -13021,7 +13024,7 @@ function markPendingPriorityLevel(root, expirationTime) {
     // 分别记录了root优先级最高的任务的过期时间以及优先级最低任务的过期时间。
     //
     // 这里的逻辑就是更新这些时间
-    // 
+    //
     var earliestPendingTime = root.earliestPendingTime;
     if (earliestPendingTime === NoWork) {
         // No other pending updates.
@@ -13226,7 +13229,7 @@ function didExpireAtExpirationTime(root, currentTime) {
 // @caller markPendingPriorityLevel
 /**
  * ！！！ 这是很重要的一步
- * 
+ *
  * 找到下一步应该执行的任务。
  * */
 function findNextExpirationTimeToWorkOn(completedExpirationTime, root) {
@@ -17727,19 +17730,11 @@ var ReactCurrentOwner$3 = ReactSharedInternals.ReactCurrentOwner;
 
 var didReceiveUpdate = false;
 
-var didWarnAboutBadClass = undefined;
-var didWarnAboutContextTypeOnFunctionComponent = undefined;
-var didWarnAboutGetDerivedStateOnFunctionComponent = undefined;
-var didWarnAboutFunctionRefs = undefined;
-var didWarnAboutReassigningProps = undefined;
-
-{
-    didWarnAboutBadClass = {};
-    didWarnAboutContextTypeOnFunctionComponent = {};
-    didWarnAboutGetDerivedStateOnFunctionComponent = {};
-    didWarnAboutFunctionRefs = {};
-    didWarnAboutReassigningProps = false;
-}
+var didWarnAboutBadClass = {};
+var didWarnAboutContextTypeOnFunctionComponent = {};
+var didWarnAboutGetDerivedStateOnFunctionComponent = {};
+var didWarnAboutFunctionRefs = {};
+var didWarnAboutReassigningProps = false;
 
 function reconcileChildren(
     current$$1,
@@ -19482,8 +19477,6 @@ function beginWork(current$$1, workInProgress, renderExpirationTime) {
         if (oldProps !== newProps || hasContextChanged()) {
             // If props or context changed, mark the fiber as having performed work.
             // This may be unset if the props are determined to be equal later (memo).
-            // 如果props或者context改变了，将这个fiber标记为有 （已完成的工作） 待执行的工作
-            // 如果后面 props 确认相等了，这个工作可以取消
             didReceiveUpdate = true;
         } else if (updateExpirationTime < renderExpirationTime) {
             didReceiveUpdate = false;
@@ -23114,7 +23107,7 @@ function unwindInterruptedWork(interruptedWork) {
     }
 }
 
-var ReactCurrentDispatcher =  .ReactCurrentDispatcher;
+var ReactCurrentDispatcher = ReactSharedInternals.ReactCurrentDispatcher;
 var ReactCurrentOwner$2 = ReactSharedInternals.ReactCurrentOwner;
 
 var didWarnAboutStateTransition = undefined;
@@ -23305,6 +23298,8 @@ if (true && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
     };
 }
 
+// 一般来说，如果有个高优先级任务导致当前任务被中断，需要清理当前
+// 任务的堆栈，然后准备开始执行高优先级任务
 function resetStack() {
     if (nextUnitOfWork !== null) {
         var interruptedWork = nextUnitOfWork.return;
@@ -24070,22 +24065,22 @@ function performUnitOfWork(workInProgress) {
     }
 
     var next = undefined;
-    // if (enableProfilerTimer) {
-    if (workInProgress.mode & ProfileMode) {
-        startProfilerTimer(workInProgress);
-    }
+    if (enableProfilerTimer) {
+        if (workInProgress.mode & ProfileMode) {
+            startProfilerTimer(workInProgress);
+        }
 
-    next = beginWork(current$$1, workInProgress, nextRenderExpirationTime);
-    workInProgress.memoizedProps = workInProgress.pendingProps;
+        next = beginWork(current$$1, workInProgress, nextRenderExpirationTime);
+        workInProgress.memoizedProps = workInProgress.pendingProps;
 
-    if (workInProgress.mode & ProfileMode) {
-        // Record the render duration assuming we didn't bailout (or error).
-        stopProfilerTimerIfRunningAndRecordDelta(workInProgress, true);
+        if (workInProgress.mode & ProfileMode) {
+            // Record the render duration assuming we didn't bailout (or error).
+            stopProfilerTimerIfRunningAndRecordDelta(workInProgress, true);
+        }
+    } else {
+        next = beginWork(current$$1, workInProgress, nextRenderExpirationTime);
+        workInProgress.memoizedProps = workInProgress.pendingProps;
     }
-    // } else {
-    //     next = beginWork(current$$1, workInProgress, nextRenderExpirationTime);
-    //     workInProgress.memoizedProps = workInProgress.pendingProps;
-    // }
 
     resetCurrentFiber();
     if (isReplayingFailedUnitOfWork) {
@@ -24153,6 +24148,7 @@ function renderRoot(root, isYieldy) {
         root !== nextRoot ||
         nextUnitOfWork === null
     ) {
+        // 从一个新的堆栈开始，清空之前的堆栈
         // Reset the stack and start working from the root.
         resetStack();
         nextRoot = root;
@@ -24529,8 +24525,11 @@ function computeExpirationForFiber(currentTime, fiber) {
     //              & 0b0001              0b0000
     if ((fiber.mode & ConcurrentMode) === NoContext) {
         // Outside of concurrent mode, updates are always synchronous.
-        // 除了 concurrent mode(0b0001)， 都是同步的
-        expirationTime = Sync; // maxSigned31BitInt
+        // ConcurrentMode: 0b0001 & 0b0001 ===> 0b0001 走else的逻辑
+        // NoContext: 0b0000 & 0b0001 === 0b0000， 同步
+        // StrictMode: 0b0010 & 0b0001 === 0b0000， 同步
+        // ProfileMode: 0b0100 & 0b0001 === 0b0000， 同步
+        expirationTime = Sync;
     } else if (isWorking && !isCommitting) {
         // During render phase, updates expire during as the current render.
         // 在渲染阶段，更新将在当前渲染期间过期
@@ -24788,7 +24787,7 @@ function warnIfNotCurrentlyBatchingInDev(fiber) {
 
 function scheduleWork(fiber, expirationTime) {
     // 更新fiber的过期时间
-    // 从当前要更新的fiber开始，依次向父级遍历，更新 child expired time
+    // 从当前要更新的fiber开始，依次向父级遍历，一直到root，更新 childExpirationTime
     var root = scheduleWorkToRoot(fiber, expirationTime);
 
     if (root === null) {
@@ -25002,10 +25001,10 @@ function requestCurrentTime() {
         return currentSchedulerTime;
     }
 
-    // 检查是否有待处理的工作 
+    // 检查是否有待处理的工作
     findHighestPriorityRoot();
 
-    // 执行完上面的函数，nextFlushedExpirationTime变量就会被更新 
+    // 执行完上面的函数，nextFlushedExpirationTime变量就会被更新
     // nextFlushedExpirationTime === NoWork，就说明整个App都没有任务要做了
     //   nextFlushedExpirationTime === Never，说明任务不重要
     if (
@@ -25036,7 +25035,7 @@ function requestWork(root, expirationTime) {
     // 将当前root添加到schedule 链表中，
     // 只有放进链表中，后面才会真正的被执行
     addRootToSchedule(root, expirationTime);
-    
+
     if (isRendering) {
         // Prevent reentrancy. Remaining work will be scheduled at the end of
         // the currently rendering batch.
@@ -25044,6 +25043,7 @@ function requestWork(root, expirationTime) {
         return;
     }
 
+    // TODO: 不懂，推测与用户交互有关
     if (isBatchingUpdates) {
         // Flush work at the end of the batch.
         if (isUnbatchingUpdates) {
@@ -25057,6 +25057,7 @@ function requestWork(root, expirationTime) {
     }
 
     // TODO: Get rid of Sync and use current time?
+    // 默认走这里，至少updateContainer走这里
     if (expirationTime === Sync) {
         performSyncWork();
     } else {
@@ -25193,6 +25194,8 @@ function shouldYieldToRenderer() {
     if (didYield) {
         return true;
     }
+    // 猜测： 这里是检测当前帧是否还有剩余时间，如果没有，
+    // shouldYield为true
     if (scheduler.unstable_shouldYield()) {
         didYield = true;
         return true;
@@ -25237,6 +25240,7 @@ function performWork(minExpirationTime, isYieldy) {
         recomputeCurrentRendererTime();
         currentSchedulerTime = currentRendererTime;
 
+        // 性能检测，不看
         if (enableUserTimingAPI) {
             var didExpire = nextFlushedExpirationTime > currentRendererTime;
             var timeout = expirationTimeToMs(nextFlushedExpirationTime);
@@ -25357,56 +25361,37 @@ function performWorkOnRoot(root, expirationTime, isYieldy) {
 
     isRendering = true;
 
-    // Check if this is async work or sync/expired work.
-    if (!isYieldy) {
-        // 同步渲染
-        // Flush work without yielding.
-        // TODO: Non-yieldy work does not necessarily imply expired work. A renderer
-        // may want to perform some work without yielding, but also without
-        // requiring the root to complete (by triggering placeholders).
+    var finishedWork = root.finishedWork;
+    if (finishedWork !== null) {
+        // root 上的工作已经全部完成，可以 commit
+        // This root is already complete. We can commit it.
+        completeRoot(root, finishedWork, expirationTime);
+    } else {
+        // 开始渲染
+        root.finishedWork = null;
+        // If this root previously suspended, clear its existing timeout, since
+        // we're about to try rendering again.
+        var timeoutHandle = root.timeoutHandle;
+        if (timeoutHandle !== noTimeout) {
+            root.timeoutHandle = noTimeout;
+            // $FlowFixMe Complains noTimeout is not a TimeoutID, despite the check above
+            cancelTimeout(timeoutHandle);
+        }
+        renderRoot(root, isYieldy);
+        finishedWork = root.finishedWork;
 
-        var finishedWork = root.finishedWork;
         if (finishedWork !== null) {
-            // root 上的工作已经全部完成，可以 commit
-            // This root is already complete. We can commit it.
-            completeRoot(root, finishedWork, expirationTime);
-        } else {
-            // 开始渲染
-            root.finishedWork = null;
-            // If this root previously suspended, clear its existing timeout, since
-            // we're about to try rendering again.
-            var timeoutHandle = root.timeoutHandle;
-            if (timeoutHandle !== noTimeout) {
-                root.timeoutHandle = noTimeout;
-                // $FlowFixMe Complains noTimeout is not a TimeoutID, despite the check above
-                cancelTimeout(timeoutHandle);
-            }
-            renderRoot(root, isYieldy);
-            finishedWork = root.finishedWork;
-            if (finishedWork !== null) {
+            // Check if this is async work or sync/expired work.
+            if (!isYieldy) {
+                // 同步渲染
+                // Flush work without yielding.
+                // TODO: Non-yieldy work does not necessarily imply expired work. A renderer
+                // may want to perform some work without yielding, but also without
+                // requiring the root to complete (by triggering placeholders).
+
                 // We've completed the root. Commit it.
                 completeRoot(root, finishedWork, expirationTime);
-            }
-        }
-    } else {
-        // Flush async work.
-        var _finishedWork = root.finishedWork;
-        if (_finishedWork !== null) {
-            // This root is already complete. We can commit it.
-            completeRoot(root, _finishedWork, expirationTime);
-        } else {
-            root.finishedWork = null;
-            // If this root previously suspended, clear its existing timeout, since
-            // we're about to try rendering again.
-            var _timeoutHandle = root.timeoutHandle;
-            if (_timeoutHandle !== noTimeout) {
-                root.timeoutHandle = noTimeout;
-                // $FlowFixMe Complains noTimeout is not a TimeoutID, despite the check above
-                cancelTimeout(_timeoutHandle);
-            }
-            renderRoot(root, isYieldy);
-            _finishedWork = root.finishedWork;
-            if (_finishedWork !== null) {
+            } else {
                 // We've completed the root. Check the if we should yield one more time
                 // before committing.
                 if (!shouldYieldToRenderer()) {
@@ -25617,6 +25602,8 @@ function scheduleRootUpdate(current$$1, element, expirationTime, callback) {
         update.callback = callback;
     }
     flushPassiveEffects();
+
+    // 将更新推入fiber的更新队列中
     enqueueUpdate(current$$1, update);
 
     scheduleWork(current$$1, expirationTime);
